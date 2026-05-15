@@ -1,8 +1,7 @@
-// v2
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = 'https://qsvrqdnyjywjzxkqwszl.supabase.co'
-const SUPABASE_ANON = 'sb_publishable_wzaKkf02vmfOvqIb3wHgKQ_mZgecfAn'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: {
@@ -86,25 +85,22 @@ export const saveConfigToDB = async (config: Record<string, unknown>) => {
     .eq('id', CONFIG_ID)
 }
 
+// ── Create user helper (via Supabase Admin) ──────────────
 export const createUser = async (
   username: string,
   password: string,
   role: Profile['role'],
   unit_id: Profile['unit_id'],
 ) => {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return { error: { message: 'Tidak ada sesi aktif' } }
-
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
+  // Email synthetic: username@jateamhub.internal
+  const email = `${username}@jateamhub.internal`
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { username, role, unit_id },
     },
-    body: JSON.stringify({ username, password, role, unit_id }),
   })
-
-  const data = await res.json()
-  if (!res.ok) return { error: { message: data.error || 'Gagal membuat user' } }
+  if (error) return { error }
   return { data }
 }
