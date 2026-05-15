@@ -93,7 +93,7 @@ export const createUser = async (
   unit_id: Profile['unit_id'],
 ) => {
   // Email synthetic: username@jateamhub.internal
-  const email = `${username}@jateamhub.internal`
+  const email = `${username}@jateamhub.app`
   const { data, error } = await supabase.auth.signUp({
     email,
     password,

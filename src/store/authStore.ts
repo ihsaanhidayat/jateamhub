@@ -5,21 +5,21 @@ import type { Role, UnitId } from '../types'
 
 interface AuthState {
   // Session
-  profile:     Profile | null
-  loading:     boolean
+  profile: Profile | null
+  loading: boolean
   initialized: boolean
 
   // Actions
-  init:        () => Promise<void>
-  login:       (username: string, password: string) => Promise<string | null>
-  logout:      () => Promise<void>
+  init: () => Promise<void>
+  login: (username: string, password: string) => Promise<string | null>
+  logout: () => Promise<void>
 
   // User management
-  users:          Profile[]
-  loadUsers:      () => Promise<void>
-  addUser:        (username: string, password: string, role: Role, unitId: UnitId, adminKey: string) => Promise<string | null>
-  updateUser:     (userId: string, role: Role, unitId: UnitId, newPassword?: string) => Promise<string | null>
-  removeUser:     (userId: string) => Promise<string | null>
+  users: Profile[]
+  loadUsers: () => Promise<void>
+  addUser: (username: string, password: string, role: Role, unitId: UnitId, adminKey: string) => Promise<string | null>
+  updateUser: (userId: string, role: Role, unitId: UnitId, newPassword?: string) => Promise<string | null>
+  removeUser: (userId: string) => Promise<string | null>
 
   // Toast helper (re-use dari dashboardStore)
   _toast: ((msg: string, type?: 'success' | 'error' | 'warn') => void) | null
@@ -29,11 +29,11 @@ interface AuthState {
 const ADMIN_KEY_DEFAULT = 'jateamhub2024'
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  profile:     null,
-  loading:     false,
+  profile: null,
+  loading: false,
   initialized: false,
-  users:       [],
-  _toast:      null,
+  users: [],
+  _toast: null,
 
   setToastFn: (fn) => set({ _toast: fn }),
 
@@ -61,7 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (username, password) => {
     set({ loading: true })
-    const email = `${username}@jateamhub.internal`
+    const email = `${username}@jateamhub.app`
     const { data, error } = await signIn(email, password)
     if (error) {
       set({ loading: false })
