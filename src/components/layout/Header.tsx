@@ -17,10 +17,10 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenConfig }: P
     searchQuery, setSearch, currentPage, setCurrentPage,
     previewUnit, setPreviewUnit,
   } = useStore()
-  const { profile: session } = useAuthStore()
+  const { profile: session, logout } = useAuthStore()
 
   const isEditable = canEdit(session as any)
-  const emoji    = (session as any)?.avatar_emoji ?? ''
+  const emoji = (session as any)?.avatar_emoji ?? ''
   const subtitle = (config.meta.subtitle || 'Selamat datang')
     .replace('{username}', `${session?.username || ''}${emoji ? ' ' + emoji : ''}`)
 
@@ -64,8 +64,8 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenConfig }: P
           ) : (
             <div className="header-logo-placeholder" title="Klik untuk atur logo" onClick={onOpenConfig} style={{ cursor: 'pointer' }}>
               <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <rect width="28" height="28" rx="6" fill="rgba(0,255,194,0.1)" stroke="rgba(0,255,194,0.3)" strokeWidth="1"/>
-                <path d="M8 14h12M14 8v12" stroke="var(--mint)" strokeWidth="1.8" strokeLinecap="round"/>
+                <rect width="28" height="28" rx="6" fill="rgba(0,255,194,0.1)" stroke="rgba(0,255,194,0.3)" strokeWidth="1" />
+                <path d="M8 14h12M14 8v12" stroke="var(--mint)" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             </div>
           )}
@@ -98,9 +98,31 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenConfig }: P
             <button className={`icon-btn${editMode ? ' active' : ''}`} onClick={toggleEditMode} title="Edit Mode">✏️</button>
           )}
           {/* Options hanya untuk admin, superadmin, unit_admin */}
-        {(session?.role === 'superadmin' || session?.role === 'admin' || (session as any)?.is_unit_admin) && (
-          <button id="options-btn" className={`icon-btn${optionsOpen ? ' active' : ''}`} onClick={onToggleOptions} title="Options">⚙️</button>
-        )}
+          {(session?.role === 'superadmin' || session?.role === 'admin' || (session as any)?.is_unit_admin) && (
+            <button id="options-btn" className={`icon-btn${optionsOpen ? ' active' : ''}`} onClick={onToggleOptions} title="Options">⚙️</button>
+          )}
+          {/* Logout untuk user biasa — admin logout via options panel */}
+          {session?.role === 'user' && !(session as any)?.is_unit_admin && (
+            <button
+              onClick={() => logout()}
+              title="Logout"
+              style={{
+                background: 'var(--bg3)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)', color: 'var(--silver3)',
+                width: 32, height: 32, display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: 14, cursor: 'pointer',
+                transition: 'all .15s',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--red)'
+                  ; (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)'
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'
+                  ; (e.currentTarget as HTMLButtonElement).style.color = 'var(--silver3)'
+              }}
+            >⏻</button>
+          )}
         </div>
       </header>
 
