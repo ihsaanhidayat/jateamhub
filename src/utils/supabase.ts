@@ -1,22 +1,22 @@
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL as string
-const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+const SUPABASE_URL = 'https://qsvrqdnyjywjzxkqwszl.supabase.co'
+const SUPABASE_ANON = 'sb_publishable_wzaKkf02vmfOvqIb3wHgKQ_mZgecfAn'
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: {
-    persistSession:    true,
-    autoRefreshToken:  true,
+    persistSession: true,
+    autoRefreshToken: true,
     detectSessionInUrl: false,
   },
 })
 
 // ── Types ────────────────────────────────────────────────
 export interface Profile {
-  id:         string
-  username:   string
-  role:       'superadmin' | 'admin' | 'user'
-  unit_id:    '' | 'pro' | 'cro' | 'klaim'
+  id: string
+  username: string
+  role: 'superadmin' | 'admin' | 'user'
+  unit_id: '' | 'pro' | 'cro' | 'klaim'
   created_at: string
 }
 
