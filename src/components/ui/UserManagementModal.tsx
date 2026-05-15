@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore'
 import { useStore } from '../../store/dashboardStore'
 import { ROLE_LABELS, ROLE_BADGE_COLOR, ROLE_DESC, UNIT_LABELS, UNIT_BADGE_COLOR, UNIT_OPTIONS } from '../../utils/roles'
 import type { Role, UnitId } from '../../types'
-import type { Profile } from '../../utils/supabase'
+import type { Profile } from '../../utils/supabaseClient'
 
 interface Props { open: boolean; onClose: () => void }
 type View = 'list' | 'add' | 'edit'
@@ -13,21 +13,21 @@ export default function UserManagementModal({ open, onClose }: Props) {
   const { profile: myProfile, users, loadUsers, addUser, updateUser, removeUser } = useAuthStore()
   const { toast, config } = useStore()
 
-  const [view,       setView]       = useState<View>('list')
+  const [view, setView] = useState<View>('list')
   const [editTarget, setEditTarget] = useState<Profile | null>(null)
-  const [loading,    setLoading]    = useState(false)
+  const [loading, setLoading] = useState(false)
 
   // Add
-  const [newUser,   setNewUser]   = useState('')
-  const [newPass,   setNewPass]   = useState('')
-  const [newRole,   setNewRole]   = useState<Role>('user')
+  const [newUser, setNewUser] = useState('')
+  const [newPass, setNewPass] = useState('')
+  const [newRole, setNewRole] = useState<Role>('user')
   const [newUnitId, setNewUnitId] = useState<UnitId>('')
-  const [newKey,    setNewKey]    = useState('')
+  const [newKey, setNewKey] = useState('')
 
   // Edit
-  const [editRole,   setEditRole]   = useState<Role>('user')
+  const [editRole, setEditRole] = useState<Role>('user')
   const [editUnitId, setEditUnitId] = useState<UnitId>('')
-  const [editPass,   setEditPass]   = useState('')
+  const [editPass, setEditPass] = useState('')
 
   const [err, setErr] = useState('')
 
@@ -90,11 +90,11 @@ export default function UserManagementModal({ open, onClose }: Props) {
         view === 'list'
           ? <button className="btn-save" onClick={() => { setView('add'); setErr('') }}>＋ Tambah User</button>
           : <>
-              <button className="btn-cancel" onClick={goList} disabled={loading}>Batal</button>
-              <button className="btn-save" onClick={view === 'add' ? handleAdd : handleSaveEdit} disabled={loading}>
-                {loading ? 'Menyimpan...' : 'Simpan'}
-              </button>
-            </>
+            <button className="btn-cancel" onClick={goList} disabled={loading}>Batal</button>
+            <button className="btn-save" onClick={view === 'add' ? handleAdd : handleSaveEdit} disabled={loading}>
+              {loading ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </>
       }
     >
       {/* LIST */}
@@ -106,9 +106,9 @@ export default function UserManagementModal({ open, onClose }: Props) {
             </div>
           )}
           {users.map(u => {
-            const badge    = getBadge(u)
-            const isMe     = u.id === myProfile?.id
-            const isSA     = u.role === 'superadmin'
+            const badge = getBadge(u)
+            const isMe = u.id === myProfile?.id
+            const isSA = u.role === 'superadmin'
             const adminCant = myProfile?.role === 'admin' && (u.role === 'admin' || u.role === 'superadmin')
             const cantEdit = adminCant
 

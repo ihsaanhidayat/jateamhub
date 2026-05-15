@@ -10,11 +10,11 @@ import {
 } from '../types'
 import { uid } from '../utils/helpers'
 import { sanitizeRole, sanitizePage } from '../utils/security'
-import { loadConfigFromDB, saveConfigToDB } from '../utils/supabase'
+import { loadConfigFromDB, saveConfigToDB } from '../utils/supabaseClient'
 
-const DATA_KEY   = 'jateamhub-data'
-const AUTH_KEY   = 'jateamhub-auth'
-const USERS_KEY  = 'jateamhub-users'
+const DATA_KEY = 'jateamhub-data'
+const AUTH_KEY = 'jateamhub-auth'
+const USERS_KEY = 'jateamhub-users'
 const PRESET_KEY = 'jateamhub-presets'
 const ADMIN_KEY_DEFAULT = 'jateamhub2024'
 const COLLAPSED_H = 1
@@ -23,15 +23,15 @@ const CONFIG_VERSION = '4.0'
 // Migrate section lama ke struktur baru
 const migrateSection = (s: Section): Section => ({
   ...s,
-  subtitle:    s.subtitle    ?? '',
+  subtitle: s.subtitle ?? '',
   sharedRoles: s.sharedRoles ?? [],
-  visibility:  s.visibility  ?? (s.sharedRoles?.length ? 'unit' : 'all'),
+  visibility: s.visibility ?? (s.sharedRoles?.length ? 'unit' : 'all'),
   targetUnits: s.targetUnits ?? (s.sharedRoles ?? []),
-  type:        s.type        ?? 'section',
-  widgetType:  s.widgetType,
-  collapsed:   s.collapsed   ?? false,
-  pageId:      s.pageId      ?? 'beranda',
-  _expandedH:  s._expandedH  ?? (s.collapsed ? SECTION_DEFAULT_H : (s.layout?.h ?? SECTION_DEFAULT_H)),
+  type: s.type ?? 'section',
+  widgetType: s.widgetType,
+  collapsed: s.collapsed ?? false,
+  pageId: s.pageId ?? 'beranda',
+  _expandedH: s._expandedH ?? (s.collapsed ? SECTION_DEFAULT_H : (s.layout?.h ?? SECTION_DEFAULT_H)),
 })
 
 const autoLayout = (sections: Section[]): Section[] => {
@@ -62,12 +62,12 @@ const mkSections = (): Section[] => autoLayout([
     layout: { x: 0, y: 0, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
     pageId: 'beranda', visibility: 'all', targetUnits: [],
     type: 'section', items: [
-      { id: 'i1', title: 'Email Korporat',  url: 'https://mail.google.com',     desc: 'Gmail perusahaan', icon: '', tags: ['email'], newTab: true },
-      { id: 'i2', title: 'Jateam Jira',     url: 'https://jira.atlassian.com',  desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i3', title: 'Kalender',         url: 'https://calendar.google.com', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i4', title: 'JIRA',             url: 'https://jira.atlassian.com',  desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i5', title: 'APPS',             url: 'https://workspace.google.com', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i6', title: 'Office 365',       url: 'https://office.com',          desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i1', title: 'Email Korporat', url: 'https://mail.google.com', desc: 'Gmail perusahaan', icon: '', tags: ['email'], newTab: true },
+      { id: 'i2', title: 'Jateam Jira', url: 'https://jira.atlassian.com', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i3', title: 'Kalender', url: 'https://calendar.google.com', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i4', title: 'JIRA', url: 'https://jira.atlassian.com', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i5', title: 'APPS', url: 'https://workspace.google.com', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i6', title: 'Office 365', url: 'https://office.com', desc: '', icon: '', tags: [], newTab: true },
     ],
   },
   {
@@ -76,11 +76,11 @@ const mkSections = (): Section[] => autoLayout([
     layout: { x: 4, y: 0, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
     pageId: 'beranda', visibility: 'admin', targetUnits: [],
     type: 'section', items: [
-      { id: 'i7',  title: 'PAM',            url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i8',  title: 'Usma',           url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i9',  title: 'Usma 2',         url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i10', title: 'Usma 3',         url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i11', title: 'Gemini',         url: 'https://gemini.google.com', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i7', title: 'PAM', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i8', title: 'Usma', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i9', title: 'Usma 2', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i10', title: 'Usma 3', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i11', title: 'Gemini', url: 'https://gemini.google.com', desc: '', icon: '', tags: [], newTab: true },
       { id: 'i12', title: 'Edit Dashboard', url: '#', desc: '', icon: '', tags: [], newTab: true },
     ],
   },
@@ -90,13 +90,13 @@ const mkSections = (): Section[] => autoLayout([
     layout: { x: 8, y: 0, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
     pageId: 'beranda', visibility: 'admin', targetUnits: [],
     type: 'section', items: [
-      { id: 'i13', title: 'RJTP',            url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i14', title: 'COB',             url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i15', title: 'PKS',             url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i16', title: 'Less Config',     url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i17', title: 'UR',              url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i13', title: 'RJTP', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i14', title: 'COB', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i15', title: 'PKS', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i16', title: 'Less Config', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i17', title: 'UR', url: '#', desc: '', icon: '', tags: [], newTab: true },
       { id: 'i18', title: 'Rekap Efisiensi', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i19', title: 'Big Cases',       url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i19', title: 'Big Cases', url: '#', desc: '', icon: '', tags: [], newTab: true },
     ],
   },
   {
@@ -105,13 +105,13 @@ const mkSections = (): Section[] => autoLayout([
     layout: { x: 0, y: 8, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
     pageId: 'beranda', visibility: 'admin', targetUnits: [],
     type: 'section', items: [
-      { id: 'i20', title: 'COB 2024',   url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i21', title: 'Analisa',    url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i22', title: 'Matrix C',   url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i23', title: 'UC',         url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i24', title: 'Morbrief',   url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i25', title: 'Status K',   url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i26', title: 'Efisiensi',  url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i20', title: 'COB 2024', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i21', title: 'Analisa', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i22', title: 'Matrix C', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i23', title: 'UC', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i24', title: 'Morbrief', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i25', title: 'Status K', url: '#', desc: '', icon: '', tags: [], newTab: true },
+      { id: 'i26', title: 'Efisiensi', url: '#', desc: '', icon: '', tags: [], newTab: true },
     ],
   },
 ])
@@ -123,8 +123,8 @@ const defaultConfig: JateamConfig = {
     adminKey: ADMIN_KEY_DEFAULT, logoUrl: '',
     nav: [
       { label: 'BERANDA', url: '#' }, { label: 'PANDUAN', url: '#' },
-      { label: 'SUPPORT', url: '#' }, { label: 'PRO',     url: '#' },
-      { label: 'CRO',     url: '#' }, { label: 'KLAIM',   url: '#' },
+      { label: 'SUPPORT', url: '#' }, { label: 'PRO', url: '#' },
+      { label: 'CRO', url: '#' }, { label: 'KLAIM', url: '#' },
     ],
   },
   displayOptions: defaultDisplayOptions,
@@ -134,9 +134,9 @@ const defaultConfig: JateamConfig = {
 }
 
 const defaultUsers: UserAccount[] = [
-  { username: 'superadmin', password: 'admin123',  role: 'superadmin', unitId: '' },
-  { username: 'admin',      password: 'admin456',  role: 'admin',      unitId: '' },
-  { username: 'user',       password: 'user123',   role: 'user',       unitId: '' },
+  { username: 'superadmin', password: 'admin123', role: 'superadmin', unitId: '' },
+  { username: 'admin', password: 'admin456', role: 'admin', unitId: '' },
+  { username: 'user', password: 'user123', role: 'user', unitId: '' },
 ]
 
 // ── storage ──────────────────────────────────────────────
@@ -145,18 +145,18 @@ const loadConfig = (): JateamConfig => {
     const d = localStorage.getItem(DATA_KEY)
     if (!d) return structuredClone(defaultConfig)
     const p = JSON.parse(d)
-    const savedMajor   = String(p.version ?? '0').split('.')[0]
+    const savedMajor = String(p.version ?? '0').split('.')[0]
     const currentMajor = CONFIG_VERSION.split('.')[0]
     if (savedMajor !== currentMajor) {
       console.info('[JateamHub] Config version mismatch, resetting.')
       localStorage.removeItem(DATA_KEY)
       return structuredClone(defaultConfig)
     }
-    p.sections       = autoLayout(p.sections || [])
+    p.sections = autoLayout(p.sections || [])
     p.displayOptions = { ...defaultDisplayOptions, ...(p.displayOptions ?? {}) }
-    p.appearance     = { ...DEFAULT_APPEARANCE,    ...(p.appearance    ?? {}) }
-    p.meta           = { ...defaultConfig.meta,    ...(p.meta          ?? {}) }
-    p.pages          = (Array.isArray(p.pages) && p.pages.length > 0) ? p.pages : [...DEFAULT_PAGES]
+    p.appearance = { ...DEFAULT_APPEARANCE, ...(p.appearance ?? {}) }
+    p.meta = { ...defaultConfig.meta, ...(p.meta ?? {}) }
+    p.pages = (Array.isArray(p.pages) && p.pages.length > 0) ? p.pages : [...DEFAULT_PAGES]
     return p
   } catch (e) {
     console.error('[JateamHub] Config load failed, resetting.', e)
@@ -177,8 +177,8 @@ const loadUsers = (): UserAccount[] => {
     const users: UserAccount[] = JSON.parse(u)
     // Migrate: role lama pro/cro/klaim → user + unitId
     return users.map(u => {
-      if (u.role === ('pro' as string))   return { ...u, role: 'user' as Role, unitId: 'pro'   as UnitId }
-      if (u.role === ('cro' as string))   return { ...u, role: 'user' as Role, unitId: 'cro'   as UnitId }
+      if (u.role === ('pro' as string)) return { ...u, role: 'user' as Role, unitId: 'pro' as UnitId }
+      if (u.role === ('cro' as string)) return { ...u, role: 'user' as Role, unitId: 'cro' as UnitId }
       if (u.role === ('klaim' as string)) return { ...u, role: 'user' as Role, unitId: 'klaim' as UnitId }
       if (u.username === 'admin' && u.role === ('admin' as string) && !u.unitId) return u
       return { ...u, unitId: u.unitId ?? '' }
@@ -189,7 +189,7 @@ const loadUsers = (): UserAccount[] => {
   }
 }
 
-const saveUsers   = (u: UserAccount[]) => localStorage.setItem(USERS_KEY, JSON.stringify(u))
+const saveUsers = (u: UserAccount[]) => localStorage.setItem(USERS_KEY, JSON.stringify(u))
 const loadPresets = (): Preset[] => { try { const p = localStorage.getItem(PRESET_KEY); return p ? JSON.parse(p) : [] } catch { return [] } }
 const savePresets = (p: Preset[]) => localStorage.setItem(PRESET_KEY, JSON.stringify(p))
 
@@ -198,7 +198,7 @@ const loadSession = (): UserSession | null => {
     const s = localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY)
     if (!s) return null
     const sess = JSON.parse(s)
-    sess.role   = sanitizeRole(sess.role) as Role
+    sess.role = sanitizeRole(sess.role) as Role
     sess.unitId = sess.unitId ?? ''
     return sess
   } catch { return null }
@@ -208,31 +208,31 @@ const loadSession = (): UserSession | null => {
 interface DashboardStore {
   session: UserSession | null
   initSession: () => void
-  login:    (u: string, p: string, r: UserSession['remember']) => string | null
+  login: (u: string, p: string, r: UserSession['remember']) => string | null
   register: (u: string, p: string, role: Role, unitId: UnitId, key: string) => string | null
-  logout:   () => void
-  getUsers:           () => UserAccount[]
-  updateUser:         (username: string, role: Role, unitId: UnitId, newPassword?: string) => string | null
-  deleteUser:         (username: string) => string | null
+  logout: () => void
+  getUsers: () => UserAccount[]
+  updateUser: (username: string, role: Role, unitId: UnitId, newPassword?: string) => string | null
+  deleteUser: (username: string) => string | null
 
   config: JateamConfig
-  setConfig:   (cfg: JateamConfig) => void
+  setConfig: (cfg: JateamConfig) => void
   resetConfig: () => void
   loadRemoteConfig: () => Promise<void>
   syncConfig: (cfg: JateamConfig) => void
 
-  addSection:          (title: string, icon: string, subtitle: string, accentColor?: string, visibility?: string, targetUnits?: string[], pageId?: string, type?: string, widgetType?: string) => void
-  updateSection:       (id: string, title: string, icon: string, subtitle: string, width: number, accentColor?: string, pageId?: string, visibility?: string, targetUnits?: string[]) => void
-  deleteSection:       (id: string) => void
-  toggleCollapse:      (id: string) => void
+  addSection: (title: string, icon: string, subtitle: string, accentColor?: string, visibility?: string, targetUnits?: string[], pageId?: string, type?: string, widgetType?: string) => void
+  updateSection: (id: string, title: string, icon: string, subtitle: string, width: number, accentColor?: string, pageId?: string, visibility?: string, targetUnits?: string[]) => void
+  deleteSection: (id: string) => void
+  toggleCollapse: (id: string) => void
   updateSectionLayout: (id: string, layout: SectionLayout) => void
-  batchUpdateLayouts:  (layouts: Array<{ id: string; layout: SectionLayout }>) => void
-  resetLayout:         () => void
+  batchUpdateLayouts: (layouts: Array<{ id: string; layout: SectionLayout }>) => void
+  resetLayout: () => void
 
-  addItem:    (sectionId: string, data: Omit<LinkItem, 'id'>) => void
+  addItem: (sectionId: string, data: Omit<LinkItem, 'id'>) => void
   updateItem: (sectionId: string, itemId: string, data: Omit<LinkItem, 'id'>) => void
   deleteItem: (sectionId: string, itemId: string) => void
-  moveItem:   (srcSectionId: string, itemId: string, tgtSectionId: string, tgtItemId?: string) => void
+  moveItem: (srcSectionId: string, itemId: string, tgtSectionId: string, tgtItemId?: string) => void
 
   editMode: boolean
   toggleEditMode: () => void
@@ -245,24 +245,24 @@ interface DashboardStore {
   setPreviewUnit: (unit: string | null) => void
   // Undo / Redo
   history: JateamConfig[]
-  future:  JateamConfig[]
+  future: JateamConfig[]
   undo: () => void
   redo: () => void
   canUndo: boolean
   canRedo: boolean
 
-  displayOptions:    DisplayOptions
+  displayOptions: DisplayOptions
   setDisplayOptions: (o: Partial<DisplayOptions>) => void
-  appearance:        AppearanceSettings
-  setAppearance:     (o: Partial<AppearanceSettings>) => void
+  appearance: AppearanceSettings
+  setAppearance: (o: Partial<AppearanceSettings>) => void
 
-  presets:       Preset[]
-  savePreset:    (name: string) => void
-  applyPreset:   (id: string) => void
-  deletePreset:  (id: string) => void
+  presets: Preset[]
+  savePreset: (name: string) => void
+  applyPreset: (id: string) => void
+  deletePreset: (id: string) => void
 
   toasts: { id: string; msg: string; type: 'success' | 'error' | 'warn' }[]
-  toast:       (msg: string, type?: 'success' | 'error' | 'warn') => void
+  toast: (msg: string, type?: 'success' | 'error' | 'warn') => void
   removeToast: (id: string) => void
 }
 
@@ -294,10 +294,10 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   register: (username, password, role, unitId, key) => {
     const adminKey = get().config.meta.adminKey || ADMIN_KEY_DEFAULT
-    const session  = get().session
+    const session = get().session
     if (!username || !password) return 'Username dan password wajib diisi.'
-    if (password.length < 6)    return 'Password minimal 6 karakter.'
-    if (role === 'superadmin')  return 'Role superadmin tidak bisa didaftarkan.'
+    if (password.length < 6) return 'Password minimal 6 karakter.'
+    if (role === 'superadmin') return 'Role superadmin tidak bisa didaftarkan.'
     if (role === 'admin') {
       if (session?.role !== 'superadmin') return 'Hanya superadmin yang bisa membuat admin.'
       if (key !== adminKey) return 'Admin key salah.'
@@ -327,7 +327,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
     const target = users.find(u => u.username === username)
     if (!target) return 'User tidak ditemukan.'
     if (target.role === 'superadmin' && session?.role !== 'superadmin') return 'Tidak bisa ubah superadmin.'
-    target.role   = role
+    target.role = role
     target.unitId = unitId
     if (newPassword && newPassword.length >= 6) target.password = newPassword
     else if (newPassword && newPassword.length > 0) return 'Password minimal 6 karakter.'
@@ -348,10 +348,10 @@ export const useStore = create<DashboardStore>((set, get) => ({
   // ── config ───────────────────────────────────────────────
   config: loadConfig(),
   setConfig: (cfg) => {
-    cfg.appearance     = { ...DEFAULT_APPEARANCE, ...(cfg.appearance   ?? {}) }
-    cfg.sections       = autoLayout(cfg.sections || [])
+    cfg.appearance = { ...DEFAULT_APPEARANCE, ...(cfg.appearance ?? {}) }
+    cfg.sections = autoLayout(cfg.sections || [])
     cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
-    cfg.pages          = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
+    cfg.pages = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
     persist(cfg)
     saveConfigToDB(cfg as unknown as Record<string, unknown>)
     set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions })
@@ -369,10 +369,10 @@ export const useStore = create<DashboardStore>((set, get) => ({
       const remote = await loadConfigFromDB()
       if (!remote || !Array.isArray((remote as any).sections)) return
       const cfg = remote as unknown as JateamConfig
-      cfg.appearance     = { ...DEFAULT_APPEARANCE, ...(cfg.appearance   ?? {}) }
-      cfg.sections       = autoLayout(cfg.sections || [])
+      cfg.appearance = { ...DEFAULT_APPEARANCE, ...(cfg.appearance ?? {}) }
+      cfg.sections = autoLayout(cfg.sections || [])
       cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
-      cfg.pages          = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
+      cfg.pages = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
       persist(cfg)
       set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions })
     } catch (e) {
@@ -389,10 +389,10 @@ export const useStore = create<DashboardStore>((set, get) => ({
   // ── sections ─────────────────────────────────────────────
   addSection: (title, icon, subtitle, accentColor, visibility = 'all', targetUnits = [], pageId, type = 'section', widgetType) => {
     pushHistory(get, set)
-    const cfg    = structuredClone(get().config)
-    const maxY   = cfg.sections.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
+    const cfg = structuredClone(get().config)
+    const maxY = cfg.sections.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
     const lastRowSections = cfg.sections.filter(s => s.layout.y + s.layout.h === maxY)
-    const lastX  = lastRowSections.length > 0
+    const lastX = lastRowSections.length > 0
       ? Math.max(...lastRowSections.map(s => s.layout.x + s.layout.w)) % 12
       : 0
     const resolvedPageId = pageId ?? get().currentPage
@@ -414,8 +414,8 @@ export const useStore = create<DashboardStore>((set, get) => ({
     if (s) {
       s.title = title; s.subtitle = subtitle; s.icon = icon; s.width = width
       s.accentColor = accentColor
-      if (pageId)      s.pageId      = pageId
-      if (visibility)  s.visibility  = visibility as 'all' | 'admin' | 'unit'
+      if (pageId) s.pageId = pageId
+      if (visibility) s.visibility = visibility as 'all' | 'admin' | 'unit'
       if (targetUnits) s.targetUnits = targetUnits
     }
     persist(cfg); set({ config: cfg })
@@ -511,7 +511,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   // ── ui ───────────────────────────────────────────────────
   history: [],
-  future:  [],
+  future: [],
   canUndo: false,
   canRedo: false,
 
@@ -520,7 +520,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
     if (!history.length) return
     const prev = history[history.length - 1]
     const newHistory = history.slice(0, -1)
-    const newFuture  = [structuredClone(config), ...future].slice(0, MAX_HISTORY)
+    const newFuture = [structuredClone(config), ...future].slice(0, MAX_HISTORY)
     persist(prev)
     set({ config: prev, history: newHistory, future: newFuture, canUndo: newHistory.length > 0, canRedo: true })
   },
@@ -529,7 +529,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
     const { future, config, history } = get()
     if (!future.length) return
     const next = future[0]
-    const newFuture  = future.slice(1)
+    const newFuture = future.slice(1)
     const newHistory = [...history, structuredClone(config)].slice(-MAX_HISTORY)
     persist(next)
     set({ config: next, history: newHistory, future: newFuture, canUndo: true, canRedo: newFuture.length > 0 })
@@ -547,7 +547,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   displayOptions: loadConfig().displayOptions,
   setDisplayOptions: (o) => {
     const next = { ...get().displayOptions, ...o }
-    const cfg  = structuredClone(get().config)
+    const cfg = structuredClone(get().config)
     cfg.displayOptions = next
     persist(cfg); set({ displayOptions: next, config: cfg })
   },
@@ -565,7 +565,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
     const presets = [...get().presets, { id: uid(), name, ts: Date.now() }]
     savePresets(presets); set({ presets })
   },
-  applyPreset: (_id) => {},
+  applyPreset: (_id) => { },
   deletePreset: (id) => {
     const presets = get().presets.filter(x => x.id !== id)
     savePresets(presets); set({ presets })

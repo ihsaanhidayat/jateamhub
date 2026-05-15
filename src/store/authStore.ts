@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { supabase, getProfile, signIn, signOut, createUser, getAllProfiles, updateProfile } from '../utils/supabase'
-import type { Profile } from '../utils/supabase'
+import { supabase, getProfile, signIn, signOut, createUser, getAllProfiles, updateProfile } from '../utils/supabaseClient'
+import type { Profile } from '../utils/supabaseClient'
 import type { Role, UnitId } from '../types'
 
 interface AuthState {
