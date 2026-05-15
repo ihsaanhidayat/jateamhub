@@ -63,6 +63,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (data.user) {
       const profile = await getProfile(data.user.id)
       set({ profile, loading: false })
+      // Reset semua UI state — sesi baru bersih
+      window.location.reload()
     }
     return null
   },
