@@ -9,26 +9,26 @@ type View = 'list' | 'add' | 'edit'
 
 export default function UserManagementModal({ open, onClose }: Props) {
   const { session, getUsers, register, updateUser, deleteUser, toast, config } = useStore()
-  const [users,      setUsers]      = useState<UserAccount[]>([])
-  const [view,       setView]       = useState<View>('list')
+  const [users, setUsers] = useState<UserAccount[]>([])
+  const [view, setView] = useState<View>('list')
   const [editTarget, setEditTarget] = useState<UserAccount | null>(null)
 
   // Add
-  const [newUser,   setNewUser]   = useState('')
-  const [newPass,   setNewPass]   = useState('')
-  const [newRole,   setNewRole]   = useState<Role>('user')
+  const [newUser, setNewUser] = useState('')
+  const [newPass, setNewPass] = useState('')
+  const [newRole, setNewRole] = useState<Role>('user')
   const [newUnitId, setNewUnitId] = useState<UnitId>('')
-  const [newKey,    setNewKey]    = useState('')
+  const [newKey, setNewKey] = useState('')
 
   // Edit
-  const [editRole,   setEditRole]   = useState<Role>('user')
+  const [editRole, setEditRole] = useState<Role>('user')
   const [editUnitId, setEditUnitId] = useState<UnitId>('')
-  const [editPass,   setEditPass]   = useState('')
+  const [editPass, setEditPass] = useState('')
 
   const [err, setErr] = useState('')
 
   const isSuperAdmin = session?.role === 'superadmin'
-  const adminKey     = config.meta.adminKey || 'jateamhub2024'
+  const adminKey = config.meta.adminKey || 'jateamhub2024'
 
   useEffect(() => {
     if (open) { setUsers(getUsers()); setView('list'); setErr('') }
@@ -88,11 +88,11 @@ export default function UserManagementModal({ open, onClose }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 11, color: 'var(--silver3)', marginBottom: 4 }}>{users.length} user terdaftar</div>
           {users.map(u => {
-            const badge     = getRoleBadge(u)
-            const isMe      = u.username === session?.username
-            const isSA      = u.role === 'superadmin'
+            const badge = getRoleBadge(u)
+            const isMe = u.username === session?.username
+            const isSA = u.role === 'superadmin'
             const adminCant = session?.role === 'admin' && (u.role === 'admin' || u.role === 'superadmin')
-            const cantEdit  = isMe || adminCant
+            const cantEdit = isMe || adminCant
             return (
               <div key={u.username} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
@@ -105,7 +105,7 @@ export default function UserManagementModal({ open, onClose }: Props) {
                   {u.username}{isMe && <span style={{ fontSize: 10, color: 'var(--silver3)', marginLeft: 6 }}>(kamu)</span>}
                 </span>
                 {!isSA && (
-                  <button onClick={() => openEdit(u)} disabled={cantEdit}
+                  <button onClick={() => openEdit(u)} disabled={cantEdit && !isMe}
                     style={{ background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)', color: 'var(--silver3)', padding: '4px 10px', fontSize: 11, cursor: cantEdit ? 'not-allowed' : 'pointer', opacity: cantEdit ? .4 : 1 }}
                     onMouseEnter={e => { if (!cantEdit) (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--mint)' }}
                     onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border2)' }}>Edit</button>
