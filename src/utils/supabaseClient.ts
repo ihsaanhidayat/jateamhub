@@ -20,6 +20,7 @@ export interface Profile {
   unit_id:       '' | 'pro' | 'cro' | 'klaim'
   avatar_emoji:  string
   is_unit_admin: boolean
+  appearance:    Record<string, unknown>
   created_at:    string
 }
 
@@ -53,7 +54,7 @@ export const getAllProfiles = async (): Promise<Profile[]> => {
 
 export const updateProfile = async (
   userId: string,
-  updates: Partial<Pick<Profile, 'role' | 'unit_id' | 'username' | 'avatar_emoji' | 'is_unit_admin'>>
+  updates: Partial<Pick<Profile, 'role' | 'unit_id' | 'username' | 'avatar_emoji' | 'is_unit_admin' | 'appearance'>>
 ) => supabase.from('profiles').update(updates).eq('id', userId)
 
 // ── Config helpers ───────────────────────────────────────
@@ -74,6 +75,20 @@ export const saveConfigToDB = async (config: Record<string, unknown>) =>
     .from('dashboard_config')
     .update({ config, updated_at: new Date().toISOString() })
     .eq('id', CONFIG_ID)
+
+// ── User appearance ─────────────────────────────────────────
+export const saveUserAppearance = async (userId: string, appearance: Record<string, unknown>) =>
+  supabase.from('profiles').update({ appearance }).eq('id', userId)
+
+export const loadUserAppearance = async (userId: string): Promise<Record<string, unknown> | null> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('appearance')
+    .eq('id', userId)
+    .single()
+  if (error || !data) return null
+  return data.appearance ?? null
+}
 
 // ── Create user via Edge Function ────────────────────────
 export const createUser = async (

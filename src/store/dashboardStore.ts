@@ -10,9 +10,20 @@ import {
 } from '../types'
 import { uid } from '../utils/helpers'
 import { sanitizeRole, sanitizePage } from '../utils/security'
-import { loadConfigFromDB, saveConfigToDB } from '../utils/supabaseClient'
+import { loadConfigFromDB, saveConfigToDB, saveUserAppearance, loadUserAppearance } from '../utils/supabaseClient'
 
 const DATA_KEY = 'jateamhub-data'
+const APPEARANCE_KEY = 'jateamhub-appearance'
+
+// Appearance tersimpan per device — tidak sync ke DB
+const loadLocalAppearance = (): Partial<AppearanceSettings> => {
+  try {
+    const a = localStorage.getItem(APPEARANCE_KEY)
+    return a ? JSON.parse(a) : {}
+  } catch { return {} }
+}
+const saveLocalAppearance = (a: AppearanceSettings) =>
+  localStorage.setItem(APPEARANCE_KEY, JSON.stringify(a))
 const AUTH_KEY = 'jateamhub-auth'
 const USERS_KEY = 'jateamhub-users'
 const PRESET_KEY = 'jateamhub-presets'
@@ -266,6 +277,8 @@ interface DashboardStore {
   // Preview mode — admin bisa preview + edit tampilan unit lain
   previewUnit: string | null
   setPreviewUnit: (unit: string | null) => void
+  currentUserId: string | null
+  setCurrentUserId: (id: string | null) => void
   // Undo / Redo
   history: JateamConfig[]
   future: JateamConfig[]
@@ -397,12 +410,29 @@ export const useStore = create<DashboardStore>((set, get) => ({
       cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
       cfg.pages = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
 
-      // Apply device preset jika belum pernah set preference di device ini
-      if (!hasDevicePref()) {
-        const devicePreset = getDeviceAppearance()
-        if (Object.keys(devicePreset).length > 0) {
-          cfg.appearance = { ...cfg.appearance, ...devicePreset }
-          setDevicePref()
+      // Appearance per user: load dari DB profil user
+      const userId = get().currentUserId
+      if (userId) {
+        const userAppearance = await loadUserAppearance(userId)
+        if (userAppearance && Object.keys(userAppearance).length > 0) {
+          // Pakai appearance yang tersimpan di profil user
+          cfg.appearance = { ...DEFAULT_APPEARANCE, ...cfg.appearance, ...userAppearance }
+          saveLocalAppearance(cfg.appearance)
+        } else {
+          // Belum ada — cek localStorage atau device preset
+          const localAppearance = loadLocalAppearance()
+          if (Object.keys(localAppearance).length > 0) {
+            cfg.appearance = { ...DEFAULT_APPEARANCE, ...cfg.appearance, ...localAppearance }
+          } else if (!hasDevicePref()) {
+            const devicePreset = getDeviceAppearance()
+            if (Object.keys(devicePreset).length > 0) {
+              cfg.appearance = { ...cfg.appearance, ...devicePreset }
+              setDevicePref()
+            }
+          }
+          // Simpan ke profil user di DB
+          if (userId) saveUserAppearance(userId, cfg.appearance as unknown as Record<string, unknown>)
+          saveLocalAppearance(cfg.appearance)
         }
       }
 
@@ -416,7 +446,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   // Sync config ke DB (dipanggil dari setConfig)
   syncConfig: (cfg) => {
     saveConfigToDB(cfg as unknown as Record<string, unknown>)
-      .then((result) => { if (result?.error) console.error('[JateamHub] syncConfig error:', result.error) })
+      .then(({ error }) => { if (error) console.error('[JateamHub] syncConfig error:', error) })
   },
 
   // ── sections ─────────────────────────────────────────────
@@ -437,7 +467,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
       targetUnits, type: type as 'section' | 'widget', widgetType: widgetType as 'clock' | 'notes' | undefined,
       items: [],
     })
-    persist(cfg); set({ config: cfg })
+    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
   },
 
   updateSection: (id, title, icon, subtitle, width, accentColor, pageId, visibility, targetUnits) => {
@@ -451,14 +481,14 @@ export const useStore = create<DashboardStore>((set, get) => ({
       if (visibility) s.visibility = visibility as 'all' | 'admin' | 'unit'
       if (targetUnits) s.targetUnits = targetUnits
     }
-    persist(cfg); set({ config: cfg })
+    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
   },
 
   deleteSection: (id) => {
     pushHistory(get, set)
     const cfg = structuredClone(get().config)
     cfg.sections = cfg.sections.filter(s => s.id !== id)
-    persist(cfg); set({ config: cfg })
+    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
   },
 
   toggleCollapse: (id) => {
@@ -480,7 +510,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
     const cfg = structuredClone(get().config)
     const s = cfg.sections.find(s => s.id === id)
     if (s) s.layout = { ...s.layout, ...layout }
-    persist(cfg); set({ config: cfg })
+    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
   },
 
   batchUpdateLayouts: (layouts) => {
@@ -500,7 +530,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
       ...s, collapsed: false, _expandedH: SECTION_DEFAULT_H,
       layout: { x: 0, y: 0, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
     })))
-    persist(cfg); set({ config: cfg })
+    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
   },
 
   // ── items ────────────────────────────────────────────────
@@ -509,7 +539,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
     const cfg = structuredClone(get().config)
     const sec = cfg.sections.find(s => s.id === sectionId)
     if (sec) sec.items.push({ id: 'i' + uid(), ...data })
-    persist(cfg); set({ config: cfg })
+    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
   },
   updateItem: (sectionId, itemId, data) => {
     pushHistory(get, set)
@@ -518,14 +548,14 @@ export const useStore = create<DashboardStore>((set, get) => ({
     if (!sec) return
     const idx = sec.items.findIndex(i => i.id === itemId)
     if (idx >= 0) sec.items[idx] = { id: itemId, ...data }
-    persist(cfg); set({ config: cfg })
+    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
   },
   deleteItem: (sectionId, itemId) => {
     pushHistory(get, set)
     const cfg = structuredClone(get().config)
     const sec = cfg.sections.find(s => s.id === sectionId)
     if (sec) sec.items = sec.items.filter(i => i.id !== itemId)
-    persist(cfg); set({ config: cfg })
+    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
   },
   moveItem: (srcSectionId, itemId, tgtSectionId, tgtItemId) => {
     const cfg = structuredClone(get().config)
@@ -576,20 +606,29 @@ export const useStore = create<DashboardStore>((set, get) => ({
   setCurrentPage: (page) => set({ currentPage: page, searchQuery: '' }),
   previewUnit: null,
   setPreviewUnit: (unit) => set({ previewUnit: unit, editMode: false }),
+  currentUserId: null,
+  setCurrentUserId: (id) => set({ currentUserId: id }),
 
   displayOptions: loadConfig().displayOptions,
   setDisplayOptions: (o) => {
     const next = { ...get().displayOptions, ...o }
     const cfg = structuredClone(get().config)
     cfg.displayOptions = next
-    persist(cfg); set({ displayOptions: next, config: cfg })
+    persist(cfg)
+    set({ displayOptions: next, config: cfg })
   },
   appearance: loadConfig().appearance,
   setAppearance: (o) => {
     const next: AppearanceSettings = { ...get().appearance, ...o }
     const cfg = structuredClone(get().config)
     cfg.appearance = next
-    persist(cfg); set({ appearance: next, config: cfg })
+    // Simpan ke localStorage device
+    saveLocalAppearance(next)
+    persist(cfg)
+    // Sync ke profil user di DB
+    const userId = get().currentUserId
+    if (userId) saveUserAppearance(userId, next as unknown as Record<string, unknown>)
+    set({ appearance: next, config: cfg })
   },
 
   // ── presets ──────────────────────────────────────────────
