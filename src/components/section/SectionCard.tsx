@@ -74,8 +74,35 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        position: 'relative',
       } as React.CSSProperties}
     >
+      {/* Badge visibility — menempel di luar atas section */}
+      {(() => {
+        const vis = section.visibility ?? 'all'
+        if (vis === 'admin' && !isAdmin) return null
+        const badgeMap: Record<string, { label: string; color: string; bg: string; border: string }> = {
+          all:   { label: 'ALL', color: 'var(--mint)', bg: 'rgba(0,255,194,0.12)', border: 'rgba(0,255,194,0.3)' },
+          admin: { label: 'ADM', color: '#00BFFF',    bg: 'rgba(0,191,255,0.12)', border: 'rgba(0,191,255,0.3)' },
+          unit:  {
+            label: (section.targetUnits ?? []).map(u => u.toUpperCase()).join('/') || 'UNIT',
+            color: '#C77DFF', bg: 'rgba(199,125,255,0.12)', border: 'rgba(199,125,255,0.3)',
+          },
+        }
+        const badge = badgeMap[vis]
+        if (!badge) return null
+        return (
+          <span style={{
+            position: 'absolute', top: -10, left: 12, zIndex: 2,
+            fontSize: 8, fontWeight: 700, padding: '2px 7px', borderRadius: 10,
+            background: badge.bg, color: badge.color,
+            border: `1px solid ${badge.border}`,
+            letterSpacing: '.8px', textTransform: 'uppercase',
+            fontFamily: 'var(--mono)', lineHeight: 1.4,
+            pointerEvents: 'none',
+          }}>{badge.label}</span>
+        )
+      })()}
       {/* ── Header ─────────────────────────────────────── */}
       {/* section-header jadi drag handle untuk RGL (via draggableHandle) */}
       <div
@@ -89,22 +116,7 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
         onMouseLeave={() => setHeaderHovered(false)}
       >
         <span className="section-icon" style={{ marginTop: section.subtitle ? 1 : 0 }}>{section.icon || '📁'}</span>
-        {section.visibility === 'all' && (
-          <span style={{
-            fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
-            background: 'rgba(0,255,194,0.12)', color: 'var(--mint)',
-            letterSpacing: '.5px', textTransform: 'uppercase', fontFamily: 'var(--mono)',
-            flexShrink: 0, border: '1px solid rgba(0,255,194,0.2)', alignSelf: 'center',
-          }}>ALL</span>
-        )}
-        {section.visibility === 'admin' && isAdmin && (
-          <span style={{
-            fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
-            background: 'rgba(0,191,255,0.12)', color: '#00BFFF',
-            letterSpacing: '.5px', textTransform: 'uppercase', fontFamily: 'var(--mono)',
-            flexShrink: 0, border: '1px solid rgba(0,191,255,0.2)', alignSelf: 'center',
-          }}>ADM</span>
-        )}
+
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="section-title">{section.title}</div>
           {section.subtitle && (

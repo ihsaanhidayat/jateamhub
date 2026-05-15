@@ -713,6 +713,10 @@ div:hover > .folder-edit-btn { opacity: 1; }
 .rgl-grid {
   width: 100%;
   min-height: 200px;
+  padding-top: 12px;
+}
+.mobile-grid {
+  padding-top: 14px;
 }
 
 /* RGL item wrapper — full height agar section card mengisi */
