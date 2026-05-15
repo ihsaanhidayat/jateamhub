@@ -102,24 +102,21 @@ export default function GridLayout() {
     )
   }, [pageSections, q])
 
+  // Ghost section — ukuran kecil fixed, posisi setelah section terakhir
   const addButtonLayout: Layout = useMemo(() => {
-    if (!pageSections.length) return { i: ADD_KEY, x: 0, y: 0, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H }
+    const GHOST_W = 2
+    const GHOST_H = 4
+    if (!pageSections.length) return { i: ADD_KEY, x: 0, y: 0, w: GHOST_W, h: GHOST_H }
     const maxY = pageSections.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
     const bottomSections = pageSections.filter(s => s.layout.y + s.layout.h === maxY)
     const rightmost = bottomSections.reduce<Section | null>((prev, s) =>
       !prev || (s.layout.x + s.layout.w) > (prev.layout.x + prev.layout.w) ? s : prev, null)
-    const refW = rightmost?.layout.w ?? SECTION_DEFAULT_W
-    const refH = rightmost ? Math.max(rightmost._expandedH ?? rightmost.layout.h, SECTION_MIN_H) : SECTION_DEFAULT_H
     const rightmostX = rightmost ? rightmost.layout.x + rightmost.layout.w : 0
     const refY = rightmost?.layout.y ?? 0
-    if (rightmostX + refW <= 12) return { i: ADD_KEY, x: rightmostX, y: refY, w: refW, h: refH }
-    const firstInBottom = bottomSections.reduce<Section | null>((prev, s) =>
-      !prev || s.layout.x < prev.layout.x ? s : prev, null)
-    return {
-      i: ADD_KEY, x: 0, y: maxY,
-      w: firstInBottom?.layout.w ?? SECTION_DEFAULT_W,
-      h: firstInBottom ? Math.max(firstInBottom._expandedH ?? firstInBottom.layout.h, SECTION_MIN_H) : SECTION_DEFAULT_H,
-    }
+    // Coba taruh di sebelah kanan section terakhir
+    if (rightmostX + GHOST_W <= 12) return { i: ADD_KEY, x: rightmostX, y: refY, w: GHOST_W, h: GHOST_H }
+    // Tidak muat — taruh di baris baru
+    return { i: ADD_KEY, x: 0, y: maxY, w: GHOST_W, h: GHOST_H }
   }, [pageSections])
 
   const canEditAnything = isEditable || isUnitAdmin

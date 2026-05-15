@@ -17,7 +17,7 @@ import 'react-resizable/css/styles.css'
 
 export default function App() {
   const { profile, initialized, init } = useAuthStore()
-  const { editMode, currentPage, loadRemoteConfig, toast, setCurrentUserId } = useStore()
+  const { editMode, currentPage, loadRemoteConfig, toast, setCurrentUserId, isDirty, isSyncing } = useStore()
 
   const [optionsOpen,  setOptionsOpen]  = useState(false)
   const [configOpen,   setConfigOpen]   = useState(false)
@@ -26,6 +26,19 @@ export default function App() {
 
   // Init auth saat app mount
   useEffect(() => { init() }, [])
+
+  // Warn user jika ada perubahan belum tersimpan
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty || isSyncing) {
+        e.preventDefault()
+        e.returnValue = 'Ada perubahan yang belum tersimpan ke database. Yakin mau meninggalkan halaman?'
+        return e.returnValue
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty, isSyncing])
 
   // Load remote config setelah login
   useEffect(() => {

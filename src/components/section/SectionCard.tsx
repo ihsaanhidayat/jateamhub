@@ -21,10 +21,11 @@ const DENSITY: Record<string, { body: string; gap: string; headerPad: string }> 
 }
 
 export default function SectionCard({ section, canEdit: canEditProp, onEditSection, onEditItem, onAddItem }: Props) {
-  const { editMode, searchQuery, moveItem, toggleCollapse, appearance, displayOptions } = useStore()
+  const { editMode, searchQuery, moveItem, toggleCollapse, appearance, displayOptions, deleteSection, toast } = useStore()
   const { profile: session } = useAuthStore()
   const isAdminRole = session?.role === 'admin' || session?.role === 'superadmin'
   const isAdmin = canEditProp !== undefined ? canEditProp : isAdminRole
+  const [headerHovered, setHeaderHovered] = useState(false)
   const accent   = section.accentColor || 'var(--mint)'
   const density  = DENSITY[appearance.sectionDensity] || DENSITY.comfortable
   const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'
@@ -81,11 +82,29 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
         className="section-header"
         style={{
           padding: density.headerPad,
-          cursor: editMode ? 'grab' : 'default',
+          cursor: isAdmin && editMode ? 'grab' : 'default',
           alignItems: section.subtitle ? 'flex-start' : 'center',
         }}
+        onMouseEnter={() => setHeaderHovered(true)}
+        onMouseLeave={() => setHeaderHovered(false)}
       >
         <span className="section-icon" style={{ marginTop: section.subtitle ? 1 : 0 }}>{section.icon || '📁'}</span>
+        {section.visibility === 'all' && (
+          <span style={{
+            fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
+            background: 'rgba(0,255,194,0.12)', color: 'var(--mint)',
+            letterSpacing: '.5px', textTransform: 'uppercase', fontFamily: 'var(--mono)',
+            flexShrink: 0, border: '1px solid rgba(0,255,194,0.2)', alignSelf: 'center',
+          }}>ALL</span>
+        )}
+        {section.visibility === 'admin' && isAdmin && (
+          <span style={{
+            fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
+            background: 'rgba(0,191,255,0.12)', color: '#00BFFF',
+            letterSpacing: '.5px', textTransform: 'uppercase', fontFamily: 'var(--mono)',
+            flexShrink: 0, border: '1px solid rgba(0,191,255,0.2)', alignSelf: 'center',
+          }}>ADM</span>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="section-title">{section.title}</div>
           {section.subtitle && (
@@ -105,38 +124,33 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
-          {/* Badge visibility */}
-          {section.visibility === 'all' && (
-            <span style={{
-              fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 2,
-              border: '1px solid rgba(0,255,194,0.4)', color: 'var(--mint)',
-              background: 'rgba(0,255,194,0.08)', letterSpacing: '.5px',
-              textTransform: 'uppercase', fontFamily: 'var(--mono)', flexShrink: 0,
-            }}>ALL</span>
-          )}
-          {section.visibility === 'admin' && isAdmin && (
-            <span style={{
-              fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 2,
-              border: '1px solid rgba(0,191,255,0.4)', color: '#00BFFF',
-              background: 'rgba(0,191,255,0.08)', letterSpacing: '.5px',
-              textTransform: 'uppercase', fontFamily: 'var(--mono)', flexShrink: 0,
-            }}>ADM</span>
-          )}
-          {isAdmin && editMode && (
-            <>
+          {/* Focus edit mode — tombol muncul saat hover header */}
+          {isAdmin && editMode && headerHovered && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button
-                className="sec-action-btn"
+                className="sec-action-btn-lg"
                 onMouseDown={e => e.stopPropagation()}
                 onClick={e => { e.stopPropagation(); onAddItem(section.id) }}
                 title="Tambah item"
               >＋</button>
               <button
-                className="sec-action-btn"
+                className="sec-action-btn-lg"
                 onMouseDown={e => e.stopPropagation()}
                 onClick={e => { e.stopPropagation(); onEditSection(section) }}
                 title="Edit section"
               >✏️</button>
-            </>
+              <button
+                className="sec-action-btn-lg danger"
+                onMouseDown={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation()
+                  if (!confirm(`Hapus section "${section.title}"?`)) return
+                  deleteSection(section.id)
+                  toast('Section dihapus.', 'success')
+                }}
+                title="Hapus section"
+              >🗑</button>
+            </div>
           )}
           <button
             className={`sec-collapse-btn${section.collapsed ? '' : ' open'}`}

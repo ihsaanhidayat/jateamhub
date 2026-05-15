@@ -1125,3 +1125,36 @@ div:hover > .folder-edit-btn { opacity: 1; }
   .search-input { width: 90px !important; }
   .folder-grid { grid-template-columns: repeat(2, 1fr) !important; }
 }
+
+/* ── Section action buttons (focus edit mode) ─────────── */
+.sec-action-btn-lg {
+  width: 36px; height: 36px;
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--silver2);
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all .15s;
+  flex-shrink: 0;
+}
+.sec-action-btn-lg:hover {
+  border-color: var(--mint);
+  color: var(--mint);
+  background: var(--mint-bg);
+}
+.sec-action-btn-lg.danger:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: rgba(224,85,85,0.08);
+}
+
+/* Toast override — kanan atas */
+.toast-container { display: none; } /* disable old container */
+
+/* Sync status pulse */
+@keyframes pulseMint {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}

@@ -286,6 +286,11 @@ interface DashboardStore {
   redo: () => void
   canUndo: boolean
   canRedo: boolean
+  // Sync status
+  isDirty: boolean
+  isSyncing: boolean
+  syncStatus: 'saved' | 'saving' | 'error' | 'idle'
+  syncToDb: () => Promise<void>
 
   displayOptions: DisplayOptions
   setDisplayOptions: (o: Partial<DisplayOptions>) => void
@@ -389,14 +394,14 @@ export const useStore = create<DashboardStore>((set, get) => ({
     cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
     cfg.pages = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
     persist(cfg)
-    saveConfigToDB(cfg as unknown as Record<string, unknown>)
-    set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions })
+    set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions, isDirty: true })
+    get().syncToDb()
   },
   resetConfig: () => {
     const fresh = structuredClone(defaultConfig)
     persist(fresh)
-    saveConfigToDB(fresh as unknown as Record<string, unknown>)
-    set({ config: fresh, appearance: fresh.appearance, displayOptions: fresh.displayOptions, currentPage: 'beranda', previewUnit: null })
+    set({ config: fresh, appearance: fresh.appearance, displayOptions: fresh.displayOptions, currentPage: 'beranda', previewUnit: null, isDirty: true })
+    get().syncToDb()
   },
 
   // Load config dari Supabase DB — dipanggil saat app init
@@ -467,7 +472,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
       targetUnits, type: type as 'section' | 'widget', widgetType: widgetType as 'clock' | 'notes' | undefined,
       items: [],
     })
-    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
+    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
   },
 
   updateSection: (id, title, icon, subtitle, width, accentColor, pageId, visibility, targetUnits) => {
@@ -481,14 +486,14 @@ export const useStore = create<DashboardStore>((set, get) => ({
       if (visibility) s.visibility = visibility as 'all' | 'admin' | 'unit'
       if (targetUnits) s.targetUnits = targetUnits
     }
-    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
+    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
   },
 
   deleteSection: (id) => {
     pushHistory(get, set)
     const cfg = structuredClone(get().config)
     cfg.sections = cfg.sections.filter(s => s.id !== id)
-    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
+    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
   },
 
   toggleCollapse: (id) => {
@@ -510,7 +515,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
     const cfg = structuredClone(get().config)
     const s = cfg.sections.find(s => s.id === id)
     if (s) s.layout = { ...s.layout, ...layout }
-    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
+    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
   },
 
   batchUpdateLayouts: (layouts) => {
@@ -520,8 +525,8 @@ export const useStore = create<DashboardStore>((set, get) => ({
       if (s && !s.collapsed) { s.layout = { ...s.layout, ...layout }; s._expandedH = layout.h }
     })
     persist(cfg)
-    saveConfigToDB(cfg as unknown as Record<string, unknown>)
-    set({ config: cfg })
+    set({ config: cfg, isDirty: true })
+    get().syncToDb()
   },
 
   resetLayout: () => {
@@ -530,7 +535,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
       ...s, collapsed: false, _expandedH: SECTION_DEFAULT_H,
       layout: { x: 0, y: 0, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
     })))
-    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
+    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
   },
 
   // ── items ────────────────────────────────────────────────
@@ -539,7 +544,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
     const cfg = structuredClone(get().config)
     const sec = cfg.sections.find(s => s.id === sectionId)
     if (sec) sec.items.push({ id: 'i' + uid(), ...data })
-    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
+    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
   },
   updateItem: (sectionId, itemId, data) => {
     pushHistory(get, set)
@@ -548,14 +553,14 @@ export const useStore = create<DashboardStore>((set, get) => ({
     if (!sec) return
     const idx = sec.items.findIndex(i => i.id === itemId)
     if (idx >= 0) sec.items[idx] = { id: itemId, ...data }
-    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
+    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
   },
   deleteItem: (sectionId, itemId) => {
     pushHistory(get, set)
     const cfg = structuredClone(get().config)
     const sec = cfg.sections.find(s => s.id === sectionId)
     if (sec) sec.items = sec.items.filter(i => i.id !== itemId)
-    persist(cfg); saveConfigToDB(cfg as unknown as Record<string, unknown>); set({ config: cfg })
+    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
   },
   moveItem: (srcSectionId, itemId, tgtSectionId, tgtItemId) => {
     const cfg = structuredClone(get().config)
@@ -577,6 +582,25 @@ export const useStore = create<DashboardStore>((set, get) => ({
   future: [],
   canUndo: false,
   canRedo: false,
+  isDirty: false,
+  isSyncing: false,
+  syncStatus: 'idle' as const,
+
+  syncToDb: async () => {
+    const cfg = get().config
+    set({ isSyncing: true, syncStatus: 'saving' })
+    try {
+      const result = await saveConfigToDB(cfg as unknown as Record<string, unknown>)
+      if (result?.error) {
+        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+      } else {
+        set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
+        setTimeout(() => set({ syncStatus: 'idle' }), 3000)
+      }
+    } catch {
+      set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+    }
+  },
 
   undo: () => {
     const { history, config, future } = get()
@@ -648,7 +672,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   toast: (msg, type = 'success') => {
     const id = uid()
     set(s => ({ toasts: [...s.toasts, { id, msg, type }] }))
-    setTimeout(() => get().removeToast(id), 3000)
+    setTimeout(() => get().removeToast(id), 4000)
   },
   removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 }))
