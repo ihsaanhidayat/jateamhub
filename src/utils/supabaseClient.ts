@@ -1,27 +1,28 @@
 // v2
 import { createClient } from '@supabase/supabase-js'
+import type { AppearanceSettings } from '../types'
 
-const SUPABASE_URL  = 'https://qsvrqdnyjywjzxkqwszl.supabase.co'
+const SUPABASE_URL = 'https://qsvrqdnyjywjzxkqwszl.supabase.co'
 const SUPABASE_ANON = 'sb_publishable_wzaKkf02vmfOvqIb3wHgKQ_mZgecfAn'
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: {
-    persistSession:     true,
-    autoRefreshToken:   true,
+    persistSession: true,
+    autoRefreshToken: true,
     detectSessionInUrl: false,
   },
 })
 
 // ── Types ────────────────────────────────────────────────
 export interface Profile {
-  id:            string
-  username:      string
-  role:          'superadmin' | 'admin' | 'user'
-  unit_id:       '' | 'pro' | 'cro' | 'klaim'
-  avatar_emoji:  string
+  id: string
+  username: string
+  role: 'superadmin' | 'admin' | 'user'
+  unit_id: '' | 'pro' | 'cro' | 'klaim'
+  avatar_emoji: string
   is_unit_admin: boolean
-  appearance:    Record<string, unknown>
-  created_at:    string
+  appearance: Record<string, unknown>
+  created_at: string
 }
 
 // ── Auth helpers ─────────────────────────────────────────
@@ -77,7 +78,7 @@ export const saveConfigToDB = async (config: Record<string, unknown>) =>
     .eq('id', CONFIG_ID)
 
 // ── User appearance ─────────────────────────────────────────
-export const saveUserAppearance = async (userId: string, appearance: Record<string, unknown>) =>
+export const saveUserAppearance = async (userId: string, appearance: AppearanceSettings | Record<string, unknown>) =>
   supabase.from('profiles').update({ appearance }).eq('id', userId)
 
 export const loadUserAppearance = async (userId: string): Promise<Record<string, unknown> | null> => {

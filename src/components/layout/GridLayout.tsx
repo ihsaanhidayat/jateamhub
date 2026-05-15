@@ -146,18 +146,37 @@ export default function GridLayout() {
     }))
 
     if (canEditAnything && editMode) {
+      // Ghost section — kecil, menempel di sebelah kanan section terakhir di baris terbawah
+      const GHOST_W = 2, GHOST_H = 3
       const lastNorm = normalized[normalized.length - 1]
-      const lastW = lastNorm?.w ?? SECTION_DEFAULT_W
-      const lastX = lastNorm ? lastNorm.x + lastNorm.w : 0
-      const lastY = lastNorm?.y ?? 0
-      const lastH = lastNorm?.h ?? SECTION_DEFAULT_H
-      const addX = lastX + lastW <= COLS ? lastX : 0
-      const addY = lastX + lastW <= COLS ? lastY : (lastNorm ? lastNorm.y + lastNorm.h : 0)
-      base.push({
-        i: ADD_KEY, x: addX, y: addY, w: lastW, h: lastH,
-        minW: SECTION_MIN_W, minH: SECTION_MIN_H, maxH: undefined,
-        isDraggable: false, isResizable: false, resizeHandles: [] as unknown as ['se'],
-      })
+      if (lastNorm) {
+        const rightX = lastNorm.x + lastNorm.w
+        // Masih muat di baris yang sama
+        if (rightX + GHOST_W <= COLS) {
+          // Vertikal center terhadap section tetangga
+          const centerY = lastNorm.y + Math.floor((lastNorm.h - GHOST_H) / 2)
+          base.push({
+            i: ADD_KEY, x: rightX, y: Math.max(lastNorm.y, centerY),
+            w: GHOST_W, h: GHOST_H,
+            minW: GHOST_W, minH: GHOST_H, maxH: GHOST_H,
+            isDraggable: false, isResizable: false, resizeHandles: [] as unknown as ['se'],
+          })
+        } else {
+          // Baris baru — kiri bawah
+          base.push({
+            i: ADD_KEY, x: 0, y: lastNorm.y + lastNorm.h,
+            w: GHOST_W, h: GHOST_H,
+            minW: GHOST_W, minH: GHOST_H, maxH: GHOST_H,
+            isDraggable: false, isResizable: false, resizeHandles: [] as unknown as ['se'],
+          })
+        }
+      } else {
+        base.push({
+          i: ADD_KEY, x: 0, y: 0, w: GHOST_W, h: GHOST_H,
+          minW: GHOST_W, minH: GHOST_H, maxH: GHOST_H,
+          isDraggable: false, isResizable: false, resizeHandles: [] as unknown as ['se'],
+        })
+      }
     }
     return base
   }, [pageSections, editMode, isEditable, isUnitAdmin, previewUnit])
@@ -209,8 +228,9 @@ export default function GridLayout() {
               <div
                 key={section.id}
                 className="mobile-section"
-                style={{ opacity: q && !visibleSectionIds.has(section.id) ? 0.2 : 1 }}
+                style={{ opacity: q && !visibleSectionIds.has(section.id) ? 0.2 : 1, position: 'relative', paddingTop: 10 }}
               >
+                <SectionBadge section={section} isAdmin={isEditable} />
                 {renderSection(section)}
               </div>
             ))
@@ -255,7 +275,13 @@ export default function GridLayout() {
           compactType="vertical" preventCollision={false} isBounded={false}
         >
           {pageSections.map(section => (
-            <div key={section.id} style={{ opacity: q && !visibleSectionIds.has(section.id) ? 0.2 : 1, transition: 'opacity .2s' }}>
+            <div key={section.id} style={{
+              opacity: q && !visibleSectionIds.has(section.id) ? 0.2 : 1,
+              transition: 'opacity .2s',
+              position: 'relative',
+              paddingTop: 10,
+            }}>
+              <SectionBadge section={section} isAdmin={isEditable} />
               {renderSection(section)}
             </div>
           ))}
@@ -280,6 +306,35 @@ export default function GridLayout() {
       <SectionModal open={sectionModal.open} section={sectionModal.section} onClose={() => setSectionModal({ open: false, section: null })} />
       <ItemModal open={itemModal.open} sectionId={itemModal.sectionId} item={itemModal.item} onClose={() => setItemModal({ open: false, sectionId: '', item: null })} />
     </>
+  )
+}
+
+// Badge section — di luar section card, tidak terpotong overflow
+function SectionBadge({ section, isAdmin }: { section: Section; isAdmin: boolean }) {
+  const vis = section.visibility ?? 'all'
+  if (vis === 'admin' && !isAdmin) return null
+
+  const BADGE: Record<string, { label: string; color: string; bg: string; border: string; glow: string }> = {
+    all:   { label: 'ALL', color: '#0A0A0A', bg: '#00FFC2',  border: '#00FFC2', glow: 'rgba(0,255,194,0.5)'  },
+    admin: { label: 'ADM', color: '#0A0A0A', bg: '#00BFFF',  border: '#00BFFF', glow: 'rgba(0,191,255,0.5)'  },
+    unit:  {
+      label: (section.targetUnits ?? []).map(u => u.toUpperCase()).join('/') || 'UNIT',
+      color: '#0A0A0A', bg: '#C77DFF', border: '#C77DFF', glow: 'rgba(199,125,255,0.5)',
+    },
+  }
+  const b = BADGE[vis]
+  if (!b) return null
+
+  return (
+    <span style={{
+      position: 'absolute', top: 0, left: 12, zIndex: 10,
+      fontSize: 8, fontWeight: 800, padding: '2px 8px', borderRadius: 10,
+      background: b.bg, color: b.color, border: `1px solid ${b.border}`,
+      letterSpacing: '1px', textTransform: 'uppercase',
+      fontFamily: 'var(--mono)', lineHeight: 1.5,
+      pointerEvents: 'none',
+      boxShadow: `0 0 8px ${b.glow}, 0 1px 3px rgba(0,0,0,0.4)`,
+    }}>{b.label}</span>
   )
 }
 
@@ -315,13 +370,29 @@ function AddSectionCard({ onClick }: { onClick: () => void }) {
   return (
     <div onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
       style={{
-        width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
-        border: `1px dashed ${hovered ? 'var(--mint)' : 'rgba(0,255,194,0.2)'}`,
-        borderRadius: 'var(--radius)', background: hovered ? 'rgba(0,255,194,0.05)' : 'rgba(0,255,194,0.015)',
-        cursor: 'pointer', transition: 'all .2s', color: hovered ? 'var(--mint)' : 'var(--silver3)', userSelect: 'none',
+        width: '100%', height: '100%',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+        border: `1px dashed ${hovered ? 'rgba(0,255,194,0.6)' : 'rgba(0,255,194,0.18)'}`,
+        borderRadius: 'var(--radius)',
+        background: hovered ? 'rgba(0,255,194,0.06)' : 'rgba(0,255,194,0.01)',
+        cursor: 'pointer', transition: 'all .2s',
+        color: hovered ? 'var(--mint)' : 'rgba(0,255,194,0.35)',
+        userSelect: 'none',
+        boxShadow: hovered ? '0 0 12px rgba(0,255,194,0.08), inset 0 0 12px rgba(0,255,194,0.04)' : 'none',
       }}>
-      <div style={{ width: 38, height: 38, border: `1.5px dashed ${hovered ? 'var(--mint)' : 'rgba(0,255,194,0.25)'}`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 300, lineHeight: 1, transition: 'all .2s' }}>＋</div>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>Add Section</span>
+      <div style={{
+        width: 28, height: 28,
+        border: `1px dashed ${hovered ? 'rgba(0,255,194,0.8)' : 'rgba(0,255,194,0.25)'}`,
+        borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 16, fontWeight: 300, lineHeight: 1,
+        transition: 'all .2s',
+        boxShadow: hovered ? '0 0 8px rgba(0,255,194,0.3)' : 'none',
+      }}>＋</div>
+      <span style={{
+        fontSize: 8, fontWeight: 700, letterSpacing: '1.5px',
+        textTransform: 'uppercase', fontFamily: 'var(--mono)',
+      }}>ADD SECTION</span>
     </div>
   )
 }

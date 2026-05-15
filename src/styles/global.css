@@ -348,6 +348,7 @@ a { text-decoration: none; color: inherit; }
   background: var(--bg3);
   cursor: grab; user-select: none;
   position: relative;
+  border-radius: var(--radius) var(--radius) 0 0;
 }
 .section-header::before {
   content: '';
@@ -443,12 +444,22 @@ a { text-decoration: none; color: inherit; }
 }
 .item-tooltip-wrap:hover .item-tooltip { opacity: 1; transform: translateY(0); }
 
-.item-edit-btn {
-  background: none; border: none; color: transparent; font-size: 11px;
-  padding: 3px 5px; transition: all .12s; flex-shrink: 0; border-radius: var(--radius-sm);
+/* Item action group — muncul saat hover */
+.item-action-group {
+  display: flex; align-items: center; gap: 3px;
+  opacity: 0; transition: opacity .15s; flex-shrink: 0;
 }
-.item-card:hover .item-edit-btn { color: var(--silver3); }
-.item-edit-btn:hover { color: var(--mint) !important; background: var(--mint-bg); }
+.item-card:hover .item-action-group { opacity: 1; }
+.item-edit-btn, .item-delete-btn {
+  width: 28px; height: 28px;
+  background: var(--bg4); border: 1px solid var(--border2);
+  border-radius: var(--radius-sm); color: var(--silver3);
+  font-size: 13px; cursor: pointer; transition: all .12s;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; padding: 0;
+}
+.item-edit-btn:hover   { color: var(--mint); border-color: var(--mint); background: var(--mint-bg); }
+.item-delete-btn:hover { color: var(--red);  border-color: var(--red);  background: rgba(224,85,85,0.08); }
 
 /* SIZE VARIANTS */
 .size-xs .item-card { padding: 3px 6px; margin-bottom: 1px; }
@@ -675,25 +686,23 @@ mark.hl { background: rgba(0,255,194,0.18); color: var(--mint); border-radius: 2
 @keyframes tooltip-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ── Folder edit btn ────────────────────────────────────── */
-.folder-edit-btn {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  background: var(--bg4);
-  border: 1px solid var(--border2);
-  border-radius: 4px;
-  color: var(--silver3);
-  font-size: 10px;
-  padding: 2px 4px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity .15s;
-  line-height: 1;
+/* Folder action group */
+.folder-action-group {
+  position: absolute; top: 3px; right: 3px;
+  display: flex; gap: 3px;
+  opacity: 0; transition: opacity .15s;
 }
-.folder-edit-btn:hover { color: var(--mint); border-color: var(--mint); }
-
-/* Show folder edit on parent hover */
-div:hover > .folder-edit-btn { opacity: 1; }
+div:hover > .folder-action-group { opacity: 1; }
+.folder-edit-btn, .folder-delete-btn {
+  width: 26px; height: 26px;
+  background: var(--bg4); border: 1px solid var(--border2);
+  border-radius: 4px; color: var(--silver3);
+  font-size: 12px; cursor: pointer; transition: all .12s;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; line-height: 1;
+}
+.folder-edit-btn:hover   { color: var(--mint); border-color: var(--mint); }
+.folder-delete-btn:hover { color: var(--red);  border-color: var(--red); }
 
 /* ── Item compact ───────────────────────────────────────── */
 .item-compact { padding: 3px 6px !important; }
@@ -713,8 +722,9 @@ div:hover > .folder-edit-btn { opacity: 1; }
 .rgl-grid {
   width: 100%;
   min-height: 200px;
-  padding-top: 12px;
+  padding-top: 16px;
 }
+.rgl-grid .react-grid-item { margin-top: 6px; }
 .mobile-grid {
   padding-top: 14px;
 }
@@ -1162,3 +1172,130 @@ div:hover > .folder-edit-btn { opacity: 1; }
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.6; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   TECH VIBES — Dashboard
+═══════════════════════════════════════════════════════════ */
+
+/* Background grid lines — subtle tech pattern */
+body {
+  background-color: var(--black);
+  background-image:
+    linear-gradient(rgba(0,255,194,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,194,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Header — neon border bawah */
+.header {
+  border-bottom: 1px solid rgba(0,255,194,0.15) !important;
+  box-shadow: 0 1px 0 rgba(0,255,194,0.06), 0 4px 20px rgba(0,0,0,0.3);
+  background: rgba(10,10,10,0.92) !important;
+  backdrop-filter: blur(12px);
+}
+
+/* Header title — subtle glow */
+.header-title {
+  text-shadow: 0 0 12px rgba(0,255,194,0.4);
+}
+
+/* Nav active — neon glow underline */
+.nav-link.active {
+  color: var(--mint) !important;
+  text-shadow: 0 0 8px rgba(0,255,194,0.5);
+}
+.nav-link.active::after {
+  box-shadow: 0 0 6px rgba(0,255,194,0.6);
+}
+
+/* Section card — glass tech */
+.section-card {
+  background: rgba(14,14,14,0.95) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  backdrop-filter: blur(8px);
+  transition: border-color .2s, box-shadow .2s, transform .15s !important;
+}
+.section-card:hover {
+  border-color: rgba(0,255,194,0.15) !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,255,194,0.06) !important;
+}
+
+/* Section header — darker, mint accent lebih terang */
+.section-header {
+  background: rgba(10,10,10,0.8) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+}
+.section-header::before {
+  box-shadow: 0 0 8px var(--section-accent, rgba(0,255,194,0.6)) !important;
+  width: 2px !important;
+}
+
+/* Section title — sedikit lebih terang */
+.section-title {
+  letter-spacing: 0.8px;
+}
+
+/* Add section ghost — tech style */
+.add-section-ghost {
+  border: 1px dashed rgba(0,255,194,0.25) !important;
+  background: rgba(0,255,194,0.02) !important;
+}
+
+/* Options panel — glass */
+.options-panel {
+  background: rgba(10,10,10,0.95) !important;
+  border: 1px solid rgba(0,255,194,0.12) !important;
+  backdrop-filter: blur(16px) !important;
+  box-shadow: -4px 0 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,255,194,0.04) !important;
+}
+
+/* Modal — glass tech */
+.modal {
+  background: rgba(12,12,12,0.97) !important;
+  border: 1px solid rgba(0,255,194,0.12) !important;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,255,194,0.04) !important;
+}
+.modal-overlay {
+  background: rgba(0,0,0,0.8) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+/* Edit bar — tech style */
+.edit-bar {
+  background: rgba(8,8,8,0.95) !important;
+  border-top: 1px solid rgba(0,255,194,0.12) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.3) !important;
+}
+
+/* Search input focused — neon glow */
+.search-input:focus {
+  box-shadow: 0 0 0 1px rgba(0,255,194,0.3), 0 0 12px rgba(0,255,194,0.08) !important;
+}
+
+/* Icon btn active — neon glow */
+.icon-btn.active {
+  box-shadow: 0 0 8px rgba(0,255,194,0.2) !important;
+}
+
+/* Badge glow */
+.section-badge-all   { box-shadow: 0 0 6px rgba(0,255,194,0.3); }
+.section-badge-admin { box-shadow: 0 0 6px rgba(0,191,255,0.3); }
+.section-badge-unit  { box-shadow: 0 0 6px rgba(199,125,255,0.3); }
+
+/* Form fields — tech */
+.form-group input:focus,
+.form-group select:focus,
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  box-shadow: 0 0 0 1px rgba(0,255,194,0.2), 0 0 8px rgba(0,255,194,0.06) !important;
+}
+
+/* Toast — glassmorphism */
+.toast-item {
+  backdrop-filter: blur(12px) !important;
+}
+
+/* Badge section — solid, non-transparan */
+.section-badge { backdrop-filter: none !important; }

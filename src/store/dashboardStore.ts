@@ -317,6 +317,9 @@ const pushHistory = (get: () => DashboardStore, set: (s: Partial<DashboardStore>
   set({ history: newHistory, future: [] })
 }
 
+// Debounce sync ke DB — hindari terlalu banyak request
+let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
 export const useStore = create<DashboardStore>((set, get) => ({
   // ── auth ────────────────────────────────────────────────
   session: null,
@@ -525,8 +528,23 @@ export const useStore = create<DashboardStore>((set, get) => ({
       if (s && !s.collapsed) { s.layout = { ...s.layout, ...layout }; s._expandedH = layout.h }
     })
     persist(cfg)
+    // Layout changes: debounce lebih panjang (3 detik) karena dipanggil terus saat drag
     set({ config: cfg, isDirty: true })
-    get().syncToDb()
+    if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
+    syncDebounceTimer = setTimeout(async () => {
+      set({ isSyncing: true, syncStatus: 'saving' })
+      try {
+        const result = await saveConfigToDB(cfg as unknown as Record<string, unknown>)
+        if (result?.error) {
+          set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+        } else {
+          set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
+          setTimeout(() => set({ syncStatus: 'idle' }), 3000)
+        }
+      } catch {
+        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+      }
+    }, 3000)
   },
 
   resetLayout: () => {
@@ -587,19 +605,24 @@ export const useStore = create<DashboardStore>((set, get) => ({
   syncStatus: 'idle' as const,
 
   syncToDb: async () => {
-    const cfg = get().config
-    set({ isSyncing: true, syncStatus: 'saving' })
-    try {
-      const result = await saveConfigToDB(cfg as unknown as Record<string, unknown>)
-      if (result?.error) {
+    // Debounce — tunggu 1.5 detik setelah mutasi terakhir baru sync
+    if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
+    set({ isDirty: true, syncStatus: 'saving' })
+    syncDebounceTimer = setTimeout(async () => {
+      const cfg = get().config
+      set({ isSyncing: true })
+      try {
+        const result = await saveConfigToDB(cfg as unknown as Record<string, unknown>)
+        if (result?.error) {
+          set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+        } else {
+          set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
+          setTimeout(() => set({ syncStatus: 'idle' }), 3000)
+        }
+      } catch {
         set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-      } else {
-        set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
-        setTimeout(() => set({ syncStatus: 'idle' }), 3000)
       }
-    } catch {
-      set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-    }
+    }, 1500)
   },
 
   undo: () => {
