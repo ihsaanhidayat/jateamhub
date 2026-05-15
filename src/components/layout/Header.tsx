@@ -97,7 +97,10 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenConfig }: P
           {isEditable && (
             <button className={`icon-btn${editMode ? ' active' : ''}`} onClick={toggleEditMode} title="Edit Mode">✏️</button>
           )}
+          {/* Options hanya untuk admin, superadmin, unit_admin */}
+        {(session?.role === 'superadmin' || session?.role === 'admin' || (session as any)?.is_unit_admin) && (
           <button id="options-btn" className={`icon-btn${optionsOpen ? ' active' : ''}`} onClick={onToggleOptions} title="Options">⚙️</button>
+        )}
         </div>
       </header>
 

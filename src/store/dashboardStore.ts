@@ -140,6 +140,29 @@ const defaultUsers: UserAccount[] = [
 ]
 
 // ── storage ──────────────────────────────────────────────
+// Auto-detect appearance preset berdasarkan lebar layar
+const getDeviceAppearance = (): Partial<AppearanceSettings> => {
+  const w = window.innerWidth
+  if (w < 480) return {
+    itemDisplayMode: 'iconText',
+    sectionDensity: 'compact',
+    iconSize: 'small',
+    itemGridMinWidth: 56,
+  }
+  if (w < 768) return {
+    itemDisplayMode: 'button',
+    sectionDensity: 'comfortable',
+    iconSize: 'medium',
+    itemGridMinWidth: 64,
+  }
+  return {} // desktop — pakai yang tersimpan
+}
+
+// Cek apakah device sudah punya preference tersimpan
+const DEVICE_PREF_KEY = 'jateamhub-device-pref'
+const hasDevicePref = () => !!localStorage.getItem(DEVICE_PREF_KEY)
+const setDevicePref = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
+
 const loadConfig = (): JateamConfig => {
   try {
     const d = localStorage.getItem(DATA_KEY)
@@ -373,6 +396,16 @@ export const useStore = create<DashboardStore>((set, get) => ({
       cfg.sections = autoLayout(cfg.sections || [])
       cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
       cfg.pages = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
+
+      // Apply device preset jika belum pernah set preference di device ini
+      if (!hasDevicePref()) {
+        const devicePreset = getDeviceAppearance()
+        if (Object.keys(devicePreset).length > 0) {
+          cfg.appearance = { ...cfg.appearance, ...devicePreset }
+          setDevicePref()
+        }
+      }
+
       persist(cfg)
       set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions })
     } catch (e) {
@@ -383,7 +416,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   // Sync config ke DB (dipanggil dari setConfig)
   syncConfig: (cfg) => {
     saveConfigToDB(cfg as unknown as Record<string, unknown>)
-      .then(({ error }) => { if (error) console.error('[JateamHub] syncConfig error:', error) })
+      .then((result) => { if (result?.error) console.error('[JateamHub] syncConfig error:', result.error) })
   },
 
   // ── sections ─────────────────────────────────────────────
