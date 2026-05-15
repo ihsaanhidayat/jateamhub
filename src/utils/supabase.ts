@@ -92,15 +92,25 @@ export const createUser = async (
   role: Profile['role'],
   unit_id: Profile['unit_id'],
 ) => {
-  // Email synthetic: username@jateamhub.internal
-  const email = `${username}@jateamhub.app`
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { username, role, unit_id },
-    },
-  })
-  if (error) return { error }
-  return { data }
-}
+  export const createUser = async (
+    username: string,
+    password: string,
+    role: Profile['role'],
+    unit_id: Profile['unit_id'],
+  ) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return { error: { message: 'Tidak ada sesi aktif' } }
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ username, password, role, unit_id }),
+    })
+
+    const data = await res.json()
+    if (!res.ok) return { error: { message: data.error || 'Gagal membuat user' } }
+    return { data }
+  }
