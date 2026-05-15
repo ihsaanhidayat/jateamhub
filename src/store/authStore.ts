@@ -71,7 +71,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (data.user) {
       const profile = await getProfile(data.user.id)
       set({ profile, loading: false })
-      useStore.getState().setPreviewUnit(null)
     }
     return null
   },

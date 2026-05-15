@@ -85,32 +85,25 @@ export const saveConfigToDB = async (config: Record<string, unknown>) => {
     .eq('id', CONFIG_ID)
 }
 
-// ── Create user helper (via Supabase Admin) ──────────────
 export const createUser = async (
   username: string,
   password: string,
   role: Profile['role'],
   unit_id: Profile['unit_id'],
 ) => {
-  export const createUser = async (
-    username: string,
-    password: string,
-    role: Profile['role'],
-    unit_id: Profile['unit_id'],
-  ) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return { error: { message: 'Tidak ada sesi aktif' } }
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { error: { message: 'Tidak ada sesi aktif' } }
 
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ username, password, role, unit_id }),
-    })
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ username, password, role, unit_id }),
+  })
 
-    const data = await res.json()
-    if (!res.ok) return { error: { message: data.error || 'Gagal membuat user' } }
-    return { data }
-  }
+  const data = await res.json()
+  if (!res.ok) return { error: { message: data.error || 'Gagal membuat user' } }
+  return { data }
+}
