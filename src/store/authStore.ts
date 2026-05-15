@@ -63,13 +63,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ loading: true })
     const email = `${username}@jateamhub.app`
     const { data, error } = await signIn(email, password)
+    console.log('SUPABASE LOGIN:', { email, error: error?.message, user: data?.user?.email })
     if (error) {
       set({ loading: false })
-      return 'Username atau password salah.'
+      return error.message
     }
     if (data.user) {
       const profile = await getProfile(data.user.id)
       set({ profile, loading: false })
+      useStore.getState().setPreviewUnit(null)
     }
     return null
   },

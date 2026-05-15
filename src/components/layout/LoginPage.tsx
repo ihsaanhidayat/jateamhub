@@ -3,12 +3,12 @@ import { useAuthStore } from '../../store/authStore'
 
 export default function LoginPage() {
   const { login } = useAuthStore()
-  const [showPw, setShowPw]     = useState(false)
+  const [showPw, setShowPw] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
-  const [err, setErr]           = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,6 +24,7 @@ export default function LoginPage() {
       <div className="login-box">
         <div className="login-logo">
           <h1>JateamHub</h1>
+          <h3>Sugeng Rawuh, Jagoan</h3>
           <div className="underline" />
         </div>
 
@@ -62,7 +63,7 @@ export default function LoginPage() {
         </form>
 
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: 'var(--silver3)', lineHeight: 1.6 }}>
-          Tidak punya akun?<br/>
+          Tidak punya akun?<br />
           Hubungi <span style={{ color: 'var(--mint)' }}>Admin</span> untuk mendapatkan akses.
         </div>
       </div>

@@ -17,12 +17,12 @@ import 'react-resizable/css/styles.css'
 
 export default function App() {
   const { profile, initialized, init } = useAuthStore()
-  const { editMode, currentPage, loadRemoteConfig, toast } = useStore()
+  const { editMode, currentPage, loadRemoteConfig, toast, setPreviewUnit } = useStore()
 
-  const [optionsOpen,  setOptionsOpen]  = useState(false)
-  const [configOpen,   setConfigOpen]   = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const [configOpen, setConfigOpen] = useState(false)
   const [pageInfoOpen, setPageInfoOpen] = useState(false)
-  const [usersOpen,    setUsersOpen]    = useState(false)
+  const [usersOpen, setUsersOpen] = useState(false)
 
   // Init auth saat app mount
   useEffect(() => { init() }, [])
@@ -31,8 +31,8 @@ export default function App() {
   useEffect(() => {
     if (profile) {
       loadRemoteConfig()
-      // Inject toast ke authStore
       useAuthStore.getState().setToastFn(toast)
+      setPreviewUnit(null)  // reset preview saat login
     }
   }, [profile?.id])
 
@@ -78,9 +78,9 @@ export default function App() {
 
       {!isSupport && <EditBar onOpenPageInfo={() => setPageInfoOpen(true)} />}
 
-      <ConfigModal         open={configOpen}   onClose={() => setConfigOpen(false)} />
-      <PageInfoModal       open={pageInfoOpen} onClose={() => setPageInfoOpen(false)} />
-      <UserManagementModal open={usersOpen}    onClose={() => setUsersOpen(false)} />
+      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
+      <PageInfoModal open={pageInfoOpen} onClose={() => setPageInfoOpen(false)} />
+      <UserManagementModal open={usersOpen} onClose={() => setUsersOpen(false)} />
       <ToastContainer />
     </div>
   )
