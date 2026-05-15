@@ -12,28 +12,28 @@ interface Props {
 }
 
 const ITEM_VIEWS: { key: ItemDisplayMode; label: string; icon: string }[] = [
-  { key: 'button',     label: 'Button',      icon: '▣' },
-  { key: 'list',       label: 'List',        icon: '☰' },
-  { key: 'iconText',   label: 'Icon+Text',   icon: '◫' },
-  { key: 'iconOnly',   label: 'Icon Only',   icon: '◉' },
-  { key: 'textOnly',   label: 'Text Only',   icon: '≡' },
+  { key: 'button', label: 'Button', icon: '▣' },
+  { key: 'list', label: 'List', icon: '☰' },
+  { key: 'iconText', label: 'Icon+Text', icon: '◫' },
+  { key: 'iconOnly', label: 'Icon Only', icon: '◉' },
+  { key: 'textOnly', label: 'Text Only', icon: '≡' },
   { key: 'folderGrid', label: 'Folder Grid', icon: '⊞' },
 ]
 const ICON_SIZES: { key: IconSize; label: string }[] = [
-  { key: 'small',  label: 'S'  },
-  { key: 'medium', label: 'M'  },
-  { key: 'large',  label: 'L'  },
-  { key: 'xl',     label: 'XL' },
+  { key: 'small', label: 'S' },
+  { key: 'medium', label: 'M' },
+  { key: 'large', label: 'L' },
+  { key: 'xl', label: 'XL' },
 ]
 const LABEL_MODES: { key: LabelMode; label: string }[] = [
-  { key: 'show',  label: 'Show'  },
-  { key: 'hide',  label: 'Hide'  },
+  { key: 'show', label: 'Show' },
+  { key: 'hide', label: 'Hide' },
   { key: 'hover', label: 'Hover' },
 ]
 const DENSITIES: { key: SectionDensity; label: string }[] = [
-  { key: 'compact',     label: 'Compact'     },
+  { key: 'compact', label: 'Compact' },
   { key: 'comfortable', label: 'Comfortable' },
-  { key: 'spacious',    label: 'Spacious'    },
+  { key: 'spacious', label: 'Spacious' },
 ]
 const FOLDER_COLS: { cols: number; label: string }[] = [
   { cols: 1, label: '1×' },
@@ -100,7 +100,7 @@ export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers 
 
   if (!open) return null
 
-  const isEditable   = canEdit(session as any)
+  const isEditable = canEdit(session as any)
   const canManageUsers = canCreateUser(session as any)
   const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'
 
@@ -224,11 +224,11 @@ export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers 
             <div className="options-sublabel">Preview Tampilan Unit</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {[
-                { value: null,    label: 'Admin View' },
-                { value: '',      label: 'User Umum'  },
-                { value: 'pro',   label: 'PRO'        },
-                { value: 'cro',   label: 'CRO'        },
-                { value: 'klaim', label: 'Klaim'      },
+                { value: null, label: 'Admin View' },
+                { value: '', label: 'User Umum' },
+                { value: 'pro', label: 'PRO' },
+                { value: 'cro', label: 'CRO' },
+                { value: 'klaim', label: 'Klaim' },
               ].map(opt => {
                 const active = previewUnit === opt.value
                 return (
@@ -250,7 +250,7 @@ export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers 
         <div className="user-row">
           <div className="user-info" style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <span style={{ color: 'var(--silver2)', fontSize: 12 }}>
-              Halo <strong style={{ color: 'var(--mint)' }}>{session?.username}</strong>
+              Halo <strong style={{ color: 'var(--mint)' }}>{session?.username}</strong>{(session as any)?.avatar_emoji ? ` ${(session as any).avatar_emoji}` : ''}
             </span>
             {(() => {
               const badge = getDisplayBadge(session as any)

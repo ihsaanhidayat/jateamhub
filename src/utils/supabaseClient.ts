@@ -1,37 +1,35 @@
+// v2
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
-const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+const SUPABASE_URL  = 'https://qsvrqdnyjywjzxkqwszl.supabase.co'
+const SUPABASE_ANON = 'sb_publishable_wzaKkf02vmfOvqIb3wHgKQ_mZgecfAn'
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession:     true,
+    autoRefreshToken:   true,
     detectSessionInUrl: false,
   },
 })
 
 // ── Types ────────────────────────────────────────────────
 export interface Profile {
-  id: string
-  username: string
-  role: 'superadmin' | 'admin' | 'user'
-  unit_id: '' | 'pro' | 'cro' | 'klaim'
-  created_at: string
+  id:            string
+  username:      string
+  role:          'superadmin' | 'admin' | 'user'
+  unit_id:       '' | 'pro' | 'cro' | 'klaim'
+  avatar_emoji:  string
+  is_unit_admin: boolean
+  created_at:    string
 }
 
 // ── Auth helpers ─────────────────────────────────────────
-export const signIn = async (email: string, password: string) => {
-  return supabase.auth.signInWithPassword({ email, password })
-}
+export const signIn = async (email: string, password: string) =>
+  supabase.auth.signInWithPassword({ email, password })
 
-export const signOut = async () => {
-  return supabase.auth.signOut()
-}
+export const signOut = async () => supabase.auth.signOut()
 
-export const getSession = async () => {
-  return supabase.auth.getSession()
-}
+export const getSession = async () => supabase.auth.getSession()
 
 // ── Profile helpers ──────────────────────────────────────
 export const getProfile = async (userId: string): Promise<Profile | null> => {
@@ -55,15 +53,8 @@ export const getAllProfiles = async (): Promise<Profile[]> => {
 
 export const updateProfile = async (
   userId: string,
-  updates: Partial<Pick<Profile, 'role' | 'unit_id' | 'username'>>
-) => {
-  return supabase.from('profiles').update(updates).eq('id', userId)
-}
-
-export const deleteProfile = async (userId: string) => {
-  // Hapus dari auth.users — cascade ke profiles
-  return supabase.auth.admin.deleteUser(userId)
-}
+  updates: Partial<Pick<Profile, 'role' | 'unit_id' | 'username' | 'avatar_emoji' | 'is_unit_admin'>>
+) => supabase.from('profiles').update(updates).eq('id', userId)
 
 // ── Config helpers ───────────────────────────────────────
 const CONFIG_ID = '00000000-0000-0000-0000-000000000001'
@@ -78,29 +69,51 @@ export const loadConfigFromDB = async (): Promise<Record<string, unknown> | null
   return data?.config ?? null
 }
 
-export const saveConfigToDB = async (config: Record<string, unknown>) => {
-  return supabase
+export const saveConfigToDB = async (config: Record<string, unknown>) =>
+  supabase
     .from('dashboard_config')
     .update({ config, updated_at: new Date().toISOString() })
     .eq('id', CONFIG_ID)
-}
 
-// ── Create user helper (via Supabase Admin) ──────────────
+// ── Create user via Edge Function ────────────────────────
 export const createUser = async (
   username: string,
   password: string,
   role: Profile['role'],
   unit_id: Profile['unit_id'],
 ) => {
-  // Email synthetic: username@jateamhub.internal
-  const email = `${username}@jateamhub.internal`
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { username, role, unit_id },
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { error: { message: 'Tidak ada sesi aktif' } }
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
     },
+    body: JSON.stringify({ username, password, role, unit_id }),
   })
-  if (error) return { error }
+
+  const data = await res.json()
+  if (!res.ok) return { error: { message: data.error || 'Gagal membuat user' } }
+  return { data }
+}
+
+// ── Update password via Edge Function ────────────────────
+export const updateUserPassword = async (userId: string, password: string) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { error: { message: 'Tidak ada sesi aktif' } }
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/update-user-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ userId, password }),
+  })
+
+  const data = await res.json()
+  if (!res.ok) return { error: { message: data.error || 'Gagal update password' } }
   return { data }
 }

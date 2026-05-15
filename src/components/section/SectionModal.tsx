@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Modal from '../ui/Modal'
 import { useStore } from '../../store/dashboardStore'
+import { useAuthStore } from '../../store/authStore'
 import type { Section } from '../../types'
 import { SECTION_DEFAULT_W } from '../../types'
 
@@ -15,6 +16,9 @@ const UNIT_OPTIONS   = [
 
 export default function SectionModal({ open, section, onClose }: Props) {
   const { addSection, updateSection, deleteSection, updateSectionLayout, toast, config, currentPage } = useStore()
+  const { profile: session } = useAuthStore()
+  const isUnitAdmin = (session as any)?.is_unit_admin === true && (session as any)?.role === 'user'
+  const myUnit      = (session as any)?.unit_id ?? ''
   const [title,       setTitle]       = useState('')
   const [subtitle,    setSubtitle]    = useState('')
   const [icon,        setIcon]        = useState('')
@@ -46,12 +50,17 @@ export default function SectionModal({ open, section, onClose }: Props) {
 
   const handleSave = () => {
     if (!title.trim()) { toast('Judul wajib diisi.', 'error'); return }
+    // unit_admin: force visibility=unit, targetUnits=[myUnit]
+    const finalVisibility  = isUnitAdmin ? 'unit'     : visibility
+    const finalTargetUnits = isUnitAdmin ? [myUnit]   : targetUnits
+    const finalPageId      = isUnitAdmin ? 'beranda'  : pageId
+
     if (section) {
-      updateSection(section.id, title.trim(), icon.trim(), subtitle.trim(), colW * 70, accent || undefined, pageId, visibility, targetUnits)
+      updateSection(section.id, title.trim(), icon.trim(), subtitle.trim(), colW * 70, accent || undefined, finalPageId, finalVisibility, finalTargetUnits)
       updateSectionLayout(section.id, { ...section.layout, w: colW })
       toast('Section diperbarui.', 'success')
     } else {
-      addSection(title.trim(), icon.trim(), subtitle.trim(), accent || undefined, visibility, targetUnits, pageId, sectionType, sectionType === 'widget' ? widgetType : undefined)
+      addSection(title.trim(), icon.trim(), subtitle.trim(), accent || undefined, finalVisibility, finalTargetUnits, finalPageId, sectionType, sectionType === 'widget' ? widgetType : undefined)
       toast('Section ditambahkan.', 'success')
     }
     onClose()
@@ -151,7 +160,8 @@ export default function SectionModal({ open, section, onClose }: Props) {
         </div>
       </div>
 
-      {/* Visibility */}
+      {/* Visibility — hanya tampil untuk admin/superadmin */}
+      {!isUnitAdmin && (
       <div className="field">
         <label>Visibility / Target</label>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -192,6 +202,8 @@ export default function SectionModal({ open, section, onClose }: Props) {
           </div>
         )}
       </div>
+
+      )}{/* end visibility */}
 
       {/* Accent */}
       <div className="field">

@@ -101,6 +101,8 @@ export const canViewSection = (
   // User
   if (visibility === 'all')   return true
   if (visibility === 'admin') return false
-  if (visibility === 'unit')  return targetUnits.includes(session.unitId ?? '')
+  // Support both Profile (unit_id) dan UserSession (unitId)
+  const userUnit = (session as any).unit_id ?? (session as any).unitId ?? ''
+  if (visibility === 'unit')  return targetUnits.includes(userUnit)
   return false
 }

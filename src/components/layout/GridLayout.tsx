@@ -20,6 +20,14 @@ export default function GridLayout() {
   const { profile: session } = useAuthStore()
 
   const isEditable    = canEdit(session as any)
+  const isUnitAdmin   = (session as any)?.is_unit_admin === true && (session as any)?.role === 'user'
+  const myUnit        = (session as any)?.unit_id ?? ''
+  // unit_admin bisa edit section yang targetUnits includes unit mereka
+  const canEditSection = (s: import('../../types').Section) => {
+    if (isEditable) return true
+    if (!isUnitAdmin) return false
+    return (s.targetUnits ?? []).includes(myUnit)
+  }
   // Effective unit & session — pakai previewUnit kalau admin lagi preview
   const sessionUnit = (session as any)?.unit_id ?? (session as any)?.unitId ?? ''
   const effectiveUnit = (previewUnit ?? sessionUnit) as import('../../types').UnitId
@@ -56,9 +64,13 @@ export default function GridLayout() {
         return sPageId === currentPage || sUnits.includes(currentPage)
       }
 
-      // Preview mode — simulasi tampilan unit tertentu
-      const onPage = sPageId === currentPage ||
-        (isUnitPage && sUnits.includes(currentPage))
+      // Preview mode atau user biasa
+      // Section tampil kalau:
+      // 1. pageId sama dengan halaman aktif, ATAU
+      // 2. Section visibility=unit dengan targetUnits includes unit user (tampil di beranda)
+      const userUnit = (effectiveSession as any)?.unit_id ?? (effectiveSession as any)?.unitId ?? ''
+      const isSharedToUser = sVis === 'unit' && sUnits.includes(userUnit) && currentPage === 'beranda'
+      const onPage = sPageId === currentPage || isSharedToUser
       if (!onPage) return false
       return canViewSection(effectiveSession, sVis, sUnits)
     })
@@ -136,11 +148,11 @@ export default function GridLayout() {
       minW: SECTION_MIN_W,
       minH: s.collapsed ? 1 : SECTION_MIN_H,
       maxH: s.collapsed ? 1 : undefined,
-      isDraggable:   isEditable && editMode,
-      isResizable:   isEditable && editMode && !s.collapsed,
+      isDraggable:   (isEditable || (isUnitAdmin && canEditSection(s))) && editMode,
+      isResizable:   (isEditable || (isUnitAdmin && canEditSection(s))) && editMode && !s.collapsed,
       resizeHandles: ['se'] as ['se'],
     }))
-    if (isEditable && editMode) {
+    if ((isEditable || isUnitAdmin) && editMode) {
       // Add button — taruh setelah section terakhir
       const lastNorm = normalized[normalized.length - 1]
       const lastW = lastNorm?.w ?? SECTION_DEFAULT_W
@@ -185,8 +197,8 @@ export default function GridLayout() {
           rowHeight={GRID_ROW_HEIGHT} margin={[12, 12]}
           containerPadding={[0, 0]}
           onLayoutChange={handleLayoutChange}
-          isDraggable={isEditable && editMode}
-          isResizable={isEditable && editMode}
+          isDraggable={(isEditable || isUnitAdmin) && editMode}
+          isResizable={(isEditable || isUnitAdmin) && editMode}
           draggableHandle=".section-header"
           resizeHandles={['se']}
           useCSSTransforms
@@ -205,6 +217,7 @@ export default function GridLayout() {
               ) : (
                 <SectionCard
                   section={section}
+                  canEdit={canEditSection(section)}
                   onEditSection={s => setSectionModal({ open: true, section: s })}
                   onEditItem={(sId, item) => setItemModal({ open: true, sectionId: sId, item })}
                   onAddItem={sId => setItemModal({ open: true, sectionId: sId, item: null })}
@@ -213,7 +226,7 @@ export default function GridLayout() {
             </div>
           ))}
 
-          {isEditable && editMode && (
+          {(isEditable || isUnitAdmin) && editMode && (
             <div key={ADD_KEY}>
               <AddSectionCard onClick={() => setSectionModal({ open: true, section: null })} />
             </div>
@@ -221,7 +234,7 @@ export default function GridLayout() {
         </ReactGridLayout>
       )}
 
-      {isEmpty && editMode && (
+      {isEmpty && (isEditable || isUnitAdmin) && editMode && (
         <div style={{ padding: 12 }}>
           <button className="add-section-card" style={{ width: '100%', maxWidth: 300 }}
             onClick={() => setSectionModal({ open: true, section: null })}>

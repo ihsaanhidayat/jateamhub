@@ -8,6 +8,7 @@ import { sanitizeUrl } from '../../utils/security'
 
 interface Props {
   section: Section
+  canEdit?: boolean
   onEditSection: (s: Section) => void
   onEditItem:    (sectionId: string, item: LinkItem) => void
   onAddItem:     (sectionId: string) => void
@@ -19,10 +20,11 @@ const DENSITY: Record<string, { body: string; gap: string; headerPad: string }> 
   spacious:    { body: '12px', gap: '8px',  headerPad: '12px 14px 12px 17px' },
 }
 
-export default function SectionCard({ section, onEditSection, onEditItem, onAddItem }: Props) {
+export default function SectionCard({ section, canEdit: canEditProp, onEditSection, onEditItem, onAddItem }: Props) {
   const { editMode, searchQuery, moveItem, toggleCollapse, appearance, displayOptions } = useStore()
   const { profile: session } = useAuthStore()
-  const isAdmin  = session?.role === 'admin' || session?.role === 'superadmin'
+  const isAdminRole = session?.role === 'admin' || session?.role === 'superadmin'
+  const isAdmin = canEditProp !== undefined ? canEditProp : isAdminRole
   const accent   = section.accentColor || 'var(--mint)'
   const density  = DENSITY[appearance.sectionDensity] || DENSITY.comfortable
   const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'

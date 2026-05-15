@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../store/authStore'
 
 export default function LoginPage() {
@@ -6,22 +6,34 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(false)
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
+  const [shake, setShake] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim() || !password) { setErr('Username dan password wajib diisi.'); return }
+    if (!username.trim() || !password) {
+      setErr('Username dan password wajib diisi.')
+      triggerShake()
+      return
+    }
     setErr(''); setLoading(true)
     const error = await login(username.trim(), password)
     setLoading(false)
-    if (error) setErr(error)
+    if (error) {
+      setErr('Sampean salah atau lupa password? Colek admin ya 😄')
+      triggerShake()
+    }
+  }
+
+  const triggerShake = () => {
+    setShake(true)
+    setTimeout(() => setShake(false), 600)
   }
 
   return (
     <div className="login-page">
-      <div className="login-box">
+      <div className={`login-box${shake ? ' login-shake' : ''}`}>
         <div className="login-logo">
           <h1>JateamHub</h1>
           <h3>Sugeng Rawuh, Jagoan</h3>
@@ -33,11 +45,12 @@ export default function LoginPage() {
             <label>Username</label>
             <input
               value={username}
-              onChange={e => setUsername(e.target.value)}
+              onChange={e => { setUsername(e.target.value); setErr('') }}
               placeholder="username"
               autoComplete="username"
               autoFocus
               disabled={loading}
+              className={shake ? 'input-error' : ''}
             />
           </div>
           <div className="form-group">
@@ -46,25 +59,38 @@ export default function LoginPage() {
               <input
                 type={showPw ? 'text' : 'password'}
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={e => { setPassword(e.target.value); setErr('') }}
                 placeholder="••••••••"
                 autoComplete="current-password"
                 disabled={loading}
+                className={shake ? 'input-error' : ''}
               />
               <button type="button" className="pw-toggle" onClick={() => setShowPw(v => !v)}>
                 {showPw ? '🙈' : '👁'}
               </button>
             </div>
           </div>
-          <div className="login-error">{err}</div>
+
+          {err && (
+            <div className="login-error-box">
+              <span className="login-error-icon">⚠️</span>
+              <span>{err}</span>
+            </div>
+          )}
+
           <button type="submit" className="btn-login" disabled={loading}>
-            {loading ? 'Masuk...' : 'Login'}
+            {loading ? (
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <span className="login-spinner" />
+                Masuk...
+              </span>
+            ) : 'LOGIN'}
           </button>
         </form>
 
-        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: 'var(--silver3)', lineHeight: 1.6 }}>
+        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: 'var(--silver3)', lineHeight: 1.8 }}>
           Tidak punya akun?<br />
-          Hubungi <span style={{ color: 'var(--mint)' }}>Admin</span> untuk mendapatkan akses.
+          Hubungi <span style={{ color: 'var(--mint)', fontWeight: 600 }}>Admin</span> untuk mendapatkan akses.
         </div>
       </div>
     </div>

@@ -20,7 +20,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenConfig }: P
   const { profile: session } = useAuthStore()
 
   const isEditable = canEdit(session as any)
-  const subtitle   = (config.meta.subtitle || 'Selamat datang').replace('{username}', session?.username || '')
+  const emoji    = (session as any)?.avatar_emoji ?? ''
+  const subtitle = (config.meta.subtitle || 'Selamat datang')
+    .replace('{username}', `${session?.username || ''}${emoji ? ' ' + emoji : ''}`)
 
   // Navbar: admin lihat semua, user hanya USER_PAGES
   const accessiblePageIds = getAccessiblePages(session as any)
