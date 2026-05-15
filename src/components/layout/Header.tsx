@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useStore } from '../../store/dashboardStore'
+import { useAuthStore } from '../../store/authStore'
 import { getAccessiblePages, canEdit } from '../../utils/roles'
 import { sanitizePage } from '../../utils/security'
 import { USER_PAGES } from '../../types'
@@ -12,16 +13,17 @@ interface Props {
 
 export default function Header({ onToggleOptions, optionsOpen, onOpenConfig }: Props) {
   const {
-    session, config, editMode, toggleEditMode,
+    config, editMode, toggleEditMode,
     searchQuery, setSearch, currentPage, setCurrentPage,
     previewUnit, setPreviewUnit,
   } = useStore()
+  const { profile: session } = useAuthStore()
 
-  const isEditable = canEdit(session)
+  const isEditable = canEdit(session as any)
   const subtitle   = (config.meta.subtitle || 'Selamat datang').replace('{username}', session?.username || '')
 
   // Navbar: admin lihat semua, user hanya USER_PAGES
-  const accessiblePageIds = getAccessiblePages(session)
+  const accessiblePageIds = getAccessiblePages(session as any)
   const visiblePages = (config.pages ?? []).filter(p => accessiblePageIds.includes(p.id))
 
   // Auto-redirect kalau currentPage tidak accessible
@@ -31,7 +33,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenConfig }: P
     if (!accessiblePageIds.includes(currentPage) || safePage !== currentPage) {
       setCurrentPage('beranda')
     }
-  }, [session?.role, session?.unitId, currentPage, config.pages])
+  }, [session?.role, (session as any)?.unit_id, currentPage, config.pages])
 
   return (
     <>

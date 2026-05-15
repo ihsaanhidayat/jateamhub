@@ -10,6 +10,7 @@ import {
 } from '../types'
 import { uid } from '../utils/helpers'
 import { sanitizeRole, sanitizePage } from '../utils/security'
+import { loadConfigFromDB, saveConfigToDB } from '../utils/supabase'
 
 const DATA_KEY   = 'jateamhub-data'
 const AUTH_KEY   = 'jateamhub-auth'
@@ -217,6 +218,8 @@ interface DashboardStore {
   config: JateamConfig
   setConfig:   (cfg: JateamConfig) => void
   resetConfig: () => void
+  loadRemoteConfig: () => Promise<void>
+  syncConfig: (cfg: JateamConfig) => void
 
   addSection:          (title: string, icon: string, subtitle: string, accentColor?: string, visibility?: string, targetUnits?: string[], pageId?: string, type?: string, widgetType?: string) => void
   updateSection:       (id: string, title: string, icon: string, subtitle: string, width: number, accentColor?: string, pageId?: string, visibility?: string, targetUnits?: string[]) => void
@@ -349,12 +352,38 @@ export const useStore = create<DashboardStore>((set, get) => ({
     cfg.sections       = autoLayout(cfg.sections || [])
     cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
     cfg.pages          = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
-    persist(cfg); set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions })
+    persist(cfg)
+    saveConfigToDB(cfg as unknown as Record<string, unknown>)
+    set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions })
   },
   resetConfig: () => {
     const fresh = structuredClone(defaultConfig)
     persist(fresh)
+    saveConfigToDB(fresh as unknown as Record<string, unknown>)
     set({ config: fresh, appearance: fresh.appearance, displayOptions: fresh.displayOptions, currentPage: 'beranda', previewUnit: null })
+  },
+
+  // Load config dari Supabase DB — dipanggil saat app init
+  loadRemoteConfig: async () => {
+    try {
+      const remote = await loadConfigFromDB()
+      if (!remote || !Array.isArray((remote as any).sections)) return
+      const cfg = remote as unknown as JateamConfig
+      cfg.appearance     = { ...DEFAULT_APPEARANCE, ...(cfg.appearance   ?? {}) }
+      cfg.sections       = autoLayout(cfg.sections || [])
+      cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
+      cfg.pages          = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
+      persist(cfg)
+      set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions })
+    } catch (e) {
+      console.error('[JateamHub] loadRemoteConfig failed:', e)
+    }
+  },
+
+  // Sync config ke DB (dipanggil dari setConfig)
+  syncConfig: (cfg) => {
+    saveConfigToDB(cfg as unknown as Record<string, unknown>)
+      .then(({ error }) => { if (error) console.error('[JateamHub] syncConfig error:', error) })
   },
 
   // ── sections ─────────────────────────────────────────────
@@ -427,7 +456,9 @@ export const useStore = create<DashboardStore>((set, get) => ({
       const s = cfg.sections.find(s => s.id === id)
       if (s && !s.collapsed) { s.layout = { ...s.layout, ...layout }; s._expandedH = layout.h }
     })
-    persist(cfg); set({ config: cfg })
+    persist(cfg)
+    saveConfigToDB(cfg as unknown as Record<string, unknown>)
+    set({ config: cfg })
   },
 
   resetLayout: () => {

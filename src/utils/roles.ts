@@ -1,6 +1,13 @@
-import type { UserSession, UnitId, Role } from '../types'
 import { USER_PAGES, ADMIN_PAGES } from '../types'
 
+// Minimal session type — kompatibel dengan UserSession maupun Profile
+interface SessionLike {
+  role: string
+  unitId?: string
+  unit_id?: string
+}
+
+import type { Role, UnitId } from '../types'
 export type { Role, UnitId }
 
 // Unit display info
@@ -38,12 +45,12 @@ export const ROLE_DESC: Record<Role, string> = {
 }
 
 // Badge label di options panel — tampilkan unit kalau ada, role kalau tidak
-export const getDisplayBadge = (session: UserSession | null): { label: string; color: string } => {
+export const getDisplayBadge = (session: SessionLike | null): { label: string; color: string } => {
   if (!session) return { label: 'Guest', color: '#555' }
   if (session.role === 'superadmin') return { label: 'Super Admin', color: ROLE_BADGE_COLOR.superadmin }
   if (session.role === 'admin')      return { label: 'Admin',       color: ROLE_BADGE_COLOR.admin }
-  // user — tampilkan unit
-  const unit = session.unitId ?? ''
+  // user — tampilkan unit (support Profile.unit_id dan UserSession.unitId)
+  const unit = (session as any).unit_id ?? (session as any).unitId ?? ''
   return {
     label: UNIT_LABELS[unit] ?? 'User',
     color: UNIT_BADGE_COLOR[unit] ?? '#999',
@@ -51,7 +58,7 @@ export const getDisplayBadge = (session: UserSession | null): { label: string; c
 }
 
 // Halaman yang bisa diakses berdasarkan session
-export const getAccessiblePages = (session: UserSession | null): string[] => {
+export const getAccessiblePages = (session: SessionLike | null): string[] => {
   if (!session) return USER_PAGES
   // Admin & superadmin: hanya BERANDA, PANDUAN, SUPPORT di navbar
   // PRO/CRO/KLAIM dikelola via section visibility — tidak perlu halaman terpisah di navbar
@@ -60,15 +67,15 @@ export const getAccessiblePages = (session: UserSession | null): string[] => {
   return USER_PAGES
 }
 
-export const canAccessPage = (session: UserSession | null, pageId: string): boolean =>
+export const canAccessPage = (session: SessionLike | null, pageId: string): boolean =>
   getAccessiblePages(session).includes(pageId)
 
 // Permission checks
-export const canEdit        = (s: UserSession | null) => s?.role === 'superadmin' || s?.role === 'admin'
-export const canCreateUser  = (s: UserSession | null) => s?.role === 'superadmin' || s?.role === 'admin'
-export const canCreateAdmin = (s: UserSession | null) => s?.role === 'superadmin'
-export const isSuperAdmin   = (s: UserSession | null) => s?.role === 'superadmin'
-export const isAdmin        = (s: UserSession | null) => s?.role === 'admin'
+export const canEdit        = (s: SessionLike | null) => s?.role === 'superadmin' || s?.role === 'admin'
+export const canCreateUser  = (s: SessionLike | null) => s?.role === 'superadmin' || s?.role === 'admin'
+export const canCreateAdmin = (s: SessionLike | null) => s?.role === 'superadmin'
+export const isSuperAdmin   = (s: SessionLike | null) => s?.role === 'superadmin'
+export const isAdmin        = (s: SessionLike | null) => s?.role === 'admin'
 
 // Roles yang bisa dibuat admin
 export const ADMIN_CREATABLE_ROLES: Role[] = ['user']
@@ -84,7 +91,7 @@ export const UNIT_OPTIONS: { value: UnitId; label: string }[] = [
 
 // Cek apakah section boleh tampil untuk session ini
 export const canViewSection = (
-  session: UserSession | null,
+  session: SessionLike | null,
   visibility: string,
   targetUnits: string[],
 ): boolean => {

@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useStore } from '../../store/dashboardStore'
+import { useAuthStore } from '../../store/authStore'
 import { canEdit, canCreateUser, getDisplayBadge } from '../../utils/roles'
 import type { ItemDisplayMode, IconSize, LabelMode, SectionDensity } from '../../types'
 
@@ -74,7 +75,7 @@ function ChipGroup<T extends string>({ options, value, onChange }: {
 
 export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers }: Props) {
   const {
-    session, logout,
+    logout: _logout,
     editMode, toggleEditMode,
     presets, savePreset, applyPreset, deletePreset,
     displayOptions, setDisplayOptions,
@@ -83,6 +84,8 @@ export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers 
     toast,
   } = useStore()
 
+  const { profile: session, logout: authLogout } = useAuthStore()
+  const logout = authLogout
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -97,8 +100,8 @@ export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers 
 
   if (!open) return null
 
-  const isEditable   = canEdit(session)
-  const canManageUsers = canCreateUser(session)
+  const isEditable   = canEdit(session as any)
+  const canManageUsers = canCreateUser(session as any)
   const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'
 
   return (
@@ -250,7 +253,7 @@ export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers 
               Halo <strong style={{ color: 'var(--mint)' }}>{session?.username}</strong>
             </span>
             {(() => {
-              const badge = getDisplayBadge(session)
+              const badge = getDisplayBadge(session as any)
               return (
                 <span style={{
                   fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 2,

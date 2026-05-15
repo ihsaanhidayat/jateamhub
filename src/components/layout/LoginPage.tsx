@@ -1,18 +1,21 @@
 import { useState } from 'react'
-import { useStore } from '../../store/dashboardStore'
+import { useAuthStore } from '../../store/authStore'
 
 export default function LoginPage() {
-  const { login } = useStore()
-  const [showPw, setShowPw] = useState(false)
-  const [lUser, setLUser] = useState('')
-  const [lPass, setLPass] = useState('')
-  const [remember, setRemember] = useState<'never' | 'session' | 'always'>('never')
-  const [err, setErr] = useState('')
+  const { login } = useAuthStore()
+  const [showPw, setShowPw]     = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(false)
+  const [err, setErr]           = useState('')
+  const [loading, setLoading]   = useState(false)
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setErr('')
-    const error = login(lUser.trim(), lPass, remember)
+    if (!username.trim() || !password) { setErr('Username dan password wajib diisi.'); return }
+    setErr(''); setLoading(true)
+    const error = await login(username.trim(), password)
+    setLoading(false)
     if (error) setErr(error)
   }
 
@@ -21,7 +24,6 @@ export default function LoginPage() {
       <div className="login-box">
         <div className="login-logo">
           <h1>JateamHub</h1>
-          <h3>Sugeng Rawuh, Jagoan</h3>
           <div className="underline" />
         </div>
 
@@ -29,11 +31,12 @@ export default function LoginPage() {
           <div className="form-group">
             <label>Username</label>
             <input
-              value={lUser}
-              onChange={e => setLUser(e.target.value)}
+              value={username}
+              onChange={e => setUsername(e.target.value)}
               placeholder="username"
               autoComplete="username"
               autoFocus
+              disabled={loading}
             />
           </div>
           <div className="form-group">
@@ -41,33 +44,25 @@ export default function LoginPage() {
             <div className="pw-wrap">
               <input
                 type={showPw ? 'text' : 'password'}
-                value={lPass}
-                onChange={e => setLPass(e.target.value)}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 autoComplete="current-password"
+                disabled={loading}
               />
               <button type="button" className="pw-toggle" onClick={() => setShowPw(v => !v)}>
                 {showPw ? '🙈' : '👁'}
               </button>
             </div>
           </div>
-          <div className="form-group">
-            <label>Remember Me</label>
-            <select value={remember} onChange={e => setRemember(e.target.value as typeof remember)}>
-              <option value="never">Never</option>
-              <option value="session">This Session</option>
-              <option value="always">Always</option>
-            </select>
-          </div>
           <div className="login-error">{err}</div>
-          <button type="submit" className="btn-login">Login</button>
+          <button type="submit" className="btn-login" disabled={loading}>
+            {loading ? 'Masuk...' : 'Login'}
+          </button>
         </form>
 
-        <div style={{
-          marginTop: 20, textAlign: 'center',
-          fontSize: 11, color: 'var(--silver3)', lineHeight: 1.6,
-        }}>
-          Tidak punya akun?<br />
+        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: 'var(--silver3)', lineHeight: 1.6 }}>
+          Tidak punya akun?<br/>
           Hubungi <span style={{ color: 'var(--mint)' }}>Admin</span> untuk mendapatkan akses.
         </div>
       </div>

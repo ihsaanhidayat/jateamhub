@@ -10,22 +10,26 @@ import NotesWidget from '../widgets/NotesWidget'
 import type { Section, LinkItem } from '../../types'
 import { GRID_ROW_HEIGHT, SECTION_MIN_W, SECTION_MIN_H, SECTION_DEFAULT_W, SECTION_DEFAULT_H } from '../../types'
 import { canEdit, canViewSection } from '../../utils/roles'
+import { useAuthStore } from '../../store/authStore'
 
 const ReactGridLayout = WidthProvider(RGL)
 const ADD_KEY = '__add_section__'
 
 export default function GridLayout() {
-  const { config, editMode, session, batchUpdateLayouts, searchQuery, currentPage, previewUnit } = useStore()
+  const { config, editMode, batchUpdateLayouts, searchQuery, currentPage, previewUnit } = useStore()
+  const { profile: session } = useAuthStore()
 
-  const isEditable = canEdit(session)
+  const isEditable    = canEdit(session as any)
   // Effective unit & session — pakai previewUnit kalau admin lagi preview
-  const effectiveUnit = (previewUnit ?? session?.unitId ?? '') as import('../../types').UnitId
-  const effectiveSession: import('../../types').UserSession | null = previewUnit !== null
-    ? { username: session!.username, role: 'user', unitId: effectiveUnit, remember: session!.remember }
+  const sessionUnit = (session as any)?.unit_id ?? (session as any)?.unitId ?? ''
+  const effectiveUnit = (previewUnit ?? sessionUnit) as import('../../types').UnitId
+  // SessionLike minimal — cukup untuk canViewSection
+  const effectiveSession = previewUnit !== null
+    ? { role: 'user' as const, unit_id: effectiveUnit, unitId: effectiveUnit, username: session?.username ?? '', remember: 'never' as const }
     : session
 
   const [sectionModal, setSectionModal] = useState<{ open: boolean; section: Section | null }>({ open: false, section: null })
-  const [itemModal, setItemModal] = useState<{ open: boolean; sectionId: string; item: LinkItem | null }>({ open: false, sectionId: '', item: null })
+  const [itemModal,    setItemModal]    = useState<{ open: boolean; sectionId: string; item: LinkItem | null }>({ open: false, sectionId: '', item: null })
 
   // Filter sections:
   // 1. Hanya di currentPage
@@ -37,9 +41,9 @@ export default function GridLayout() {
     const isUnitPage = UNIT_PAGES.includes(currentPage)
 
     const filtered = config.sections.filter(s => {
-      const sPageId = s.pageId ?? 'beranda'
-      const sVis = s.visibility ?? 'all'
-      const sUnits = s.targetUnits ?? []
+      const sPageId    = s.pageId ?? 'beranda'
+      const sVis       = s.visibility ?? 'all'
+      const sUnits     = s.targetUnits ?? []
 
       if (previewUnit === null && isEditable) {
         // Admin di halaman unit (preview via options) — tidak masuk sini karena previewUnit null
@@ -132,8 +136,8 @@ export default function GridLayout() {
       minW: SECTION_MIN_W,
       minH: s.collapsed ? 1 : SECTION_MIN_H,
       maxH: s.collapsed ? 1 : undefined,
-      isDraggable: isEditable && editMode,
-      isResizable: isEditable && editMode && !s.collapsed,
+      isDraggable:   isEditable && editMode,
+      isResizable:   isEditable && editMode && !s.collapsed,
       resizeHandles: ['se'] as ['se'],
     }))
     if (isEditable && editMode) {
@@ -249,7 +253,7 @@ function WidgetWrapper({ section, editMode, onEdit }: { section: Section; editMo
             <button className="sec-action-btn" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onEdit(section) }} title="Edit widget">✏️</button>
           )}
           <button className={`sec-collapse-btn${section.collapsed ? '' : ' open'}`} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); toggleCollapse(section.id) }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5L7 9L11 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5L7 9L11 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../../store/dashboardStore'
+import { useAuthStore } from '../../store/authStore'
 import type { Section, LinkItem, AppearanceSettings } from '../../types'
 import { highlight } from '../../utils/helpers'
 import AppIcon from '../ui/AppIcon'
@@ -8,21 +9,22 @@ import { sanitizeUrl } from '../../utils/security'
 interface Props {
   section: Section
   onEditSection: (s: Section) => void
-  onEditItem: (sectionId: string, item: LinkItem) => void
-  onAddItem: (sectionId: string) => void
+  onEditItem:    (sectionId: string, item: LinkItem) => void
+  onAddItem:     (sectionId: string) => void
 }
 
 const DENSITY: Record<string, { body: string; gap: string; headerPad: string }> = {
-  compact: { body: '4px', gap: '2px', headerPad: '7px 12px 7px 15px' },
-  comfortable: { body: '6px', gap: '4px', headerPad: '9px 12px 9px 15px' },
-  spacious: { body: '12px', gap: '8px', headerPad: '12px 14px 12px 17px' },
+  compact:     { body: '4px',  gap: '2px',  headerPad: '7px 12px 7px 15px'  },
+  comfortable: { body: '6px',  gap: '4px',  headerPad: '9px 12px 9px 15px'  },
+  spacious:    { body: '12px', gap: '8px',  headerPad: '12px 14px 12px 17px' },
 }
 
 export default function SectionCard({ section, onEditSection, onEditItem, onAddItem }: Props) {
-  const { editMode, session, searchQuery, moveItem, toggleCollapse, appearance, displayOptions } = useStore()
-  const isAdmin = session?.role === 'admin' || session?.role === 'superadmin'
-  const accent = section.accentColor || 'var(--mint)'
-  const density = DENSITY[appearance.sectionDensity] || DENSITY.comfortable
+  const { editMode, searchQuery, moveItem, toggleCollapse, appearance, displayOptions } = useStore()
+  const { profile: session } = useAuthStore()
+  const isAdmin  = session?.role === 'admin' || session?.role === 'superadmin'
+  const accent   = section.accentColor || 'var(--mint)'
+  const density  = DENSITY[appearance.sectionDensity] || DENSITY.comfortable
   const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'
 
   // item drag state (native HTML DnD — tidak konflik dengan RGL)
@@ -55,10 +57,10 @@ export default function SectionCard({ section, onEditSection, onEditItem, onAddI
   const q = searchQuery.toLowerCase()
   const filteredItems = q
     ? section.items.filter(i =>
-      i.title.toLowerCase().includes(q) ||
-      (i.desc && i.desc.toLowerCase().includes(q)) ||
-      i.tags.some(t => t.toLowerCase().includes(q))
-    )
+        i.title.toLowerCase().includes(q) ||
+        (i.desc && i.desc.toLowerCase().includes(q)) ||
+        i.tags.some(t => t.toLowerCase().includes(q))
+      )
     : section.items
 
   return (
@@ -141,7 +143,7 @@ export default function SectionCard({ section, onEditSection, onEditItem, onAddI
             title={section.collapsed ? 'Expand' : 'Collapse'}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M3 5L7 9L11 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3 5L7 9L11 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
         </div>
@@ -216,7 +218,7 @@ export default function SectionCard({ section, onEditSection, onEditItem, onAddI
       {isAdmin && editMode && (
         <div className="rgl-resize-hint" title="Drag untuk resize">
           <svg width="10" height="10" viewBox="0 0 10 10">
-            <path d="M2 9L9 2M5 9L9 5M8 9L9 8" stroke="var(--mint)" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M2 9L9 2M5 9L9 5M8 9L9 8" stroke="var(--mint)" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
         </div>
       )}
@@ -243,18 +245,18 @@ interface ListItemProps {
   showDesc: boolean
   showTags: boolean
   onDragStart: (e: React.DragEvent, item: LinkItem) => void
-  onDragOver: (e: React.DragEvent, id: string) => void
-  onDrop: (e: React.DragEvent, id: string) => void
+  onDragOver:  (e: React.DragEvent, id: string) => void
+  onDrop:      (e: React.DragEvent, id: string) => void
   onDragLeave: () => void
   onEdit: () => void
 }
 
 function ListItem({ item, searchQuery, editMode, dragOver, appearance, showDesc, showTags, onDragStart, onDragOver, onDrop, onDragLeave, onEdit }: ListItemProps) {
   const [hovered, setHovered] = useState(false)
-  const isCompact = appearance.itemDisplayMode === 'list'
+  const isCompact  = appearance.itemDisplayMode === 'list'
   const isTextOnly = appearance.itemDisplayMode === 'textOnly'
   const isIconOnly = appearance.itemDisplayMode === 'iconOnly'
-  const showLabel = appearance.labelMode === 'show' || (appearance.labelMode === 'hover' && hovered)
+  const showLabel  = appearance.labelMode === 'show' || (appearance.labelMode === 'hover' && hovered)
   const showTooltip = appearance.tooltipEnabled && hovered && (
     isIconOnly || appearance.labelMode === 'hide' || (appearance.labelMode === 'hover' && item.desc)
   )
@@ -315,8 +317,8 @@ interface FolderItemProps {
   dragOver: boolean
   appearance: AppearanceSettings
   onDragStart: (e: React.DragEvent, item: LinkItem) => void
-  onDragOver: (e: React.DragEvent, id: string) => void
-  onDrop: (e: React.DragEvent, id: string) => void
+  onDragOver:  (e: React.DragEvent, id: string) => void
+  onDrop:      (e: React.DragEvent, id: string) => void
   onDragLeave: () => void
   onEdit: () => void
 }

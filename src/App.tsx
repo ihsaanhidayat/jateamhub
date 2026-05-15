@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useAuthStore } from './store/authStore'
 import { useStore } from './store/dashboardStore'
 import LoginPage from './components/layout/LoginPage'
 import Header from './components/layout/Header'
@@ -15,15 +16,42 @@ import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 
 export default function App() {
-  const { session, initSession, editMode, currentPage } = useStore()
+  const { profile, initialized, init } = useAuthStore()
+  const { editMode, currentPage, loadRemoteConfig, toast } = useStore()
+
   const [optionsOpen,  setOptionsOpen]  = useState(false)
   const [configOpen,   setConfigOpen]   = useState(false)
   const [pageInfoOpen, setPageInfoOpen] = useState(false)
   const [usersOpen,    setUsersOpen]    = useState(false)
 
-  useEffect(() => { initSession() }, [])
+  // Init auth saat app mount
+  useEffect(() => { init() }, [])
 
-  if (!session) return <LoginPage />
+  // Load remote config setelah login
+  useEffect(() => {
+    if (profile) {
+      loadRemoteConfig()
+      // Inject toast ke authStore
+      useAuthStore.getState().setToastFn(toast)
+    }
+  }, [profile?.id])
+
+  // Loading state
+  if (!initialized) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', background: 'var(--black)',
+        color: 'var(--mint)', fontSize: 14, fontFamily: 'var(--font)',
+        gap: 10,
+      }}>
+        <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span>
+        Memuat...
+      </div>
+    )
+  }
+
+  if (!profile) return <LoginPage />
 
   const isSupport = currentPage === 'support'
 
@@ -48,7 +76,6 @@ export default function App() {
         {isSupport ? <SupportPage /> : <GridLayout />}
       </main>
 
-      {/* Edit bar hanya muncul di halaman non-support */}
       {!isSupport && <EditBar onOpenPageInfo={() => setPageInfoOpen(true)} />}
 
       <ConfigModal         open={configOpen}   onClose={() => setConfigOpen(false)} />
