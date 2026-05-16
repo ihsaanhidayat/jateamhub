@@ -51,7 +51,7 @@ export default function App() {
 
       // Coffee popup — sekali per session untuk user & admin_unit
       const sessionKey = `coffee-shown-${profile.id}`
-      if (!sessionStorage.getItem(sessionKey) && (profile.role === 'user' || profile.role === 'admin_unit')) {
+      if (!sessionStorage.getItem(sessionKey) && (profile.role === 'user' || profile.role === 'guest')) {
         sessionStorage.setItem(sessionKey, '1')
         setTimeout(() => setCoffeeOpen(true), 1500)
       }
@@ -81,7 +81,7 @@ export default function App() {
       <Header
         onToggleOptions={() => setOptionsOpen(v => !v)}
         optionsOpen={optionsOpen}
-        onOpenProfile={() => setProfileOpen(true)}
+        onOpenAdvanced={() => setProfileOpen(true)}
       />
 
       <OptionsPanel open={optionsOpen} onClose={() => setOptionsOpen(false)} />

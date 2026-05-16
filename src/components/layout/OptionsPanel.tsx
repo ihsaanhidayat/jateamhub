@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
-import { can, canSeeOptionsPanel } from '../../utils/roles'
+import { can, canSeeOptions } from '../../utils/roles'
 import type { ItemDisplayMode, IconSize, LabelMode, ThemeId } from '../../types'
 import { THEMES } from '../../types'
 
@@ -69,7 +69,7 @@ export default function OptionsPanel({ open, onClose }: Props) {
     return () => document.removeEventListener('mousedown', handler)
   }, [open, onClose])
 
-  if (!open || !canSeeOptionsPanel(session as any)) return null
+  if (!open || !canSeeOptions(session as any)) return null
 
   const isSuperAdmin   = session?.role === 'superadmin'
   const isFolderGrid   = appearance.itemDisplayMode === 'folderGrid'
@@ -96,7 +96,7 @@ export default function OptionsPanel({ open, onClose }: Props) {
                   border: `1px solid ${globalTheme === t.id ? 'var(--mint)' : 'var(--border2)'}`,
                   cursor: 'pointer', transition: 'all .15s', textAlign: 'left',
                 }}>
-                  <div style={{ width: 20, height: 20, borderRadius: 4, background: t.accent, flexShrink: 0, boxShadow: `0 0 6px ${t.accent}66` }} />
+                  <div style={{ width: 20, height: 20, borderRadius: 4, background: t.colors[1], flexShrink: 0, boxShadow: `0 0 6px ${t.colors[1]}66` }} />
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: globalTheme === t.id ? 'var(--mint)' : 'var(--silver2)' }}>{t.name}</div>
                     <div style={{ fontSize: 10, color: 'var(--silver3)' }}>{t.description}</div>

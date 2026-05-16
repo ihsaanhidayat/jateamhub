@@ -1,12 +1,12 @@
 import { create } from 'zustand'
 import {
   supabase, getProfile, signIn, signOut,
-  createUser, getAllProfiles, getUnitProfiles,
+  createUser, getAllProfiles, getProfilesByScope,
   updateProfile, updateUserPassword,
 } from '../utils/supabaseClient'
 import type { Profile } from '../utils/supabaseClient'
-import type { Role, UnitId } from '../types'
-import { can } from '../utils/roles'
+import type { Role } from '../types'
+import { canManageUser, canCreateUser, canAssignRole, getRegion, getUnit } from '../utils/roles'
 
 interface AuthState {
   profile:     Profile | null
@@ -19,17 +19,13 @@ interface AuthState {
   login:       (username: string, password: string) => Promise<string | null>
   logout:      () => Promise<void>
   loadUsers:   () => Promise<void>
-  addUser:     (username: string, password: string, role: Role, unitId: UnitId) => Promise<string | null>
-  updateUser:  (userId: string, role: Role, unitId: UnitId, newPassword?: string, avatarEmoji?: string) => Promise<string | null>
+  addUser:     (username: string, password: string, role: Role, unitId: string, regionScope?: string, unitScope?: string) => Promise<string | null>
+  updateUser:  (userId: string, role: Role, unitId: string, newPassword?: string, emoji?: string, regionScope?: string, unitScope?: string) => Promise<string | null>
   removeUser:  (userId: string) => Promise<string | null>
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  profile:     null,
-  loading:     false,
-  initialized: false,
-  users:       [],
-  _toast:      null,
+  profile: null, loading: false, initialized: false, users: [], _toast: null,
 
   setToastFn: (fn) => set({ _toast: fn }),
 
@@ -64,73 +60,53 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return null
   },
 
-  logout: async () => {
-    await signOut()
-    set({ profile: null })
-  },
+  logout: async () => { await signOut(); set({ profile: null }) },
 
   loadUsers: async () => {
-    const myProfile = get().profile
-    if (!myProfile) return
-    // admin_unit hanya lihat user di unitnya
-    if (myProfile.role === 'admin_unit') {
-      const profiles = await getUnitProfiles(myProfile.unit_id)
-      set({ users: profiles })
+    const me = get().profile
+    if (!me) return
+    if (me.role === 'superadmin' || (me.role === 'admin' && (me.region_scope ?? 'global') === 'global')) {
+      set({ users: await getAllProfiles() })
     } else {
-      const profiles = await getAllProfiles()
-      set({ users: profiles })
+      set({ users: await getProfilesByScope(me.region_scope ?? 'global', me.unit_scope ?? 'general') })
     }
   },
 
-  addUser: async (username, password, role, unitId) => {
-    const myProfile = get().profile
-    if (!myProfile) return 'Tidak ada sesi.'
-
-    // Permission check
-    if (role === 'superadmin') return 'Role superadmin tidak bisa dibuat.'
-    if (role === 'admin' && myProfile.role !== 'superadmin') return 'Hanya superadmin yang bisa membuat admin.'
-    if (myProfile.role === 'admin_unit') {
-      // admin_unit hanya bisa buat user di unitnya
-      if (role !== 'user') return 'Admin unit hanya bisa membuat user biasa.'
-      if (unitId !== myProfile.unit_id) return 'Admin unit hanya bisa membuat user di unitnya.'
-    }
-
-    const { error } = await createUser(username, password, role, unitId)
+  addUser: async (username, password, role, unitId, regionScope, unitScope) => {
+    const me = get().profile
+    if (!me) return 'Tidak ada sesi.'
+    if (!canCreateUser(me as any, role)) return 'Tidak ada akses untuk membuat user dengan role ini.'
+    if (!canAssignRole(me as any, role)) return 'Tidak bisa assign role ini.'
+    const { error } = await createUser(username, password, role, unitId, regionScope, unitScope)
     if (error) return error.message
     await get().loadUsers()
     return null
   },
 
-  updateUser: async (userId, role, unitId, newPassword, avatarEmoji) => {
-    const myProfile = get().profile
-    if (!myProfile) return 'Tidak ada sesi.'
+  updateUser: async (userId, role, unitId, newPassword, emoji, regionScope, unitScope) => {
+    const me = get().profile
+    if (!me) return 'Tidak ada sesi.'
     const target = get().users.find(u => u.id === userId)
+    if (!target) return 'User tidak ditemukan.'
 
-    // Permission checks
-    if (role === 'superadmin' && target?.role !== 'superadmin') return 'Tidak bisa assign superadmin.'
-    if (target?.role === 'superadmin' && role !== 'superadmin')  return 'Tidak bisa ubah role superadmin.'
-    if (role === 'admin' && myProfile.role !== 'superadmin')     return 'Hanya superadmin yang bisa assign admin.'
-    if (myProfile.role === 'admin_unit' && target?.unit_id !== myProfile.unit_id) return 'Tidak bisa edit user unit lain.'
+    if (userId !== me.id && !canManageUser(me as any, target as any)) return 'Tidak ada akses untuk edit user ini.'
+    if (target.role === 'superadmin' && me.role !== 'superadmin') return 'Tidak bisa edit superadmin.'
+    if (role !== target.role && !canAssignRole(me as any, role)) return 'Tidak bisa assign role ini.'
 
-    // Update profile
-    if (target?.role !== 'superadmin') {
-      const updates: Partial<Profile> = { role, unit_id: unitId }
-      if (avatarEmoji !== undefined && can({ role: myProfile.role }, 'APPEARANCE_EMOJI_AVATAR')) {
-        updates.avatar_emoji = avatarEmoji
-      }
-      const { error } = await updateProfile(userId, updates)
-      if (error) return error.message
-    } else {
-      if (avatarEmoji !== undefined) {
-        await updateProfile(userId, { avatar_emoji: avatarEmoji })
-      }
+    const updates: Partial<Profile> = {
+      role,
+      unit_id:      unitId,
+      unit_scope:   unitScope  ?? target.unit_scope  ?? 'general',
+      region_scope: regionScope ?? target.region_scope ?? 'global',
     }
+    if (emoji !== undefined) updates.emoji = emoji
 
-    // Update password — hanya superadmin dan admin
+    const { error } = await updateProfile(userId, updates)
+    if (error) return error.message
+
     if (newPassword && newPassword.length >= 6) {
-      if (!can({ role: myProfile.role }, 'USER_RESET_PASSWORD')) return 'Tidak ada akses untuk reset password.'
-      const { error } = await updateUserPassword(userId, newPassword)
-      if (error) return error.message
+      const { error: pwErr } = await updateUserPassword(userId, newPassword) as any
+      if (pwErr) return pwErr.message
     }
 
     await get().loadUsers()
@@ -138,14 +114,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   removeUser: async (userId) => {
-    const myProfile = get().profile
-    if (!myProfile) return 'Tidak ada sesi.'
-    if (userId === myProfile.id) return 'Tidak bisa hapus akun sendiri.'
+    const me = get().profile
+    if (!me) return 'Tidak ada sesi.'
+    if (userId === me.id) return 'Tidak bisa hapus akun sendiri.'
     const target = get().users.find(u => u.id === userId)
-    if (target?.role === 'superadmin') return 'Tidak bisa hapus superadmin.'
-    if (target?.role === 'admin' && myProfile.role !== 'superadmin') return 'Hanya superadmin yang bisa hapus admin.'
-    if (myProfile.role === 'admin_unit' && target?.unit_id !== myProfile.unit_id) return 'Tidak bisa hapus user unit lain.'
-
+    if (!target) return 'User tidak ditemukan.'
+    if (!canManageUser(me as any, target as any)) return 'Tidak ada akses untuk hapus user ini.'
+    if (target.role === 'superadmin') return 'Tidak bisa hapus superadmin.'
     const { error } = await supabase.functions.invoke('delete-user', { body: { userId } })
     if (error) await supabase.from('profiles').delete().eq('id', userId)
     await get().loadUsers()
