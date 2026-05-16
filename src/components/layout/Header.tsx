@@ -20,7 +20,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
   const { profile: session } = useAuthStore()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
-  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewOpen,     setPreviewOpen]     = useState(false)
+  const [hamburgerOpen,   setHamburgerOpen]   = useState(false)
+  const hamburgerRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const fileRef    = useRef<HTMLInputElement>(null)
@@ -37,8 +39,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileDropdown(false)
-      if (previewRef.current && !previewRef.current.contains(e.target as Node)) setPreviewOpen(false)
+      if (profileRef.current    && !profileRef.current.contains(e.target as Node))    setProfileDropdown(false)
+      if (previewRef.current    && !previewRef.current.contains(e.target as Node))    setPreviewOpen(false)
+      if (hamburgerRef.current  && !hamburgerRef.current.contains(e.target as Node))  setHamburgerOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -182,19 +185,85 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
             </div>
           )}
 
-          {/* Filter — 10px dari profile area */}
-          <div className="search-wrap" style={{ marginRight: 10 }}>
+          {/* Filter */}
+          <div className="search-wrap desktop-only" style={{ marginRight: 10 }}>
             <input className="search-input" placeholder="Filter..." value={searchQuery} onChange={e => setSearch(e.target.value)} />
             <span className="search-icon">⌕</span>
           </div>
 
-          {/* Edit mode — 5px dari filter */}
-          <button className={`icon-btn${editMode ? ' active' : ''}`} onClick={toggleEditMode} title="Edit Mode"
+          {/* Edit mode */}
+          <button className={`icon-btn desktop-only${editMode ? ' active' : ''}`} onClick={toggleEditMode} title="Edit Mode"
             style={{ marginLeft: 5 }}>✏️</button>
 
-          {/* Options — 10px dari edit mode */}
-          <button id="options-btn" className={`icon-btn${optionsOpen ? ' active' : ''}`} onClick={onToggleOptions} title="Options"
+          {/* Options */}
+          <button id="options-btn" className={`icon-btn desktop-only${optionsOpen ? ' active' : ''}`} onClick={onToggleOptions} title="Options"
             style={{ marginLeft: 10 }}>⚙️</button>
+
+          {/* ── MOBILE ONLY — Hamburger menu ── */}
+          <div className="mobile-only" ref={hamburgerRef} style={{ position: 'relative' }}>
+            <button
+              className={`icon-btn${hamburgerOpen ? ' active' : ''}`}
+              onClick={() => setHamburgerOpen(v => !v)}
+              title="Menu"
+              style={{ fontSize: 18, fontWeight: 700 }}
+            >☰</button>
+            {hamburgerOpen && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                background: 'rgba(12,12,12,0.98)',
+                border: '1px solid rgba(0,255,194,0.15)',
+                borderRadius: 10, minWidth: 220,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                zIndex: 500, overflow: 'hidden',
+                animation: 'scaleIn 0.15s ease',
+              }}>
+                {/* Filter search */}
+                <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      className="search-input"
+                      placeholder="Filter..."
+                      value={searchQuery}
+                      onChange={e => setSearch(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                    <span className="search-icon">⌕</span>
+                  </div>
+                </div>
+                {/* Edit mode */}
+                <button onClick={() => { toggleEditMode(); setHamburgerOpen(false) }} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  width: '100%', padding: '12px 16px', background: editMode ? 'var(--mint-bg)' : 'none',
+                  border: 'none', borderBottom: '1px solid var(--border)',
+                  color: editMode ? 'var(--mint)' : 'var(--silver2)', fontSize: 13,
+                  cursor: 'pointer', fontFamily: 'var(--font)', textAlign: 'left',
+                }}>
+                  <span>✏️</span> Edit Mode {editMode ? '(Aktif)' : ''}
+                </button>
+                {/* Options */}
+                <button onClick={() => { onToggleOptions(); setHamburgerOpen(false) }} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  width: '100%', padding: '12px 16px', background: optionsOpen ? 'var(--mint-bg)' : 'none',
+                  border: 'none', borderBottom: '1px solid var(--border)',
+                  color: 'var(--silver2)', fontSize: 13,
+                  cursor: 'pointer', fontFamily: 'var(--font)', textAlign: 'left',
+                }}>
+                  <span>⚙️</span> Options
+                </button>
+                {/* View mode — hanya admin */}
+                {isAdminLevel && (
+                  <button onClick={() => { setHamburgerOpen(false); setPreviewOpen(v => !v) }} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: '100%', padding: '12px 16px', background: 'none',
+                    border: 'none', color: 'var(--silver2)', fontSize: 13,
+                    cursor: 'pointer', fontFamily: 'var(--font)', textAlign: 'left',
+                  }}>
+                    <span>👁</span> View Mode
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Profile dropdown — lebih besar dari tombol lain */}
           <div className="preview-dropdown" ref={profileRef} style={{ marginLeft: 16 }}>

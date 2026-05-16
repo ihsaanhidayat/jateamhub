@@ -618,8 +618,15 @@ button { cursor: pointer; }
 .header { animation: none; }
 .modal { animation: scaleIn 0.2s ease both; }
 
+/* ── Responsive visibility helpers ──────────────────────────── */
+.desktop-only { display: flex; }
+.mobile-only  { display: none; }
+
 /* ── Mobile Responsive ────────────────────────────────────── */
 @media (max-width: 767px) {
+  /* Sembunyikan desktop tools, tampilkan hamburger */
+  .desktop-only { display: none !important; }
+  .mobile-only  { display: flex !important; }
   .header { height: auto; min-height: 56px; padding: 8px 12px; gap: 8px; }
   .header-left { gap: 12px; flex-wrap: wrap; }
   .header-brand { flex-shrink: 0; }
@@ -627,7 +634,8 @@ button { cursor: pointer; }
   .header-sub { font-size: 10px !important; max-width: 160px; }
   .header-nav { gap: 2px; }
   .nav-link { font-size: 10px !important; padding: 4px 8px !important; }
-  .header-right { gap: 5px; }
+  .header-right { gap: 8px; flex-shrink: 0; }
+  .profile-btn { width: 38px !important; height: 38px !important; flex-shrink: 0; }
   .search-bar { top: 56px; padding: 6px 12px; }
   .search-input { width: 100% !important; font-size: 12px; }
   .search-input:focus { width: 100% !important; }
