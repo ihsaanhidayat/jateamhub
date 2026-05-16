@@ -131,9 +131,12 @@ button { cursor: pointer; }
 }
 .header-brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .header-title {
-  font-size: 20px; font-weight: 800; color: var(--mint);
-  letter-spacing: -0.8px; line-height: 1.1; white-space: nowrap;
+  font-size: 24px; font-weight: 800; color: var(--mint);
+  letter-spacing: -1px; line-height: 1.1; white-space: nowrap;
   text-shadow: 0 0 20px var(--accent-glow);
+}
+.header-sub {
+  font-size: 12px;
 }
 .header-sub {
   font-size: 11px; color: var(--silver3);
@@ -143,16 +146,7 @@ button { cursor: pointer; }
 .header-nav { display: flex; align-items: center; gap: 2px; }
 .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
-/* Search bar — sticky di bawah header */
-.search-bar {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 20px;
-  background: rgba(8,8,8,0.9);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  position: sticky; top: 68px; z-index: 99;
-  backdrop-filter: blur(12px);
-  flex-shrink: 0;
-}
+/* search-bar dihapus — filter ada di header */
 
 .nav-link {
   padding: 6px 14px; font-size: 11px; font-weight: 700;
@@ -227,7 +221,7 @@ button { cursor: pointer; }
 
 /* Profile button */
 .profile-btn {
-  width: 34px; height: 34px; border-radius: 50%;
+  width: 46px; height: 46px; border-radius: 50%;
   background: var(--mint-bg); border: 1.5px solid var(--mint);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden; cursor: pointer; transition: all .15s;
@@ -248,9 +242,8 @@ button { cursor: pointer; }
 .rgl-grid {
   width: 100%;
   min-height: 200px;
-  padding: 16px 48px 24px;
-  max-width: 1600px;
-  margin: 0 auto;
+  /* Margin 17px atas/bawah, 40px kiri/kanan */
+  padding: 17px 40px;
   box-sizing: border-box;
 }
 .rgl-grid .react-grid-item { transition: none !important; }
@@ -362,15 +355,15 @@ button { cursor: pointer; }
 
 /* Folder grid */
 .folder-grid {
-  display: grid; padding: 8px; gap: 6px;
-  grid-template-columns: repeat(var(--folder-cols, 4), 1fr);
+  display: grid; padding: 6px; gap: 4px;
+  grid-template-columns: repeat(var(--folder-cols, 5), 1fr);
 }
 .folder-item {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 5px; padding: 10px 6px; border-radius: var(--radius-sm);
+  gap: 4px; padding: 8px 4px; border-radius: var(--radius-sm);
   background: var(--bg3); border: 1px solid var(--border);
   cursor: pointer; transition: all .15s; text-align: center;
-  position: relative; min-height: 70px;
+  position: relative; min-height: 60px;
 }
 .folder-item:hover { background: var(--bg4); border-color: var(--border2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 .folder-item-icon { width: 36px; height: 36px; border-radius: 8px; object-fit: contain; flex-shrink: 0; }
@@ -647,4 +640,31 @@ button { cursor: pointer; }
 @media (max-width: 380px) {
   .nav-link { font-size: 9px !important; padding: 3px 6px !important; }
   .search-input { width: 80px !important; }
+}
+
+/* ── Shared Section — dari admin, read-only ─────────────────── */
+.section-card.shared-section {
+  /* Border kiri biru untuk indikator shared */
+  --section-accent: #00BFFF;
+}
+.section-card.shared-section .section-header {
+  /* Cursor default — tidak bisa di-drag */
+  cursor: default !important;
+}
+.shared-indicator {
+  /* Label "SHARED" di pojok kanan header */
+  position: absolute;
+  top: 6px; right: 10px;
+  font-size: 8px; font-weight: 700;
+  color: rgba(0,191,255,0.4);
+  font-family: var(--mono);
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+
+/* ── Section body collapse — benar-benar tersembunyi ─────────── */
+.section-body.collapsed {
+  display: none !important;  /* tidak tampil sama sekali */
+  height: 0 !important;
+  overflow: hidden !important;
 }

@@ -46,17 +46,29 @@ export const canManageUsers  = (s: SessionLike | null) => can(s, 'USER_CREATE')
 // ── User management helpers ───────────────────
 export const canManageUser = (current: SessionLike | null, target: SessionLike): boolean => {
   if (!current) return false
+  const isSelf = current.id !== undefined && current.id === target.id
+
+  // Superadmin bisa manage siapapun
   if (current.role === 'superadmin') return true
+
   if (current.role !== 'admin') return false
-  // Admin tidak bisa manage superadmin atau admin lain
+
+  // Setiap admin bisa edit diri sendiri
+  if (isSelf) return true
+
+  // Admin tidak bisa manage superadmin atau sesama admin
   if (target.role === 'superadmin' || target.role === 'admin') return false
+
   const cr = getRegion(current), cu = getUnit(current)
   const tr = getRegion(target),  tu = getUnit(target)
-  // Global admin — bisa semua user
+
+  // Admin global (region:global, unit:general) — bisa semua user
   if (cr === 'global' && cu === 'general') return true
-  // Regional admin — sama region
+
+  // Admin regional (region:xxx, unit:general) — hanya user di region yang sama
   if (cr !== 'global' && cu === 'general') return tr === cr
-  // Regional+unit admin — sama region dan unit
+
+  // Admin unit (region:xxx, unit:yyy) — hanya user di region+unit yang sama
   return tr === cr && tu === cu
 }
 
@@ -115,20 +127,47 @@ export const getAllowedRoles = (current: SessionLike | null): Role[] => {
   return []
 }
 
+// ── Share section permission ─────────────────────────────────
+// Hanya admin regional dan admin unit (bukan admin global) yang bisa share section
+export const canShareSection = (s: SessionLike | null): boolean => {
+  if (!s || s.role !== 'admin') return false
+  const region = getRegion(s)
+  // Admin global (region=global) TIDAK BISA share section ke siapapun
+  if (region === 'global') return false
+  return true
+}
+
+// Dapatkan visibility options yang diizinkan berdasarkan scope admin
+export const getAllowedVisibility = (s: SessionLike | null) => {
+  if (!s || s.role !== 'admin') return []
+  const region = getRegion(s)
+  const unit   = getUnit(s)
+  if (region === 'global') return [] // admin global tidak bisa share
+  if (unit !== 'general') {
+    // Admin unit — hanya bisa share ke unitnya dalam regionnya
+    return [{ value: 'unit', label: `Unit ${unit.toUpperCase()} · ${REGION_LABELS[region] ?? region.toUpperCase()}` }]
+  }
+  // Admin regional — share ke seluruh region
+  return [{ value: 'region', label: `Semua user di ${REGION_LABELS[region] ?? region.toUpperCase()}` }]
+}
+
 // ── Section visibility ────────────────────────
+// Apakah user bisa melihat shared section ini
 export const canViewSection = (
   session: SessionLike | null,
   visibility: string,
-  targetUnits: string[],
+  targetRegion: string | null,
+  targetUnit:   string | null,
 ): boolean => {
   if (!session) return false
+  // Admin dan superadmin bisa lihat semua shared section
   if (session.role === 'superadmin' || session.role === 'admin') return true
-  if (visibility === 'all')   return true
-  if (visibility === 'admin') return false
-  if (visibility === 'unit') {
-    const unit = getUnit(session)
-    return targetUnits.includes(unit) || targetUnits.includes(session.unit_id ?? '')
-  }
+  const userRegion = getRegion(session)
+  const userUnit   = getUnit(session)
+  // Section dari admin regional — tampil ke semua user di region tersebut
+  if (visibility === 'region') return userRegion === targetRegion
+  // Section dari admin unit — tampil ke user di unit+region yang sama
+  if (visibility === 'unit') return userRegion === targetRegion && userUnit === targetUnit
   return false
 }
 

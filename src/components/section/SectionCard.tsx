@@ -8,11 +8,15 @@ import AppIcon from '../ui/AppIcon'
 import { sanitizeUrl } from '../../utils/security'
 
 interface Props {
-  section: Section
-  canEdit?: boolean
-  onEditSection: (s: Section) => void
-  onEditItem:    (sectionId: string, item: LinkItem) => void
-  onAddItem:     (sectionId: string) => void
+  section:              Section
+  isShared?:            boolean
+  canEdit?:             boolean
+  onEditSection:        (s: Section) => void
+  onEditItem:           (sectionId: string, item: LinkItem) => void
+  onAddItem:            (sectionId: string) => void
+  onDeleteSection:      (id: string) => void
+  onToggleFavorite?:    (sectionId: string) => void        // toggle favorite section
+  onToggleFavoriteItem?:(sectionId: string, itemId: string) => void // toggle favorite item
 }
 
 const DENSITY: Record<string, { body: string; gap: string; headerPad: string }> = {
@@ -21,11 +25,15 @@ const DENSITY: Record<string, { body: string; gap: string; headerPad: string }> 
   spacious:    { body: '12px', gap: '8px',  headerPad: '12px 14px 12px 17px' },
 }
 
-export default function SectionCard({ section, canEdit: canEditProp, onEditSection, onEditItem, onAddItem }: Props) {
-  const { editMode, searchQuery, moveItem, toggleCollapse, appearance, displayOptions, deleteSection, deleteItem, toast } = useStore()
+export default function SectionCard({ section, isShared, canEdit: canEditProp, onEditSection, onEditItem, onAddItem, onDeleteSection, onToggleFavorite, onToggleFavoriteItem }: Props) {
+  const { editMode, searchQuery, moveItem, toggleCollapse, appearance, displayOptions, deleteItem, toast } = useStore()
   const { profile: session } = useAuthStore()
-  const isAdminRole = session?.role === 'admin' || session?.role === 'superadmin'
-  const isAdmin = canEditProp !== undefined ? canEditProp : isAdminRole
+  // Semua user bisa edit section pribadi mereka sendiri
+  // Shared section tetap read-only
+  // isAdmin = bisa edit section ini
+  // isShared = false berarti section pribadi, semua user boleh edit
+  // isShared = true berarti dari admin, tidak boleh diedit siapapun
+  const isAdmin = isShared ? false : true
   const [headerHovered, setHeaderHovered] = useState(false)
   const [confirmDel, setConfirmDel] = useState<{ open: boolean; type: 'section' | 'item'; itemId?: string; msg: string }>({ open: false, type: 'section', msg: '' })
   const accent   = section.accentColor || 'var(--mint)'
@@ -49,7 +57,7 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
     if (!raw.startsWith('item:')) return
     const [, srcItemId, srcSectionId] = raw.split(':')
     if (srcItemId === tgtItemId) return
-    moveItem(srcSectionId, srcItemId, section.id, tgtItemId)
+    moveItem(srcSectionId, srcItemId, section.id)
   }
   const onListDrop = (e: React.DragEvent) => {
     e.preventDefault(); setItemDragOver(null)
@@ -114,14 +122,18 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
           {/* Focus edit mode — tombol muncul saat hover header */}
-          {isAdmin && editMode && headerHovered && (
+          {isAdmin && editMode && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <button
-                className="sec-action-btn-lg"
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); onAddItem(section.id) }}
-                title="Tambah item"
-              >＋</button>
+              {/* Tombol favorite section — hanya untuk OWN, sebelah tombol edit */}
+              {!isShared && onToggleFavorite && (
+                <button
+                  className="sec-action-btn-lg"
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); onToggleFavorite(section.id) }}
+                  title={section.isFavorite ? 'Hapus dari favorit' : 'Tandai favorit'}
+                  style={{ color: section.isFavorite ? '#FFD700' : undefined }}
+                >⭐</button>
+              )}
               <button
                 className="sec-action-btn-lg"
                 onMouseDown={e => e.stopPropagation()}
@@ -134,6 +146,7 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
                 onClick={e => {
                   e.stopPropagation()
                   setConfirmDel({ open: true, type: 'section', msg: `Hapus section "${section.title}" beserta semua item di dalamnya?` })
+                  // panggil onDeleteSection dari parent saat konfirmasi
                 }}
                 title="Hapus section"
               >🗑</button>
@@ -182,8 +195,15 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
                 onDragLeave={() => setItemDragOver(null)}
                 onEdit={() => onEditItem(section.id, item)}
                 onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
+                onToggleFavorite={!isShared && onToggleFavoriteItem
+                  ? (itemId) => onToggleFavoriteItem(section.id, itemId)
+                  : undefined}
               />
             ))}
+            {/* Ghost + item — muncul saat edit mode, setelah icon terakhir */}
+            {isAdmin && editMode && (
+              <GhostAddItem onClick={() => onAddItem(section.id)} />
+            )}
           </div>
         ) : (
           <div
@@ -237,8 +257,7 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
         danger
         onConfirm={() => {
           if (confirmDel.type === 'section') {
-            deleteSection(section.id)
-            toast('Section dihapus.', 'success')
+            onDeleteSection(section.id)  // panggil handler dari parent GridLayout
           } else if (confirmDel.itemId) {
             deleteItem(section.id, confirmDel.itemId)
             toast('Item dihapus.', 'success')
@@ -248,6 +267,28 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
         onCancel={() => setConfirmDel({ open: false, type: 'section', msg: '' })}
       />
     </>
+  )
+}
+
+// ── Ghost add item ────────────────────────────────────────
+function GhostAddItem({ onClick }: { onClick: () => void }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', gap: 4, cursor: 'pointer',
+        borderRadius: 8, minHeight: 70,
+        border: `1.5px dashed ${hov ? 'var(--mint)' : 'rgba(0,255,194,0.2)'}`,
+        background: hov ? 'rgba(0,255,194,0.06)' : 'transparent',
+        transition: 'all .15s',
+        color: hov ? 'var(--mint)' : 'rgba(0,255,194,0.3)',
+      }}>
+      <span style={{ fontSize: 20, fontWeight: 300, lineHeight: 1 }}>＋</span>
+    </div>
   )
 }
 
@@ -353,7 +394,7 @@ interface FolderItemProps {
   onDelete: () => void
 }
 
-function FolderItem({ item, searchQuery, editMode, dragOver, appearance, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete }: FolderItemProps) {
+function FolderItem({ item, searchQuery, editMode, dragOver, appearance, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete, onToggleFavorite }: FolderItemProps & { onToggleFavorite?: (itemId: string) => void }) {
   const [hovered, setHovered] = useState(false)
   const showLabel = appearance.labelMode === 'show' || (appearance.labelMode === 'hover' && hovered)
 
@@ -405,8 +446,21 @@ function FolderItem({ item, searchQuery, editMode, dragOver, appearance, onDragS
         </div>
       )}
 
+      {/* ⭐ badge favorit di pojok kiri atas — tampil saat item adalah favorit */}
+      {item.isFavorite && (
+        <span style={{
+          position: 'absolute', top: 3, left: 3, fontSize: 10, zIndex: 5,
+          filter: 'drop-shadow(0 0 3px rgba(255,215,0,0.8))',
+          pointerEvents: 'none', lineHeight: 1,
+        }}>⭐</span>
+      )}
       {editMode && (
         <div className="folder-action-group" onMouseDown={e => e.stopPropagation()}>
+          {onToggleFavorite && (
+            <button className="folder-edit-btn" onClick={e => { e.stopPropagation(); onToggleFavorite(item.id) }}
+              title={item.isFavorite ? 'Hapus favorit' : 'Favorit'}
+              style={{ color: item.isFavorite ? '#FFD700' : undefined }}>⭐</button>
+          )}
           <button className="folder-edit-btn" onClick={e => { e.stopPropagation(); onEdit() }} title="Edit">✏️</button>
           <button className="folder-delete-btn" onClick={e => { e.stopPropagation(); onDelete() }} title="Hapus">🗑</button>
         </div>

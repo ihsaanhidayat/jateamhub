@@ -1,42 +1,28 @@
 import { useRef } from 'react'
 import { useStore } from '../../store/dashboardStore'
-import { validateImportConfig } from '../../utils/security'
+// security import dihapus — user tidak butuh import/reset config
 
-interface Props { onAddSection: () => void }
+interface Props { onAddSection?: () => void }
 
 export default function EditBar({ onAddSection }: Props) {
   const {
-    editMode, setConfig, resetConfig, resetLayout, config, toast,
+    editMode, toast,
     undo, redo, canUndo, canRedo,
-    isDirty, isSyncing, syncStatus, syncGlobalToDb,
+    isDirty, isSyncing, syncStatus, syncPersonalToDb,
+    personalSections,
   } = useStore()
-  const fileRef = useRef<HTMLInputElement>(null)
+
 
   if (!editMode) return null
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => {
-      try {
-        const data = JSON.parse(ev.target?.result as string)
-        const err = validateImportConfig(data)
-        if (err) { toast(err, 'error'); return }
-        if (!confirm('Import akan mengganti config saat ini. Lanjutkan?')) return
-        setConfig(data); toast('Config berhasil diimport.', 'success')
-      } catch { toast('File JSON tidak valid.', 'error') }
-    }
-    reader.readAsText(file); e.target.value = ''
-  }
-
-  const handleExport = () => {
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
+  // Export section pribadi user sebagai JSON backup
+  const handleExportPersonal = () => {
+    const blob = new Blob([JSON.stringify(personalSections, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `jateamhub-config-${new Date().toISOString().slice(0,10)}.json`
+    a.download = `my-sections-${new Date().toISOString().slice(0,10)}.json`
     a.click(); URL.revokeObjectURL(a.href)
-    toast('Config diekspor.', 'success')
+    toast('Section diekspor.', 'success')
   }
 
   const btnStyle = (disabled: boolean) => ({
@@ -58,7 +44,7 @@ export default function EditBar({ onAddSection }: Props) {
       </div>
     )
     if (syncStatus === 'error' || isDirty) return (
-      <button onClick={() => syncGlobalToDb()} className="sync-error" style={{ background: 'none', border: '1px solid rgba(224,85,85,0.3)', borderRadius: 'var(--radius-sm)', padding: '4px 10px', cursor: 'pointer' }}>
+      <button onClick={() => syncPersonalToDb()} className="sync-error" style={{ background: 'none', border: '1px solid rgba(224,85,85,0.3)', borderRadius: 'var(--radius-sm)', padding: '4px 10px', cursor: 'pointer' }}>
         ⚠ Belum tersimpan
       </button>
     )
@@ -80,17 +66,10 @@ export default function EditBar({ onAddSection }: Props) {
         ↪ Redo
       </button>
       <div style={{ width: 1, height: 20, background: 'var(--border2)', margin: '0 2px', flexShrink: 0 }} />
-      <button className="eb-btn" onClick={onAddSection}
-        style={{ background: 'var(--mint-bg)', border: '1px solid rgba(0,255,194,0.3)', color: 'var(--mint)', fontWeight: 700 }}>
-        ＋ Section
-      </button>
-      <button className="eb-btn" onClick={() => fileRef.current?.click()}>📥 Import</button>
-      <button className="eb-btn" onClick={handleExport}>📤 Export</button>
-      <button className="eb-btn" onClick={() => { if (!confirm('Reset layout?')) return; resetLayout(); toast('Layout direset.', 'success') }}>⊞ Layout</button>
+
+      <button className="eb-btn" onClick={handleExportPersonal}>📤 Export</button>
       <div style={{ marginLeft: 4 }}>{syncIndicator()}</div>
       <div className="eb-spacer" />
-      <button className="eb-btn danger" onClick={() => { if (!confirm('Reset semua config?')) return; resetConfig(); toast('Config direset.', 'success') }}>🔄 Reset</button>
-      <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
     </div>
   )
 }

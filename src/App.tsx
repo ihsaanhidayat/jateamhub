@@ -1,14 +1,17 @@
+// ─────────────────────────────────────────────────────────────
+// APP.TSX — Root component, routing auth, inisialisasi app
+// ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react'
 import { useAuthStore } from './store/authStore'
 import { useStore, applyThemeToDOM } from './store/dashboardStore'
-import LoginPage from './components/layout/LoginPage'
-import Header from './components/layout/Header'
+import LoginPage    from './components/layout/LoginPage'
+import Header       from './components/layout/Header'
 import OptionsPanel from './components/layout/OptionsPanel'
-import EditBar from './components/layout/EditBar'
-import GridLayout from './components/layout/GridLayout'
-import ProfilePage from './components/layout/ProfilePage'
-import PanduanFAB from './components/layout/PanduanFAB'
-import CoffeeModal from './components/ui/CoffeeModal'
+import EditBar      from './components/layout/EditBar'
+import GridLayout   from './components/layout/GridLayout'
+import ProfilePage  from './components/layout/ProfilePage'
+import PanduanFAB   from './components/layout/PanduanFAB'
+import CoffeeModal  from './components/ui/CoffeeModal'
 import SectionModal from './components/section/SectionModal'
 import ToastContainer from './components/ui/Toast'
 
@@ -16,20 +19,23 @@ import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 
 export default function App() {
+  // Ambil state auth dan store yang diperlukan
   const { profile, initialized, init } = useAuthStore()
   const {
-    editMode, loadRemoteConfig, toast, setCurrentUserId,
+    editMode, initUser, toast, setCurrentUserId,
     isDirty, isSyncing, globalTheme,
   } = useStore()
 
+  // State UI lokal
   const [optionsOpen,    setOptionsOpen]    = useState(false)
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [addSectionOpen, setAddSectionOpen] = useState(false)
   const [coffeeOpen,     setCoffeeOpen]     = useState(false)
 
+  // Inisialisasi auth saat app pertama kali dibuka
   useEffect(() => { init() }, [])
 
-  // Warn saat ada perubahan belum tersimpan
+  // Peringatkan user saat mau meninggalkan halaman dengan perubahan belum tersimpan
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (isDirty || isSyncing) {
@@ -42,27 +48,34 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [isDirty, isSyncing])
 
-  // Load config + apply theme saat login
+  // Jalankan saat user berhasil login — load semua data user
   useEffect(() => {
     if (profile) {
       setCurrentUserId(profile.id)
-      loadRemoteConfig(profile.id, profile.role, profile.unit_id)
+      // Init store dengan data user: section pribadi + shared sections + preferences
+      initUser(
+        profile.id,
+        profile.role,
+        (profile as any).region_scope ?? 'global',
+        (profile as any).unit_scope   ?? 'general',
+      )
+      // Inject fungsi toast ke authStore agar bisa tampilkan notifikasi
       useAuthStore.getState().setToastFn(toast)
 
-      // Coffee popup — sekali per session untuk user & admin_unit
+      // Tampilkan coffee modal sekali per session untuk user dan guest
       const sessionKey = `coffee-shown-${profile.id}`
-      if (!sessionStorage.getItem(sessionKey) && (profile.role === 'user' || profile.role === 'guest')) {
+      if (!sessionStorage.getItem(sessionKey) &&
+          (profile.role === 'user' || profile.role === 'guest')) {
         sessionStorage.setItem(sessionKey, '1')
         setTimeout(() => setCoffeeOpen(true), 1500)
       }
     }
   }, [profile?.id])
 
-  // Apply theme ke DOM
-  useEffect(() => {
-    applyThemeToDOM(globalTheme)
-  }, [globalTheme])
+  // Terapkan theme ke DOM setiap kali theme berubah
+  useEffect(() => { applyThemeToDOM(globalTheme) }, [globalTheme])
 
+  // Tampilkan loading spinner saat init auth belum selesai
   if (!initialized) return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -74,32 +87,57 @@ export default function App() {
     </div>
   )
 
+  // Tampilkan halaman login jika belum login
   if (!profile) return <LoginPage />
 
+  // Superadmin: langsung tampilkan halaman user management tanpa dashboard
+  if (profile.role === 'superadmin') return (
+    <>
+      <ProfilePage onClose={() => {}} />
+      <ToastContainer />
+    </>
+  )
+
+  // Dashboard utama untuk semua role selain superadmin
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
+      {/* Header dengan semua kontrol navigasi */}
       <Header
         onToggleOptions={() => setOptionsOpen(v => !v)}
         optionsOpen={optionsOpen}
         onOpenAdvanced={() => setProfileOpen(true)}
       />
 
+      {/* Options panel — tersedia untuk semua user */}
       <OptionsPanel open={optionsOpen} onClose={() => setOptionsOpen(false)} />
 
+      {/* Konten utama — grid layout */}
       <main className={`main${editMode ? ' edit-active' : ''}`} style={{ flex: 1 }}>
-        <GridLayout />
+        <GridLayout onAddSection={() => setAddSectionOpen(true)} />
       </main>
 
+      {/* Edit bar — muncul saat edit mode aktif */}
       {editMode && <EditBar onAddSection={() => setAddSectionOpen(true)} />}
 
-      {/* Modals */}
-      {profileOpen    && <ProfilePage onClose={() => setProfileOpen(false)} />}
-      {coffeeOpen     && <CoffeeModal onClose={() => setCoffeeOpen(false)} />}
-      {addSectionOpen && <SectionModal open={addSectionOpen} section={null} onClose={() => setAddSectionOpen(false)} />}
+      {/* Modal tambah section pribadi */}
+      {addSectionOpen && (
+        <SectionModal
+          open={addSectionOpen}
+          section={null}
+          onClose={() => setAddSectionOpen(false)}
+        />
+      )}
 
-      {/* FAB */}
+      {/* Modal profile advanced (users + settings) */}
+      {profileOpen && <ProfilePage onClose={() => setProfileOpen(false)} />}
+
+      {/* Popup coffee — sekali per session untuk user/guest */}
+      {coffeeOpen && <CoffeeModal onClose={() => setCoffeeOpen(false)} />}
+
+      {/* FAB panduan — floating button kanan bawah */}
       <PanduanFAB />
 
+      {/* Toast notifikasi — kanan atas */}
       <ToastContainer />
     </div>
   )

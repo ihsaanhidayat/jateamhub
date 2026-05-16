@@ -1,3 +1,8 @@
+// ─────────────────────────────────────────────────────────────
+// AUTH STORE — State management autentikasi dan user management
+// Superadmin: hanya user management, zero section access
+// Admin: scope-aware user management berdasarkan region + unit
+// ─────────────────────────────────────────────────────────────
 import { create } from 'zustand'
 import {
   supabase, getProfile, signIn, signOut,
@@ -9,15 +14,21 @@ import type { Role } from '../types'
 import { canManageUser, canCreateUser, canAssignRole, getRegion, getUnit } from '../utils/roles'
 
 interface AuthState {
-  profile:     Profile | null
-  loading:     boolean
-  initialized: boolean
-  users:       Profile[]
+  profile:     Profile | null   // profil user yang sedang login
+  loading:     boolean           // sedang proses login/init
+  initialized: boolean           // inisialisasi auth sudah selesai
+  users:       Profile[]         // daftar user untuk management
+
+  // Fungsi inject toast dari dashboard store
   _toast: ((msg: string, type?: 'success' | 'error' | 'warn') => void) | null
-  setToastFn:  (fn: (msg: string, type?: 'success' | 'error' | 'warn') => void) => void
-  init:        () => Promise<void>
-  login:       (username: string, password: string) => Promise<string | null>
-  logout:      () => Promise<void>
+  setToastFn: (fn: (msg: string, type?: 'success' | 'error' | 'warn') => void) => void
+
+  // Auth actions
+  init:    () => Promise<void>
+  login:   (username: string, password: string) => Promise<string | null>
+  logout:  () => Promise<void>
+
+  // User management actions
   loadUsers:   () => Promise<void>
   addUser:     (username: string, password: string, role: Role, unitId: string, regionScope?: string, unitScope?: string) => Promise<string | null>
   updateUser:  (userId: string, role: Role, unitId: string, newPassword?: string, emoji?: string, regionScope?: string, unitScope?: string) => Promise<string | null>
@@ -25,19 +36,28 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  profile: null, loading: false, initialized: false, users: [], _toast: null,
+  profile:     null,
+  loading:     false,
+  initialized: false,
+  users:       [],
+  _toast:      null,
 
+  // Simpan referensi fungsi toast dari dashboard store
   setToastFn: (fn) => set({ _toast: fn }),
 
+  // ── Inisialisasi: cek sesi aktif saat app dibuka ──────────
   init: async () => {
     set({ loading: true })
     const { data: { session } } = await supabase.auth.getSession()
     if (session?.user) {
+      // Ada sesi aktif — ambil profil dari DB
       const profile = await getProfile(session.user.id)
       set({ profile, loading: false, initialized: true })
     } else {
+      // Tidak ada sesi
       set({ profile: null, loading: false, initialized: true })
     }
+    // Dengarkan perubahan status auth (login/logout dari tab lain)
     supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const profile = await getProfile(session.user.id)
@@ -48,6 +68,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     })
   },
 
+  // ── Login: konversi username → email format jateamhub ─────
   login: async (username, password) => {
     set({ loading: true })
     const email = `${username}@jateamhub.app`
@@ -57,46 +78,74 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const profile = await getProfile(data.user.id)
       set({ profile, loading: false })
     }
-    return null
+    return null // null = tidak ada error
   },
 
-  logout: async () => { await signOut(); set({ profile: null }) },
+  // ── Logout: hapus sesi ────────────────────────────────────
+  logout: async () => {
+    await signOut()
+    set({ profile: null })
+  },
 
+  // ── Load users berdasarkan scope admin yang login ──────────
   loadUsers: async () => {
     const me = get().profile
     if (!me) return
-    if (me.role === 'superadmin' || (me.role === 'admin' && (me.region_scope ?? 'global') === 'global')) {
+
+    // Superadmin dan admin global → load semua user
+    if (me.role === 'superadmin' ||
+       (me.role === 'admin' && (me.region_scope ?? 'global') === 'global')) {
       set({ users: await getAllProfiles() })
     } else {
-      set({ users: await getProfilesByScope(me.region_scope ?? 'global', me.unit_scope ?? 'general') })
+      // Admin wilayah/unit → hanya load user dalam scope-nya
+      set({ users: await getProfilesByScope(
+        me.region_scope ?? 'global',
+        me.unit_scope   ?? 'general'
+      )})
     }
   },
 
+  // ── Tambah user baru — validasi permission dulu ───────────
   addUser: async (username, password, role, unitId, regionScope, unitScope) => {
     const me = get().profile
     if (!me) return 'Tidak ada sesi.'
-    if (!canCreateUser(me as any, role)) return 'Tidak ada akses untuk membuat user dengan role ini.'
-    if (!canAssignRole(me as any, role)) return 'Tidak bisa assign role ini.'
+
+    // Cek apakah boleh membuat user dengan role ini
+    if (!canCreateUser(me as any, role))  return 'Tidak ada akses membuat user dengan role ini.'
+    if (!canAssignRole(me as any, role))  return 'Tidak bisa assign role ini.'
+
     const { error } = await createUser(username, password, role, unitId, regionScope, unitScope)
     if (error) return error.message
+
     await get().loadUsers()
     return null
   },
 
+  // ── Update user — validasi permission dan scope ───────────
   updateUser: async (userId, role, unitId, newPassword, emoji, regionScope, unitScope) => {
-    const me = get().profile
+    const me     = get().profile
     if (!me) return 'Tidak ada sesi.'
     const target = get().users.find(u => u.id === userId)
     if (!target) return 'User tidak ditemukan.'
 
-    if (userId !== me.id && !canManageUser(me as any, target as any)) return 'Tidak ada akses untuk edit user ini.'
-    if (target.role === 'superadmin' && me.role !== 'superadmin') return 'Tidak bisa edit superadmin.'
-    if (role !== target.role && !canAssignRole(me as any, role)) return 'Tidak bisa assign role ini.'
+    // Tidak boleh edit diri sendiri melalui user management
+    // kecuali untuk reset password (dihandle terpisah)
+    if (userId !== me.id && !canManageUser(me as any, target as any))
+      return 'Tidak ada akses untuk edit user ini.'
 
+    // Tidak boleh downgrade/upgrade superadmin
+    if (target.role === 'superadmin' && me.role !== 'superadmin')
+      return 'Tidak bisa edit superadmin.'
+
+    // Tidak boleh assign role yang lebih tinggi dari diri sendiri
+    if (role !== target.role && !canAssignRole(me as any, role))
+      return 'Tidak bisa assign role ini.'
+
+    // Update data profil
     const updates: Partial<Profile> = {
       role,
       unit_id:      unitId,
-      unit_scope:   unitScope  ?? target.unit_scope  ?? 'general',
+      unit_scope:   unitScope   ?? target.unit_scope   ?? 'general',
       region_scope: regionScope ?? target.region_scope ?? 'global',
     }
     if (emoji !== undefined) updates.emoji = emoji
@@ -104,6 +153,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { error } = await updateProfile(userId, updates)
     if (error) return error.message
 
+    // Update password jika diisi dan panjang minimal 6
     if (newPassword && newPassword.length >= 6) {
       const { error: pwErr } = await updateUserPassword(userId, newPassword) as any
       if (pwErr) return pwErr.message
@@ -113,16 +163,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return null
   },
 
+  // ── Hapus user — validasi permission ──────────────────────
   removeUser: async (userId) => {
     const me = get().profile
     if (!me) return 'Tidak ada sesi.'
     if (userId === me.id) return 'Tidak bisa hapus akun sendiri.'
+
     const target = get().users.find(u => u.id === userId)
     if (!target) return 'User tidak ditemukan.'
-    if (!canManageUser(me as any, target as any)) return 'Tidak ada akses untuk hapus user ini.'
+    if (!canManageUser(me as any, target as any)) return 'Tidak ada akses hapus user ini.'
     if (target.role === 'superadmin') return 'Tidak bisa hapus superadmin.'
+
+    // Hapus via Edge Function (butuh service role key)
     const { error } = await supabase.functions.invoke('delete-user', { body: { userId } })
+    // Fallback: hapus langsung dari profiles jika edge function gagal
     if (error) await supabase.from('profiles').delete().eq('id', userId)
+
     await get().loadUsers()
     return null
   },

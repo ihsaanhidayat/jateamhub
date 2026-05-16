@@ -1,105 +1,56 @@
-// ─────────────────────────────────────────────
-// DASHBOARD STORE — split global + unit config
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// DASHBOARD STORE — State management layout dan tampilan dashboard
+// Pisahan antara: section pribadi user + shared sections dari admin
+// ─────────────────────────────────────────────────────────────
 import { create } from 'zustand'
 import type {
-  JateamConfig, Section, LinkItem, AppearanceSettings,
-  DisplayOptions, Preset, ThemeId, PageDef,
+  JateamConfig, Section, LinkItem,
+  AppearanceSettings, DisplayOptions, Preset, ThemeId, PageDef,
 } from '../types'
 import {
   DEFAULT_APPEARANCE, defaultDisplayOptions, DEFAULT_PAGES,
-  GRID_ROW_HEIGHT, SECTION_DEFAULT_W, SECTION_DEFAULT_H,
+  SECTION_DEFAULT_W, SECTION_DEFAULT_H, GRID_ROW_HEIGHT,
 } from '../types'
 import {
-  loadGlobalConfig, saveGlobalConfig,
-  loadUnitConfig, saveUnitConfig,
+  getUserLayout, saveUserLayout,
+  getSharedSections, getAllSharedSections,
+  createSharedSection, updateSharedSection, deleteSharedSection,
   saveUserAppearance, loadUserAppearance,
   saveGlobalTheme, loadGlobalTheme,
 } from '../utils/supabaseClient'
+import type { SharedSection } from '../utils/supabaseClient'
 
-const DATA_KEY       = 'jateamhub-data'
-const APPEARANCE_KEY = 'jateamhub-appearance'
-const CONFIG_VERSION = '4.0'
-const MAX_HISTORY    = 20
+// ── Konstanta ─────────────────────────────────────────────────
+const CONFIG_VERSION = '5.0'   // versi format config
+const MAX_HISTORY = 20      // maksimal langkah undo
+const DATA_KEY = 'jateamhub-personal' // key localStorage section pribadi
+const APPEARANCE_KEY = 'jateamhub-appearance' // key localStorage preferensi tampilan
 
-// ── Local appearance ──────────────────────────
+// ── Helper: simpan/baca preferensi tampilan dari localStorage ──
 const loadLocalAppearance = (): Partial<AppearanceSettings> => {
-  try { const a = localStorage.getItem(APPEARANCE_KEY); return a ? JSON.parse(a) : {} } catch { return {} }
+  try {
+    const a = localStorage.getItem(APPEARANCE_KEY)
+    return a ? JSON.parse(a) : {}
+  } catch { return {} }
 }
 const saveLocalAppearance = (a: AppearanceSettings) =>
   localStorage.setItem(APPEARANCE_KEY, JSON.stringify(a))
 
-// ── Device preset ─────────────────────────────
+// ── Helper: preset tampilan berdasarkan ukuran layar device ───
 const getDevicePreset = (): Partial<AppearanceSettings> => {
   const w = window.innerWidth
   if (w < 480) return { itemDisplayMode: 'folderGrid', iconSize: 'medium', folderGridCols: 2 }
-  if (w < 768) return { itemDisplayMode: 'folderGrid', iconSize: 'large',  folderGridCols: 3 }
-  return {}
+  if (w < 768) return { itemDisplayMode: 'folderGrid', iconSize: 'large', folderGridCols: 3 }
+  return {} // desktop — pakai preferensi tersimpan
 }
 const DEVICE_PREF_KEY = 'jateamhub-device-pref'
-const hasDevicePref   = () => !!localStorage.getItem(DEVICE_PREF_KEY)
-const setDevicePref   = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
+const hasDevicePref = () => !!localStorage.getItem(DEVICE_PREF_KEY)
+const setDevicePref = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
 
-// ── uid ───────────────────────────────────────
+// ── Helper: generate ID unik untuk section/item ───────────────
 const uid = () => Math.random().toString(36).slice(2, 10)
 
-// ── Default config ────────────────────────────
-const makeDefaultSections = () => {
-  const COLS = 12
-  const W    = 4  // 3 section × 4 = 12 kolom penuh
-  const H    = 5
-  return [
-    {
-      id: 'sdefault1', title: 'Section 1', icon: '📁', subtitle: '',
-      items: [], layout: { x: 0, y: 0, w: W, h: H },
-      visibility: 'all' as const, targetUnits: [],
-      pageId: 'beranda', type: 'section' as const,
-    },
-    {
-      id: 'sdefault2', title: 'Section 2', icon: '📁', subtitle: '',
-      items: [], layout: { x: W, y: 0, w: W, h: H },
-      visibility: 'all' as const, targetUnits: [],
-      pageId: 'beranda', type: 'section' as const,
-    },
-    {
-      id: 'sdefault3', title: 'Section 3', icon: '📁', subtitle: '',
-      items: [], layout: { x: W * 2, y: 0, w: W, h: H },
-      visibility: 'all' as const, targetUnits: [],
-      pageId: 'beranda', type: 'section' as const,
-    },
-  ]
-}
-
-const defaultConfig: JateamConfig = {
-  version: CONFIG_VERSION,
-  meta: { title: 'JateamHub', subtitle: 'Selamat datang, {username}', logoUrl: '', coffeeUrl: '', adminKey: '' },
-  pages:          [...DEFAULT_PAGES],
-  sections:       makeDefaultSections(),
-  appearance:     { ...DEFAULT_APPEARANCE, folderGridCols: 5, iconSize: 'large' },
-  displayOptions: { ...defaultDisplayOptions },
-  presets:        [],
-}
-
-// ── Persist ───────────────────────────────────
-const persist = (cfg: JateamConfig) => {
-  try { localStorage.setItem(DATA_KEY, JSON.stringify(cfg)) } catch {}
-}
-const loadLocal = (): JateamConfig => {
-  try {
-    const d = localStorage.getItem(DATA_KEY)
-    if (!d) return structuredClone(defaultConfig)
-    const p = JSON.parse(d)
-    if (String(p.version ?? '0').split('.')[0] !== CONFIG_VERSION.split('.')[0]) {
-      return structuredClone(defaultConfig)
-    }
-    p.appearance     = { ...DEFAULT_APPEARANCE,    ...(p.appearance    ?? {}) }
-    p.displayOptions = { ...defaultDisplayOptions, ...(p.displayOptions ?? {}) }
-    p.pages          = Array.isArray(p.pages) && p.pages.length > 0 ? p.pages : [...DEFAULT_PAGES]
-    return p
-  } catch { return structuredClone(defaultConfig) }
-}
-
-// ── Auto layout ───────────────────────────────
+// ── Helper: auto-layout section agar tidak tumpang tindih ─────
 const autoLayout = (sections: Section[]): Section[] => {
   const COLS = 12; let col = 0, row = 0, rowH = 0
   return sections.map(s => {
@@ -112,112 +63,128 @@ const autoLayout = (sections: Section[]): Section[] => {
   })
 }
 
-// ── Debounce sync ─────────────────────────────
-let globalSyncTimer: ReturnType<typeof setTimeout> | null = null
-let unitSyncTimers: Record<string, ReturnType<typeof setTimeout>> = {}
+// ── Helper: baca section pribadi dari localStorage ────────────
+const loadPersonalFromLocal = (): Section[] => {
+  try {
+    const d = localStorage.getItem(DATA_KEY)
+    return d ? JSON.parse(d) : []
+  } catch { return [] }
+}
 
-// ── Store interface ───────────────────────────
+// ── Helper: simpan section pribadi ke localStorage ────────────
+const persistPersonal = (sections: Section[]) => {
+  try { localStorage.setItem(DATA_KEY, JSON.stringify(sections)) } catch { }
+}
+
+// ── Debounce timer untuk sync ke DB ──────────────────────────
+let personalSyncTimer: ReturnType<typeof setTimeout> | null = null
+let appearanceSyncTimer: ReturnType<typeof setTimeout> | null = null
+
+// ── Tipe interface store ──────────────────────────────────────
 interface DashboardStore {
-  config:         JateamConfig
-  unitSections:   Record<string, Section[]>  // unit_id → sections
-  appearance:     AppearanceSettings
+  // -- State --
+  personalSections: Section[]        // section pribadi user
+  sharedSections: SharedSection[]  // section dari admin (read-only)
+  appearance: AppearanceSettings
   displayOptions: DisplayOptions
-  presets:        Preset[]
-  editMode:       boolean
-  searchQuery:    string
-  currentPage:    string
-  previewUnit:    string | null
-  currentUserId:  string | null
-  globalTheme:    ThemeId
-  history:        JateamConfig[]
-  future:         JateamConfig[]
-  canUndo:        boolean
-  canRedo:        boolean
-  isDirty:        boolean
-  isSyncing:      boolean
-  syncStatus:     'saved' | 'saving' | 'error' | 'idle'
+  presets: Preset[]
+  editMode: boolean
+  searchQuery: string
+  previewFilter: { role: string; region: string; unit: string } // filter preview admin
+  currentUserId: string | null
+  currentUserRole: string
+  currentRegion: string
+  currentUnit: string
+  globalTheme: ThemeId
+  history: Section[][]   // stack undo
+  future: Section[][]   // stack redo
+  canUndo: boolean
+  canRedo: boolean
+  isDirty: boolean
+  isSyncing: boolean
+  syncStatus: 'saved' | 'saving' | 'error' | 'idle'
 
-  // Init
-  loadRemoteConfig:  (userId: string, role: string, unitId: string) => Promise<void>
-  setCurrentUserId:  (id: string | null) => void
+  // -- Init & Load --
+  initUser: (userId: string, role: string, region: string, unit: string) => Promise<void>
+  setCurrentUserId: (id: string | null) => void
 
-  // Config
-  setConfig:     (cfg: JateamConfig) => void
-  resetConfig:   () => void
-  resetLayout:   () => void
+  // -- Section Pribadi --
+  addPersonalSection: (data: Partial<Section>) => void
+  updatePersonalSection: (id: string, updates: Partial<Section>) => void
+  deletePersonalSection: (id: string) => void
+  toggleCollapse: (id: string) => void
+  batchUpdateLayouts: (layouts: Array<{ id: string; layout: any }>) => void
 
-  // Section — global
-  addSection:          (...args: any[]) => void
-  updateSection:       (id: string, title: string, icon: string, subtitle: string, w: number, accent?: string, pageId?: string, visibility?: string, targetUnits?: string[]) => void
-  deleteSection:       (id: string) => void
-  toggleCollapse:      (id: string) => void
-  batchUpdateLayouts:  (layouts: Array<{ id: string; layout: any }>) => void
-  updateSectionLayout: (id: string, layout: any) => void
+  // -- Items (dalam section pribadi) --
+  addItem: (sectionId: string, data: Omit<LinkItem, 'id'>) => void
+  updateItem: (sectionId: string, itemId: string, data: Omit<LinkItem, 'id'>) => void
+  deleteItem: (sectionId: string, itemId: string) => void
+  moveItem: (srcId: string, itemId: string, tgtId: string) => void
 
-  // Section — unit
-  addUnitSection:     (unitId: string, data: Partial<Section>) => void
-  updateUnitSection:  (unitId: string, sectionId: string, updates: Partial<Section>) => void
-  deleteUnitSection:  (unitId: string, sectionId: string) => void
-  batchUpdateUnitLayouts: (unitId: string, layouts: Array<{ id: string; layout: any }>) => void
+  // -- Shared Sections (admin only) --
+  loadSharedSections: () => Promise<void>
+  addSharedSection: (data: Omit<SharedSection, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
+  updateSharedSectionFn: (id: string, updates: Partial<SharedSection>) => Promise<void>
+  deleteSharedSectionFn: (id: string) => Promise<void>
 
-  // Items
-  addItem:     (sectionId: string, data: Omit<LinkItem, 'id'>, unitId?: string) => void
-  updateItem:  (sectionId: string, itemId: string, data: Omit<LinkItem, 'id'>, unitId?: string) => void
-  deleteItem:  (sectionId: string, itemId: string, unitId?: string) => void
-  moveItem:    (srcId: string, itemId: string, tgtId: string, tgtItemId?: string) => void
+  // -- Favorites --
+  toggleFavoriteSection: (id: string) => void
+  toggleFavoriteItem: (sectionId: string, itemId: string) => void
 
-  // UI
-  toggleEditMode:    () => void
-  setSearch:         (q: string) => void
-  setCurrentPage:    (p: string) => void
-  setPreviewUnit:    (u: string | null) => void
+  // -- UI State --
+  toggleEditMode: () => void
+  setSearch: (q: string) => void
+  setPreviewFilter: (filter: { role: string; region: string; unit: string }) => void
 
-  // Appearance
-  setAppearance:     (o: Partial<AppearanceSettings>) => void
+  // -- Tampilan / Appearance --
+  setAppearance: (o: Partial<AppearanceSettings>) => void
   setDisplayOptions: (o: Partial<DisplayOptions>) => void
-  setGlobalTheme:    (theme: ThemeId) => void
+  setGlobalTheme: (theme: ThemeId) => void
 
-  // Presets
-  savePreset:   (name: string) => void
-  applyPreset:  (id: string) => void
+  // -- Presets --
+  savePreset: (name: string) => void
+  applyPreset: (id: string) => void
   deletePreset: (id: string) => void
 
-  // Undo/Redo
+  // -- Undo/Redo --
   undo: () => void
   redo: () => void
 
-  // Sync
-  syncGlobalToDb:   () => Promise<void>
-  syncUnitToDb:     (unitId: string) => Promise<void>
+  // -- Sync --
+  syncPersonalToDb: () => Promise<void>
 
-  // Toast
+  // -- Toast --
   toast: (msg: string, type?: 'success' | 'error' | 'warn') => void
   toasts: Array<{ id: string; msg: string; type: 'success' | 'error' | 'warn' }>
   removeToast: (id: string) => void
 }
 
+// ── Buat store dengan Zustand ─────────────────────────────────
 export const useStore = create<DashboardStore>((set, get) => ({
-  config:         loadLocal(),
-  unitSections:   {},
-  appearance:     { ...DEFAULT_APPEARANCE, ...loadLocalAppearance() },
+  // -- Nilai awal state --
+  personalSections: loadPersonalFromLocal(),
+  sharedSections: [],
+  appearance: { ...DEFAULT_APPEARANCE, ...loadLocalAppearance() },
   displayOptions: { ...defaultDisplayOptions },
-  presets:        [],
-  editMode:       false,
-  searchQuery:    '',
-  currentPage:    'beranda',
-  previewUnit:    null,
-  currentUserId:  null,
-  globalTheme:    'dark-mint',
-  history:        [],
-  future:         [],
-  canUndo:        false,
-  canRedo:        false,
-  isDirty:        false,
-  isSyncing:      false,
-  syncStatus:     'idle',
-  toasts:         [],
+  presets: [],
+  editMode: false,
+  searchQuery: '',
+  previewFilter: { role: '', region: '', unit: '' },
+  currentUserId: null,
+  currentUserRole: 'user',
+  currentRegion: 'global',
+  currentUnit: 'general',
+  globalTheme: 'dark-mint',
+  history: [],
+  future: [],
+  canUndo: false,
+  canRedo: false,
+  isDirty: false,
+  isSyncing: false,
+  syncStatus: 'idle',
+  toasts: [],
 
-  // ── Toast ─────────────────────────────────
+  // ── Toast: tampilkan notifikasi ───────────────────────────
   toast: (msg, type = 'success') => {
     const id = uid()
     set(s => ({ toasts: [...s.toasts.slice(-2), { id, msg, type }] }))
@@ -225,65 +192,103 @@ export const useStore = create<DashboardStore>((set, get) => ({
   },
   removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 
+  // ── Set ID user yang sedang login ─────────────────────────
   setCurrentUserId: (id) => set({ currentUserId: id }),
 
-  // ── Load remote config ────────────────────
-  loadRemoteConfig: async (userId, role, unitId) => {
-    try {
-      // Load global config
-      const remote = await loadGlobalConfig()
-      if (remote && Array.isArray((remote as any).sections)) {
-        const cfg = remote as unknown as JateamConfig
-        cfg.appearance     = { ...DEFAULT_APPEARANCE, ...(cfg.appearance ?? {}) }
-        cfg.sections       = autoLayout(cfg.sections || [])
-        cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
-        cfg.pages          = Array.isArray(cfg.pages) && cfg.pages.length ? cfg.pages : [...DEFAULT_PAGES]
-        cfg.presets        = Array.isArray(cfg.presets) ? cfg.presets : []
+  // ── Init: load semua data saat user login ─────────────────
+  initUser: async (userId, role, region, unit) => {
+    set({ currentUserId: userId, currentUserRole: role, currentRegion: region, currentUnit: unit })
 
-        // Load appearance per user
-        const userAppearance = await loadUserAppearance(userId)
-        if (userAppearance && Object.keys(userAppearance).length > 0) {
-          cfg.appearance = { ...DEFAULT_APPEARANCE, ...cfg.appearance, ...userAppearance }
-        } else if (!hasDevicePref()) {
-          const preset = getDevicePreset()
-          if (Object.keys(preset).length > 0) {
-            cfg.appearance = { ...cfg.appearance, ...preset }
-            setDevicePref()
-          }
-        }
-        saveLocalAppearance(cfg.appearance)
-        persist(cfg)
-        set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions, presets: cfg.presets })
+    // Load section pribadi dari DB
+    const dbSections = await getUserLayout(userId)
+    if (dbSections && Array.isArray(dbSections) && dbSections.length > 0) {
+      // User sudah punya layout — reset posisi dari atas (y:0) agar tidak melayang
+      const raw = dbSections as Section[]
+      // Sort by posisi lama lalu re-layout dari atas
+      const sorted = [...raw].sort((a, b) => (a.layout.y * 100 + a.layout.x) - (b.layout.y * 100 + b.layout.x))
+      const sections = autoLayout(sorted)
+      persistPersonal(sections)
+      set({ personalSections: sections })
+      // Simpan posisi baru ke DB
+      await saveUserLayout(userId, sections)
+    } else {
+      // User pertama kali login — buat 2 section default: Layanan Bersama + Favorit
+      const genId = () => 's' + Math.random().toString(36).slice(2, 10)
+      const defaultSections: Section[] = [
+        {
+          id: genId(), title: 'LAYANAN BERSAMA', icon: '🌐',
+          subtitle: 'Layanan internal perusahaan', items: [],
+          layout: { x: 0, y: 0, w: 4, h: 5 },
+          visibility: 'all', targetUnits: [], pageId: 'beranda', type: 'section',
+        },
+        {
+          id: genId(), title: 'FAVORIT', icon: '⭐',
+          subtitle: 'Section pribadiku', items: [],
+          layout: { x: 4, y: 0, w: 4, h: 5 },
+          visibility: 'all', targetUnits: [], pageId: 'beranda', type: 'section',
+          isFavorite: false,
+        },
+      ]
+      persistPersonal(defaultSections)
+      set({ personalSections: defaultSections })
+      await saveUserLayout(userId, defaultSections)
+    }
+
+    // Load shared sections sesuai role/region/unit user
+    const shared = await getSharedSections(role, region, unit)
+    set({ sharedSections: shared })
+
+    // Load preferensi tampilan dari DB profil user
+    const dbAppearance = await loadUserAppearance(userId)
+    if (dbAppearance && Object.keys(dbAppearance).length > 0) {
+      // DB lebih prioritas dari localStorage
+      saveLocalAppearance(dbAppearance)
+      set({ appearance: dbAppearance })
+    } else if (!hasDevicePref()) {
+      // Pertama kali di device ini — pakai preset berdasarkan ukuran layar
+      const preset = getDevicePreset()
+      if (Object.keys(preset).length > 0) {
+        const next = { ...get().appearance, ...preset }
+        saveLocalAppearance(next)
+        set({ appearance: next })
+        setDevicePref()
       }
+    }
 
-      // Load unit config jika user punya unit
-      if (unitId && unitId !== '') {
-        const unitCfg = await loadUnitConfig(unitId)
-        if (unitCfg) {
-          const sections = autoLayout(((unitCfg as any).sections ?? []) as Section[])
-          set(s => ({ unitSections: { ...s.unitSections, [unitId]: sections } }))
-        }
-      }
+    // Load presets tampilan
+    const localPresets = localStorage.getItem('jateamhub-presets')
+    if (localPresets) set({ presets: JSON.parse(localPresets) })
 
-      // Load global theme
-      const theme = await loadGlobalTheme()
-      set({ globalTheme: theme })
-      applyThemeToDOM(theme)
+    // Load dan terapkan theme global
+    const theme = await loadGlobalTheme()
+    set({ globalTheme: theme })
+    applyThemeToDOM(theme)
+  },
 
-    } catch (e) {
-      console.error('[JateamHub] loadRemoteConfig failed:', e)
+  // ── Load shared sections — bisa dipanggil ulang saat preview ─
+  loadSharedSections: async () => {
+    const { currentUserRole, currentRegion, currentUnit } = get()
+    // Admin: load semua shared sections untuk dikelola
+    if (currentUserRole === 'admin') {
+      const all = await getAllSharedSections()
+      set({ sharedSections: all })
+    } else {
+      // User biasa: load hanya yang sesuai scope-nya
+      const filtered = await getSharedSections(currentUserRole, currentRegion, currentUnit)
+      set({ sharedSections: filtered })
     }
   },
 
-  // ── Sync global ───────────────────────────
-  syncGlobalToDb: async () => {
-    if (globalSyncTimer) clearTimeout(globalSyncTimer)
+  // ── Sync section pribadi ke DB dengan debounce ────────────
+  syncPersonalToDb: async () => {
+    if (personalSyncTimer) clearTimeout(personalSyncTimer)
     set({ isDirty: true, syncStatus: 'saving' })
-    globalSyncTimer = setTimeout(async () => {
-      const cfg = get().config
+    personalSyncTimer = setTimeout(async () => {
+      const { personalSections, currentUserId } = get()
+      if (!currentUserId) return
       set({ isSyncing: true })
       try {
-        const result = await saveGlobalConfig(cfg as unknown as Record<string, unknown>)
+        const result = await saveUserLayout(currentUserId, personalSections)
         if ((result as any)?.error) {
           set({ isSyncing: false, syncStatus: 'error', isDirty: true })
         } else {
@@ -293,312 +298,285 @@ export const useStore = create<DashboardStore>((set, get) => ({
       } catch {
         set({ isSyncing: false, syncStatus: 'error', isDirty: true })
       }
-    }, 1500)
+    }, 1500) // tunggu 1.5 detik setelah perubahan terakhir
   },
 
-  // ── Sync unit ─────────────────────────────
-  syncUnitToDb: async (unitId) => {
-    if (unitSyncTimers[unitId]) clearTimeout(unitSyncTimers[unitId])
-    set({ isDirty: true, syncStatus: 'saving' })
-    unitSyncTimers[unitId] = setTimeout(async () => {
-      const sections = get().unitSections[unitId] ?? []
-      set({ isSyncing: true })
-      try {
-        const result = await saveUnitConfig(unitId, { sections } as unknown as Record<string, unknown>)
-        if ((result as any)?.error) {
-          set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-        } else {
-          set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
-          setTimeout(() => set({ syncStatus: 'idle' }), 3000)
-        }
-      } catch {
-        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-      }
-    }, 1500)
-  },
-
-  // ── History ───────────────────────────────
-  setConfig: (cfg) => {
-    const prev = get().config
+  // ── Helper: push snapshot ke history untuk undo ───────────
+  pushHistory: () => {
+    const prev = get().personalSections
     const history = [...get().history, structuredClone(prev)].slice(-MAX_HISTORY)
-    persist(cfg)
-    get().syncGlobalToDb()
-    set({ config: cfg, history, future: [], canUndo: true, canRedo: false, appearance: cfg.appearance, displayOptions: cfg.displayOptions })
+    set({ history, future: [], canUndo: true, canRedo: false })
   },
 
-  resetConfig: () => {
-    const fresh = structuredClone(defaultConfig)
-    persist(fresh)
-    get().syncGlobalToDb()
-    set({ config: fresh, appearance: fresh.appearance, displayOptions: fresh.displayOptions, currentPage: 'beranda', previewUnit: null, history: [], future: [], canUndo: false, canRedo: false })
+  // ── Tambah section pribadi baru ───────────────────────────
+  addPersonalSection: (data) => {
+    ; (get() as any).pushHistory()
+    const current = get().personalSections
+    // Hitung posisi Y setelah section terakhir
+    const maxY = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
+    const newSection: Section = {
+      id: 's' + uid(),
+      title: data.title ?? 'Section Baru',
+      icon: data.icon ?? '📁',
+      subtitle: data.subtitle ?? '',
+      items: [],
+      layout: { x: 0, y: maxY, w: data.layout?.w ?? SECTION_DEFAULT_W, h: data.layout?.h ?? SECTION_DEFAULT_H },
+      visibility: 'all',   // section pribadi selalu 'all' (hanya milik user ini)
+      targetUnits: [],
+      pageId: 'beranda',
+      accentColor: data.accentColor,
+      type: data.type ?? 'section',
+      widgetType: data.widgetType,
+    }
+    const next = [...current, newSection]
+    persistPersonal(next)
+    set({ personalSections: next })
+    get().syncPersonalToDb()
   },
 
-  resetLayout: () => {
-    const cfg = structuredClone(get().config)
-    cfg.sections = autoLayout(cfg.sections)
-    persist(cfg)
-    get().syncGlobalToDb()
-    set({ config: cfg })
+  // ── Update section pribadi ────────────────────────────────
+  updatePersonalSection: (id, updates) => {
+    const next = get().personalSections.map(s =>
+      s.id === id ? { ...s, ...updates } : s
+    )
+    persistPersonal(next)
+    set({ personalSections: next })
+    get().syncPersonalToDb()
   },
 
+  // ── Hapus section pribadi ─────────────────────────────────
+  deletePersonalSection: (id) => {
+    ; (get() as any).pushHistory()
+    const next = get().personalSections.filter(s => s.id !== id)
+    persistPersonal(next)
+    set({ personalSections: next })
+    get().syncPersonalToDb()
+  },
+
+  // ── Toggle collapse section (buka/tutup) ──────────────────
+  toggleCollapse: (id) => {
+    const next = get().personalSections.map(s => {
+      if (s.id !== id) return s
+      if (!s.collapsed) {
+        // Simpan tinggi asli, set tinggi jadi 1 (hanya header)
+        return { ...s, _expandedH: s.layout.h, layout: { ...s.layout, h: 1 }, collapsed: true }
+      } else {
+        // Kembalikan ke tinggi asli
+        return { ...s, layout: { ...s.layout, h: s._expandedH ?? SECTION_DEFAULT_H }, collapsed: false }
+      }
+    })
+    persistPersonal(next)
+    set({ personalSections: next })
+    get().syncPersonalToDb()
+  },
+
+  // ── Update posisi/ukuran banyak section sekaligus (setelah drag) ──
+  batchUpdateLayouts: (layouts) => {
+    const next = get().personalSections.map(s => {
+      const found = layouts.find(l => l.id === s.id)
+      if (!found || s.collapsed) return s
+      return { ...s, layout: { ...s.layout, ...found.layout }, _expandedH: found.layout.h }
+    })
+    persistPersonal(next)
+    set({ personalSections: next, isDirty: true, syncStatus: 'saving' })
+    // Debounce lebih panjang (3 detik) untuk drag — banyak update kecil
+    if (personalSyncTimer) clearTimeout(personalSyncTimer)
+    personalSyncTimer = setTimeout(async () => {
+      const { currentUserId } = get()
+      if (!currentUserId) return
+      set({ isSyncing: true })
+      try {
+        await saveUserLayout(currentUserId, next)
+        set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
+        setTimeout(() => set({ syncStatus: 'idle' }), 3000)
+      } catch {
+        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+      }
+    }, 3000)
+  },
+
+  // ── Tambah item/link ke dalam section pribadi ─────────────
+  addItem: (sectionId, data) => {
+    const next = get().personalSections.map(s =>
+      s.id === sectionId
+        ? { ...s, items: [...s.items, { id: 'i' + uid(), ...data }] }
+        : s
+    )
+    persistPersonal(next)
+    set({ personalSections: next })
+    get().syncPersonalToDb()
+  },
+
+  // ── Update item/link di dalam section pribadi ─────────────
+  updateItem: (sectionId, itemId, data) => {
+    const next = get().personalSections.map(s => {
+      if (s.id !== sectionId) return s
+      return {
+        ...s,
+        items: s.items.map(i => i.id === itemId ? { id: itemId, ...data } : i)
+      }
+    })
+    persistPersonal(next)
+    set({ personalSections: next })
+    get().syncPersonalToDb()
+  },
+
+  // ── Hapus item/link dari section pribadi ──────────────────
+  deleteItem: (sectionId, itemId) => {
+    const next = get().personalSections.map(s => {
+      if (s.id !== sectionId) return s
+      return { ...s, items: s.items.filter(i => i.id !== itemId) }
+    })
+    persistPersonal(next)
+    set({ personalSections: next })
+    get().syncPersonalToDb()
+  },
+
+  // ── Pindahkan item antar section ──────────────────────────
+  moveItem: (srcId, itemId, tgtId) => {
+    const sections = get().personalSections
+    const item = sections.find(s => s.id === srcId)?.items.find(i => i.id === itemId)
+    if (!item) return
+    const next = sections.map(s => {
+      if (s.id === srcId) return { ...s, items: s.items.filter(i => i.id !== itemId) }
+      if (s.id === tgtId) return { ...s, items: [...s.items, item] }
+      return s
+    })
+    persistPersonal(next)
+    set({ personalSections: next })
+    get().syncPersonalToDb()
+  },
+
+  // ── Tambah shared section (admin saja) ────────────────────
+  addSharedSection: async (data) => {
+    await createSharedSection(data)
+    await get().loadSharedSections() // reload setelah tambah
+  },
+
+  // ── Update shared section (admin saja) ────────────────────
+  updateSharedSectionFn: async (id, updates) => {
+    await updateSharedSection(id, updates)
+    await get().loadSharedSections()
+  },
+
+  // ── Hapus shared section (admin saja) ─────────────────────
+  deleteSharedSectionFn: async (id) => {
+    await deleteSharedSection(id)
+    await get().loadSharedSections()
+  },
+
+  // ── Toggle favorite section ──────────────────────────────────
+  // Tandai section sebagai favorit — akan tampil di urutan pertama group OWN
+  toggleFavoriteSection: (id: string) => {
+    const next = get().personalSections.map(s =>
+      s.id === id ? { ...s, isFavorite: !s.isFavorite } : s
+    )
+    persistPersonal(next)
+    set({ personalSections: next })
+    get().syncPersonalToDb()
+  },
+
+  // ── Toggle favorite item/link ──────────────────────────────
+  // Tandai link sebagai favorit — badge ⭐ muncul di pojok icon
+  toggleFavoriteItem: (sectionId: string, itemId: string) => {
+    const next = get().personalSections.map(s => {
+      if (s.id !== sectionId) return s
+      return {
+        ...s,
+        items: s.items.map(i =>
+          i.id === itemId ? { ...i, isFavorite: !i.isFavorite } : i
+        )
+      }
+    })
+    persistPersonal(next)
+    set({ personalSections: next })
+    get().syncPersonalToDb()
+  },
+
+  // ── Toggle edit mode ──────────────────────────────────────
+  toggleEditMode: () => set(s => ({ editMode: !s.editMode, searchQuery: '' })),
+
+  // ── Set query filter pencarian section ────────────────────
+  setSearch: (q) => set({ searchQuery: q }),
+
+  // ── Set filter preview untuk admin (role + region + unit) ─
+  setPreviewFilter: (filter) => set({ previewFilter: filter }),
+
+  // ── Update preferensi tampilan user ──────────────────────
+  setAppearance: (o) => {
+    const next = { ...get().appearance, ...o }
+    saveLocalAppearance(next) // simpan ke localStorage langsung
+    set({ appearance: next })
+    // Sync ke DB dengan debounce 2 detik
+    const userId = get().currentUserId
+    if (userId) {
+      if (appearanceSyncTimer) clearTimeout(appearanceSyncTimer)
+      appearanceSyncTimer = setTimeout(() => saveUserAppearance(userId, next), 2000)
+    }
+  },
+
+  // ── Update pilihan tampilan (show desc, show tags) ────────
+  setDisplayOptions: (o) => set(s => ({ displayOptions: { ...s.displayOptions, ...o } })),
+
+  // ── Set theme global (superadmin saja) ───────────────────
+  setGlobalTheme: (theme) => {
+    saveGlobalTheme(theme)     // simpan ke DB
+    applyThemeToDOM(theme)     // terapkan ke CSS variables
+    set({ globalTheme: theme })
+    get().setAppearance({ theme }) // sinkron ke appearance user
+  },
+
+  // ── Simpan preset tampilan ────────────────────────────────
+  savePreset: (name) => {
+    const preset = { id: uid(), name, appearance: { ...get().appearance } }
+    const presets = [...get().presets, preset]
+    localStorage.setItem('jateamhub-presets', JSON.stringify(presets))
+    set({ presets })
+  },
+
+  // ── Terapkan preset tampilan yang dipilih ─────────────────
+  applyPreset: (id) => {
+    const preset = get().presets.find(p => p.id === id)
+    if (preset) get().setAppearance(preset.appearance)
+  },
+
+  // ── Hapus preset tampilan ─────────────────────────────────
+  deletePreset: (id) => {
+    const presets = get().presets.filter(p => p.id !== id)
+    localStorage.setItem('jateamhub-presets', JSON.stringify(presets))
+    set({ presets })
+  },
+
+  // ── Undo: kembalikan ke state sebelumnya ──────────────────
   undo: () => {
-    const { history, config, future } = get()
+    const { history, personalSections, future } = get()
     if (!history.length) return
     const prev = history[history.length - 1]
     const newHistory = history.slice(0, -1)
-    const newFuture  = [structuredClone(config), ...future].slice(0, MAX_HISTORY)
-    persist(prev)
-    set({ config: prev, history: newHistory, future: newFuture, canUndo: newHistory.length > 0, canRedo: true })
+    const newFuture = [structuredClone(personalSections), ...future].slice(0, MAX_HISTORY)
+    persistPersonal(prev)
+    set({
+      personalSections: prev, history: newHistory, future: newFuture,
+      canUndo: newHistory.length > 0, canRedo: true
+    })
   },
 
+  // ── Redo: maju ke state berikutnya ───────────────────────
   redo: () => {
-    const { history, config, future } = get()
+    const { history, personalSections, future } = get()
     if (!future.length) return
     const next = future[0]
-    const newFuture  = future.slice(1)
-    const newHistory = [...history, structuredClone(config)].slice(-MAX_HISTORY)
-    persist(next)
-    set({ config: next, history: newHistory, future: newFuture, canUndo: true, canRedo: newFuture.length > 0 })
-  },
-
-  toggleEditMode: () => set(s => ({ editMode: !s.editMode, searchQuery: '' })),
-  setSearch:      (q) => set({ searchQuery: q }),
-  setCurrentPage: (p) => set({ currentPage: p, searchQuery: '' }),
-  setPreviewUnit: (u) => set({ previewUnit: u, editMode: false }),
-
-  // ── Global sections ───────────────────────
-  addSection: (title, icon, subtitle, accent, visibility, targetUnits, pageId, type, widgetType) => {
-    const cfg = structuredClone(get().config)
-    const COLS = 12
-    const existing = cfg.sections.filter(s => (s.pageId ?? 'beranda') === (pageId ?? 'beranda'))
-    const maxY = existing.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
-    cfg.sections.push({
-      id: 's' + uid(), title, icon, subtitle, items: [],
-      layout: { x: 0, y: maxY, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
-      visibility: visibility ?? 'all', targetUnits: targetUnits ?? [],
-      pageId: pageId ?? 'beranda', accentColor: accent, type: type ?? 'section', widgetType,
+    const newFuture = future.slice(1)
+    const newHistory = [...history, structuredClone(personalSections)].slice(-MAX_HISTORY)
+    persistPersonal(next)
+    set({
+      personalSections: next, history: newHistory, future: newFuture,
+      canUndo: true, canRedo: newFuture.length > 0
     })
-    const prev = get().config
-    const history = [...get().history, structuredClone(prev)].slice(-MAX_HISTORY)
-    persist(cfg)
-    get().syncGlobalToDb()
-    set({ config: cfg, history, future: [], canUndo: true, canRedo: false })
-  },
-
-  updateSection: (id, title, icon, subtitle, w, accent, pageId, visibility, targetUnits) => {
-    const cfg = structuredClone(get().config)
-    const s = cfg.sections.find(s => s.id === id)
-    if (s) {
-      s.title = title; s.icon = icon; s.subtitle = subtitle
-      s.layout.w = Math.floor(w / 70) || s.layout.w
-      if (accent !== undefined) s.accentColor = accent
-      if (pageId) s.pageId = pageId
-      if (visibility) s.visibility = visibility as any
-      if (targetUnits) s.targetUnits = targetUnits
-    }
-    persist(cfg); get().syncGlobalToDb()
-    set({ config: cfg })
-  },
-
-  deleteSection: (id) => {
-    const cfg = structuredClone(get().config)
-    cfg.sections = cfg.sections.filter(s => s.id !== id)
-    const prev = get().config
-    const history = [...get().history, structuredClone(prev)].slice(-MAX_HISTORY)
-    persist(cfg); get().syncGlobalToDb()
-    set({ config: cfg, history, future: [], canUndo: true, canRedo: false })
-  },
-
-  toggleCollapse: (id) => {
-    const cfg = structuredClone(get().config)
-    const s = cfg.sections.find(s => s.id === id)
-    if (s) {
-      if (!s.collapsed) { s._expandedH = s.layout.h; s.layout.h = 1; s.collapsed = true }
-      else { s.layout.h = s._expandedH ?? SECTION_DEFAULT_H; s.collapsed = false }
-    }
-    persist(cfg); get().syncGlobalToDb()
-    set({ config: cfg })
-  },
-
-  batchUpdateLayouts: (layouts) => {
-    const cfg = structuredClone(get().config)
-    layouts.forEach(({ id, layout }) => {
-      const s = cfg.sections.find(s => s.id === id)
-      if (s && !s.collapsed) { s.layout = { ...s.layout, ...layout }; s._expandedH = layout.h }
-    })
-    persist(cfg)
-    if (globalSyncTimer) clearTimeout(globalSyncTimer)
-    set({ config: cfg, isDirty: true, syncStatus: 'saving' })
-    globalSyncTimer = setTimeout(async () => {
-      set({ isSyncing: true })
-      try {
-        const result = await saveGlobalConfig(cfg as unknown as Record<string, unknown>)
-        if ((result as any)?.error) set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-        else { set({ isSyncing: false, syncStatus: 'saved', isDirty: false }); setTimeout(() => set({ syncStatus: 'idle' }), 3000) }
-      } catch { set({ isSyncing: false, syncStatus: 'error', isDirty: true }) }
-    }, 3000)
-  },
-
-  updateSectionLayout: (id, layout) => {
-    const cfg = structuredClone(get().config)
-    const s = cfg.sections.find(s => s.id === id)
-    if (s) s.layout = { ...s.layout, ...layout }
-    persist(cfg); get().syncGlobalToDb()
-    set({ config: cfg })
-  },
-
-  // ── Unit sections ─────────────────────────
-  addUnitSection: (unitId, data) => {
-    const current = structuredClone(get().unitSections[unitId] ?? [])
-    const maxY = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
-    current.push({
-      id: 's' + uid(), title: data.title ?? 'New Section',
-      icon: data.icon ?? '📁', subtitle: data.subtitle ?? '', items: [],
-      layout: { x: 0, y: maxY, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
-      visibility: 'unit', targetUnits: [unitId],
-      pageId: 'beranda', accentColor: data.accentColor, type: 'section',
-    })
-    set(s => ({ unitSections: { ...s.unitSections, [unitId]: current } }))
-    get().syncUnitToDb(unitId)
-  },
-
-  updateUnitSection: (unitId, sectionId, updates) => {
-    const current = structuredClone(get().unitSections[unitId] ?? [])
-    const idx = current.findIndex(s => s.id === sectionId)
-    if (idx >= 0) current[idx] = { ...current[idx], ...updates }
-    set(s => ({ unitSections: { ...s.unitSections, [unitId]: current } }))
-    get().syncUnitToDb(unitId)
-  },
-
-  deleteUnitSection: (unitId, sectionId) => {
-    const current = (get().unitSections[unitId] ?? []).filter(s => s.id !== sectionId)
-    set(s => ({ unitSections: { ...s.unitSections, [unitId]: current } }))
-    get().syncUnitToDb(unitId)
-  },
-
-  batchUpdateUnitLayouts: (unitId, layouts) => {
-    const current = structuredClone(get().unitSections[unitId] ?? [])
-    layouts.forEach(({ id, layout }) => {
-      const s = current.find(s => s.id === id)
-      if (s) { s.layout = { ...s.layout, ...layout }; s._expandedH = layout.h }
-    })
-    set(s => ({ unitSections: { ...s.unitSections, [unitId]: current } }))
-    if (unitSyncTimers[unitId]) clearTimeout(unitSyncTimers[unitId])
-    unitSyncTimers[unitId] = setTimeout(async () => {
-      await saveUnitConfig(unitId, { sections: current } as unknown as Record<string, unknown>)
-    }, 3000)
-  },
-
-  // ── Items ─────────────────────────────────
-  addItem: (sectionId, data, unitId) => {
-    if (unitId) {
-      const current = structuredClone(get().unitSections[unitId] ?? [])
-      const s = current.find(s => s.id === sectionId)
-      if (s) s.items.push({ id: 'i' + uid(), ...data })
-      set(st => ({ unitSections: { ...st.unitSections, [unitId]: current } }))
-      get().syncUnitToDb(unitId)
-    } else {
-      const cfg = structuredClone(get().config)
-      const s = cfg.sections.find(s => s.id === sectionId)
-      if (s) s.items.push({ id: 'i' + uid(), ...data })
-      persist(cfg); get().syncGlobalToDb(); set({ config: cfg })
-    }
-  },
-
-  updateItem: (sectionId, itemId, data, unitId) => {
-    if (unitId) {
-      const current = structuredClone(get().unitSections[unitId] ?? [])
-      const s = current.find(s => s.id === sectionId)
-      if (s) { const idx = s.items.findIndex(i => i.id === itemId); if (idx >= 0) s.items[idx] = { id: itemId, ...data } }
-      set(st => ({ unitSections: { ...st.unitSections, [unitId]: current } }))
-      get().syncUnitToDb(unitId)
-    } else {
-      const cfg = structuredClone(get().config)
-      const s = cfg.sections.find(s => s.id === sectionId)
-      if (s) { const idx = s.items.findIndex(i => i.id === itemId); if (idx >= 0) s.items[idx] = { id: itemId, ...data } }
-      persist(cfg); get().syncGlobalToDb(); set({ config: cfg })
-    }
-  },
-
-  deleteItem: (sectionId, itemId, unitId) => {
-    if (unitId) {
-      const current = structuredClone(get().unitSections[unitId] ?? [])
-      const s = current.find(s => s.id === sectionId)
-      if (s) s.items = s.items.filter(i => i.id !== itemId)
-      set(st => ({ unitSections: { ...st.unitSections, [unitId]: current } }))
-      get().syncUnitToDb(unitId)
-    } else {
-      const cfg = structuredClone(get().config)
-      const s = cfg.sections.find(s => s.id === sectionId)
-      if (s) s.items = s.items.filter(i => i.id !== itemId)
-      persist(cfg); get().syncGlobalToDb(); set({ config: cfg })
-    }
-  },
-
-  moveItem: (srcId, itemId, tgtId, tgtItemId) => {
-    const cfg = structuredClone(get().config)
-    const src = cfg.sections.find(s => s.id === srcId)
-    const tgt = cfg.sections.find(s => s.id === tgtId)
-    if (!src || !tgt) return
-    const item = src.items.find(i => i.id === itemId)
-    if (!item) return
-    src.items = src.items.filter(i => i.id !== itemId)
-    if (tgtItemId) {
-      const tgtIdx = tgt.items.findIndex(i => i.id === tgtItemId)
-      tgt.items.splice(tgtIdx >= 0 ? tgtIdx : tgt.items.length, 0, item)
-    } else tgt.items.push(item)
-    persist(cfg); get().syncGlobalToDb(); set({ config: cfg })
-  },
-
-  // ── Appearance ────────────────────────────
-  setAppearance: (o) => {
-    const next = { ...get().appearance, ...o }
-    const cfg  = structuredClone(get().config)
-    cfg.appearance = next
-    saveLocalAppearance(next)
-    persist(cfg)
-    const userId = get().currentUserId
-    if (userId) saveUserAppearance(userId, next)
-    set({ appearance: next, config: cfg })
-  },
-
-  setDisplayOptions: (o) => {
-    const next = { ...get().displayOptions, ...o }
-    const cfg  = structuredClone(get().config)
-    cfg.displayOptions = next
-    persist(cfg)
-    set({ displayOptions: next, config: cfg })
-  },
-
-  setGlobalTheme: (theme) => {
-    saveGlobalTheme(theme)
-    applyThemeToDOM(theme)
-    set({ globalTheme: theme })
-    get().setAppearance({ theme })
-  },
-
-  // ── Presets ───────────────────────────────
-  savePreset: (name) => {
-    const preset: Preset = { id: uid(), name, appearance: { ...get().appearance } }
-    const cfg = structuredClone(get().config)
-    cfg.presets = [...(cfg.presets ?? []), preset]
-    persist(cfg); get().syncGlobalToDb()
-    set({ config: cfg, presets: cfg.presets })
-  },
-  applyPreset: (id) => {
-    const preset = get().presets.find(p => p.id === id)
-    if (!preset) return
-    get().setAppearance(preset.appearance)
-  },
-  deletePreset: (id) => {
-    const cfg = structuredClone(get().config)
-    cfg.presets = (cfg.presets ?? []).filter(p => p.id !== id)
-    persist(cfg); get().syncGlobalToDb()
-    set({ config: cfg, presets: cfg.presets })
   },
 }))
 
-// ── Theme DOM ─────────────────────────────────
+// ── Terapkan theme ke CSS custom properties di DOM ────────────
 export function applyThemeToDOM(theme: ThemeId) {
   document.documentElement.setAttribute('data-theme', theme)
 }

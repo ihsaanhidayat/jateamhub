@@ -1,245 +1,210 @@
+// ─────────────────────────────────────────────────────────────
+// SECTION MODAL — Form tambah/edit section pribadi
+// Visibility options berbeda per role user
+// Page dropdown DIHAPUS — semua section di beranda
+// ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react'
 import Modal from '../ui/Modal'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import type { Section } from '../../types'
-import { SECTION_DEFAULT_W } from '../../types'
+import { REGIONS, UNITS } from '../../types'
 
-interface Props { open: boolean; section: Section | null; onClose: () => void }
+interface Props {
+  open:    boolean
+  section: Section | null  // null = mode tambah baru
+  onClose: () => void
+}
 
-const ACCENT_PRESETS = ['#00FFC2','#00BFFF','#FF6B6B','#FFD93D','#C77DFF','#FF9F40','#6BCB77','#FF6BD6']
-const UNIT_OPTIONS   = [
-  { value: 'pro',   label: 'PRO',   color: '#C77DFF' },
-  { value: 'cro',   label: 'CRO',   color: '#FF9F40' },
-  { value: 'klaim', label: 'Klaim', color: '#FF6B6B' },
+// Pilihan accent color untuk section
+const ACCENT_COLORS = [
+  '#00FFC2', '#00BFFF', '#FF6B6B', '#FFD93D',
+  '#C77DFF', '#FF8C42', '#A78BFA', '#34D399',
 ]
 
 export default function SectionModal({ open, section, onClose }: Props) {
-  const { addSection, updateSection, deleteSection, updateSectionLayout, toast, config, currentPage } = useStore()
-  const { profile: session } = useAuthStore()
-  const isUnitAdmin = (session as any)?.is_unit_admin === true && (session as any)?.role === 'user'
-  const myUnit      = (session as any)?.unit_id ?? ''
-  const [title,       setTitle]       = useState('')
-  const [subtitle,    setSubtitle]    = useState('')
-  const [icon,        setIcon]        = useState('')
-  const [colW,        setColW]        = useState(SECTION_DEFAULT_W)
-  const [accent,      setAccent]      = useState('')
-  const [pageId,      setPageId]      = useState('beranda')
-  const [visibility,  setVisibility]  = useState<'all' | 'admin' | 'unit'>('all')
-  const [targetUnits, setTargetUnits] = useState<string[]>([])
-  const [sectionType, setSectionType] = useState<'section' | 'widget'>('section')
-  const [widgetType,  setWidgetType]  = useState<'clock' | 'notes'>('clock')
+  const { addPersonalSection, updatePersonalSection, toast } = useStore()
+  const { profile } = useAuthStore()
 
+  // State form
+  const [title,      setTitle]      = useState('')
+  const [icon,       setIcon]       = useState('📁')
+  const [subtitle,   setSubtitle]   = useState('')
+  const [accent,     setAccent]     = useState(ACCENT_COLORS[0])
+  const [type,       setType]       = useState<'section' | 'widget'>('section')
+  const [widgetType, setWidgetType] = useState<'clock' | 'notes'>('clock')
+  const [colW,       setColW]       = useState(3)
+
+  // Isi form saat edit section yang sudah ada
   useEffect(() => {
-    if (open) {
-      setTitle(section?.title ?? '')
-      setSubtitle(section?.subtitle ?? '')
-      setIcon(section?.icon ?? '')
-      setColW(section?.layout?.w ?? SECTION_DEFAULT_W)
-      setAccent(section?.accentColor ?? '')
-      setPageId(section?.pageId ?? currentPage)
-      setVisibility(section?.visibility ?? 'all')
-      setTargetUnits(section?.targetUnits ?? [])
-      setSectionType(section?.type ?? 'section')
-      setWidgetType(section?.widgetType ?? 'clock')
+    if (section) {
+      setTitle(section.title)
+      setIcon(section.icon ?? '📁')
+      setSubtitle(section.subtitle ?? '')
+      setAccent(section.accentColor ?? ACCENT_COLORS[0])
+      setType((section.type ?? 'section') as 'section' | 'widget')
+      setWidgetType((section.widgetType ?? 'clock') as 'clock' | 'notes')
+      setColW(section.layout?.w ?? 3)
+    } else {
+      // Reset form saat tambah baru
+      setTitle(''); setIcon('📁'); setSubtitle('')
+      setAccent(ACCENT_COLORS[0]); setType('section')
+      setWidgetType('clock'); setColW(3)
     }
-  }, [open, section, currentPage])
+  }, [section, open])
 
-  const toggleUnit = (unit: string) =>
-    setTargetUnits(prev => prev.includes(unit) ? prev.filter(u => u !== unit) : [...prev, unit])
-
+  // Simpan section (tambah atau update)
   const handleSave = () => {
-    if (!title.trim()) { toast('Judul wajib diisi.', 'error'); return }
-    // unit_admin: force visibility=unit, targetUnits=[myUnit]
-    const finalVisibility  = isUnitAdmin ? 'unit'     : visibility
-    const finalTargetUnits = isUnitAdmin ? [myUnit]   : targetUnits
-    const finalPageId      = isUnitAdmin ? 'beranda'  : pageId
+    if (!title.trim()) { toast('Judul section tidak boleh kosong.', 'error'); return }
 
     if (section) {
-      updateSection(section.id, title.trim(), icon.trim(), subtitle.trim(), colW * 70, accent || undefined, finalPageId, finalVisibility, finalTargetUnits)
-      updateSectionLayout(section.id, { ...section.layout, w: colW })
+      // Mode edit — update section yang sudah ada
+      updatePersonalSection(section.id, {
+        title:      title.trim(),
+        icon:       icon.trim(),
+        subtitle:   subtitle.trim(),
+        accentColor: accent || undefined,
+        layout:     { ...section.layout, w: colW },
+        type,
+        widgetType: type === 'widget' ? widgetType : undefined,
+      })
       toast('Section diperbarui.', 'success')
     } else {
-      addSection(title.trim(), icon.trim(), subtitle.trim(), accent || undefined, finalVisibility, finalTargetUnits, finalPageId, sectionType, sectionType === 'widget' ? widgetType : undefined)
+      // Mode tambah — buat section baru
+      addPersonalSection({
+        title:      title.trim(),
+        icon:       icon.trim(),
+        subtitle:   subtitle.trim(),
+        accentColor: accent || undefined,
+        layout:     { x: 0, y: 0, w: colW, h: 5 },
+        type,
+        widgetType: type === 'widget' ? widgetType : undefined,
+      })
       toast('Section ditambahkan.', 'success')
     }
     onClose()
   }
 
-  const handleDelete = () => {
-    if (!section) return
-    if (!confirm('Hapus section ini beserta semua item di dalamnya?')) return
-    deleteSection(section.id); toast('Section dihapus.', 'success'); onClose()
-  }
-
-  const pages = config.pages ?? []
-
   return (
-    <Modal open={open} title={section ? 'Edit Section' : 'Tambah Section'} onClose={onClose}
+    <Modal
+      open={open}
+      title={section ? `Edit: ${section.title}` : 'Tambah Section Baru'}
+      onClose={onClose}
       footer={
         <>
-          {section && <button className="btn-delete" onClick={handleDelete}>🗑 Hapus</button>}
           <button className="btn-cancel" onClick={onClose}>Batal</button>
-          <button className="btn-save" onClick={handleSave}>Simpan</button>
+          <button className="btn-save" onClick={handleSave}>
+            {section ? 'Simpan' : 'Tambahkan'}
+          </button>
         </>
       }
     >
-      {/* Tipe — hanya di add mode */}
+      {/* Judul section */}
+      <div className="field">
+        <label>Judul</label>
+        <input
+          value={title} onChange={e => setTitle(e.target.value)}
+          placeholder="Nama section..." autoFocus
+        />
+      </div>
+
+      {/* Icon emoji */}
+      <div className="field">
+        <label>Icon (emoji)</label>
+        <input
+          value={icon} onChange={e => setIcon(e.target.value)}
+          placeholder="📁" maxLength={4}
+          style={{ fontSize: 20, width: 80 }}
+        />
+      </div>
+
+      {/* Subtitle / deskripsi */}
+      <div className="field">
+        <label>Subtitle (opsional)</label>
+        <input
+          value={subtitle} onChange={e => setSubtitle(e.target.value)}
+          placeholder="Deskripsi singkat..."
+        />
+      </div>
+
+      {/* Tipe section — hanya saat tambah baru */}
       {!section && (
         <div className="field">
           <label>Tipe</label>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             {(['section', 'widget'] as const).map(t => (
-              <button key={t} onClick={() => setSectionType(t)} style={{
+              <button key={t} onClick={() => setType(t)} style={{
                 flex: 1, padding: '8px', fontSize: 12, fontWeight: 600,
-                background: sectionType === t ? 'var(--mint-bg2)' : 'var(--bg3)',
-                border: `1px solid ${sectionType === t ? 'var(--mint)' : 'var(--border2)'}`,
-                borderRadius: 'var(--radius-sm)', color: sectionType === t ? 'var(--mint)' : 'var(--silver3)',
-                cursor: 'pointer', fontFamily: 'var(--font)',
-              }}>
-                {t === 'section' ? '📋 Section' : '🧩 Widget'}
-              </button>
+                background: type === t ? 'var(--mint-bg2)' : 'var(--bg3)',
+                border: `1px solid ${type === t ? 'var(--mint)' : 'var(--border2)'}`,
+                borderRadius: 6, color: type === t ? 'var(--mint)' : 'var(--silver3)',
+                cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+              }}>{t === 'section' ? '📁 Section' : '🧩 Widget'}</button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Widget type selector */}
-      {sectionType === 'widget' && !section && (
+      {/* Pilih tipe widget — hanya jika tipe = widget */}
+      {type === 'widget' && !section && (
         <div className="field">
-          <label>Jenis Widget</label>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {([['clock', '🕐 Digital Clock'], ['notes', '📝 Notes']] as const).map(([wt, label]) => (
-              <button key={wt} onClick={() => setWidgetType(wt)} style={{
+          <label>Tipe Widget</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(['clock', 'notes'] as const).map(w => (
+              <button key={w} onClick={() => setWidgetType(w)} style={{
                 flex: 1, padding: '8px', fontSize: 12, fontWeight: 600,
-                background: widgetType === wt ? 'var(--mint-bg2)' : 'var(--bg3)',
-                border: `1px solid ${widgetType === wt ? 'var(--mint)' : 'var(--border2)'}`,
-                borderRadius: 'var(--radius-sm)', color: widgetType === wt ? 'var(--mint)' : 'var(--silver3)',
-                cursor: 'pointer', fontFamily: 'var(--font)',
-              }}>{label}</button>
+                background: widgetType === w ? 'var(--mint-bg2)' : 'var(--bg3)',
+                border: `1px solid ${widgetType === w ? 'var(--mint)' : 'var(--border2)'}`,
+                borderRadius: 6, color: widgetType === w ? 'var(--mint)' : 'var(--silver3)',
+                cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+              }}>{w === 'clock' ? '🕐 Jam' : '📝 Catatan'}</button>
             ))}
           </div>
         </div>
       )}
 
+      {/* Lebar section dalam kolom grid (1-12) */}
       <div className="field">
-        <label>Title</label>
-        <input value={title} onChange={e => setTitle(e.target.value)}
-          placeholder={sectionType === 'widget' ? 'e.g. Jam Digital' : 'e.g. Layanan Bersama'} autoFocus />
-      </div>
-      <div className="field">
-        <label>Subtitle (opsional)</label>
-        <input value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Keterangan singkat" />
-      </div>
-
-      {sectionType === 'section' && (
-        <div className="field">
-          <label>Icon (emoji atau URL)</label>
-          <input value={icon} onChange={e => setIcon(e.target.value)} placeholder="🔧 atau https://..." />
-        </div>
-      )}
-
-      <div className="field-row">
-        <div className="field">
-          <label>Halaman</label>
-          <select value={pageId} onChange={e => setPageId(e.target.value)}>
-            {pages.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label>Lebar (kolom)</label>
-          <select value={colW} onChange={e => setColW(Number(e.target.value))}>
-            <option value={2}>2 — Narrow</option>
-            <option value={3}>3 — Slim</option>
-            <option value={4}>4 — Normal</option>
-            <option value={5}>5</option>
-            <option value={6}>6 — Half</option>
-            <option value={8}>8 — Wide</option>
-            <option value={12}>12 — Full</option>
-          </select>
+        <label>Lebar (kolom grid: {colW}/12)</label>
+        <input
+          type="range" min={2} max={12} value={colW}
+          onChange={e => setColW(Number(e.target.value))}
+          style={{ width: '100%', accentColor: 'var(--mint)' }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--silver3)', marginTop: 2 }}>
+          <span>Sempit</span><span>Penuh</span>
         </div>
       </div>
 
-      {/* Visibility — hanya tampil untuk admin/superadmin */}
-      {!isUnitAdmin && (
+      {/* Warna aksen border section */}
       <div className="field">
-        <label>Visibility / Target</label>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          {([
-            ['all',   '🌐 Semua User',   'var(--mint)'],
-            ['admin', '🔒 Admin Only',   '#00BFFF'],
-            ['unit',  '🎯 Unit Tertentu','#C77DFF'],
-          ] as const).map(([v, label, color]) => (
-            <button key={v} onClick={() => setVisibility(v)} style={{
-              flex: 1, padding: '7px 4px', fontSize: 11, fontWeight: 600,
-              background: visibility === v ? color + '22' : 'var(--bg3)',
-              border: `1px solid ${visibility === v ? color : 'var(--border2)'}`,
-              borderRadius: 'var(--radius-sm)', color: visibility === v ? color : 'var(--silver3)',
-              cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s',
-            }}>{label}</button>
+        <label>Warna Aksen</label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {ACCENT_COLORS.map(c => (
+            <div key={c} onClick={() => setAccent(c)} style={{
+              width: 28, height: 28, borderRadius: 6, background: c,
+              cursor: 'pointer', transition: 'all .15s',
+              border: `2px solid ${accent === c ? 'white' : 'transparent'}`,
+              boxShadow: accent === c ? `0 0 8px ${c}` : 'none',
+            }} />
           ))}
+          {/* Tombol hapus warna aksen */}
+          <div onClick={() => setAccent('')} style={{
+            width: 28, height: 28, borderRadius: 6,
+            background: 'var(--bg3)', border: `1px solid ${!accent ? 'var(--mint)' : 'var(--border2)'}`,
+            cursor: 'pointer', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 12, color: 'var(--silver3)',
+          }}>✕</div>
         </div>
-
-        {/* Target units — muncul kalau visibility=unit */}
-        {visibility === 'unit' && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {UNIT_OPTIONS.map(u => {
-              const active = targetUnits.includes(u.value)
-              return (
-                <div key={u.value} onClick={() => toggleUnit(u.value)} style={{
-                  padding: '4px 12px', borderRadius: 'var(--radius-sm)',
-                  border: `1px solid ${active ? u.color : 'var(--border2)'}`,
-                  background: active ? u.color + '22' : 'var(--bg3)',
-                  color: active ? u.color : 'var(--silver3)',
-                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  transition: 'all .15s', userSelect: 'none',
-                  textTransform: 'uppercase', letterSpacing: '.5px', fontFamily: 'var(--mono)',
-                }}>
-                  {active ? '✓ ' : ''}{u.label}
-                </div>
-              )
-            })}
-          </div>
-        )}
       </div>
 
-      )}{/* end visibility */}
-
-      {/* Accent */}
-      <div className="field">
-        <label>Accent Color</label>
-        <div className="color-swatches">
-          <div className={`color-swatch clear${!accent ? ' selected' : ''}`} onClick={() => setAccent('')} title="Default">✕</div>
-          {ACCENT_PRESETS.map(c => (
-            <div key={c} className={`color-swatch${accent === c ? ' selected' : ''}`}
-              style={{ background: c }} onClick={() => setAccent(c)} />
-          ))}
-        </div>
-        {accent && (
-          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="color" value={accent} onChange={e => setAccent(e.target.value)}
-              style={{ width: 32, height: 24, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }} />
-            <span style={{ fontSize: 11, color: 'var(--silver3)', fontFamily: 'var(--mono)' }}>{accent}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Preview */}
+      {/* Info: section pribadi hanya untuk diri sendiri */}
       <div style={{
-        background: 'var(--bg3)', borderRadius: 'var(--radius-sm)',
-        padding: '8px 12px', borderLeft: `3px solid ${accent || 'var(--mint)'}`,
-        display: 'flex', alignItems: 'center', gap: 8,
+        fontSize: 11, color: 'var(--silver3)', padding: '10px 12px',
+        background: 'var(--bg3)', borderRadius: 6, lineHeight: 1.5,
       }}>
-        <span style={{ fontSize: 14 }}>{icon || (sectionType === 'widget' ? '🧩' : '📁')}</span>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--silver)', textTransform: 'uppercase', letterSpacing: '.8px' }}>
-            {title || 'Preview'}
-          </div>
-          {subtitle && <div style={{ fontSize: 10, color: 'var(--silver3)' }}>{subtitle}</div>}
-        </div>
-        <div style={{ marginLeft: 'auto', fontSize: 9, color: visibility === 'all' ? 'var(--mint)' : visibility === 'admin' ? '#00BFFF' : '#C77DFF', fontFamily: 'var(--mono)', fontWeight: 700, textTransform: 'uppercase' }}>
-          {visibility === 'all' ? 'ALL' : visibility === 'admin' ? 'ADM' : `UNIT(${targetUnits.length})`}
-        </div>
+        💡 Section ini hanya tampil di dashboard kamu. Untuk membuat section yang
+        bisa dilihat user lain, gunakan fitur Shared Section (admin only).
       </div>
     </Modal>
   )

@@ -197,7 +197,7 @@ export default function LoginPage() {
             <label style={{ display: 'block', fontSize: 10, fontWeight: 600, letterSpacing: '1.2px', color: 'rgba(0,255,194,0.6)', textTransform: 'uppercase', marginBottom: 6, fontFamily: 'var(--mono)' }}>Password</label>
             <div style={{ position: 'relative' }}>
               <input
-                type={showPw ? 'text' : 'password'}
+                type="password"
                 value={password}
                 onChange={e => { setPassword(e.target.value); setErr('') }}
                 placeholder="••••••••"
@@ -206,17 +206,13 @@ export default function LoginPage() {
                 style={{
                   width: '100%', background: 'rgba(0,255,194,0.04)',
                   border: `1px solid ${err ? 'rgba(224,85,85,0.6)' : 'rgba(0,255,194,0.2)'}`,
-                  borderRadius: 6, padding: '10px 40px 10px 12px',
+                  borderRadius: 6, padding: '10px 12px',
                   color: '#E0E0E0', fontSize: 14, fontFamily: 'var(--font)',
                   transition: 'all .2s', outline: 'none', boxSizing: 'border-box',
                 }}
                 onFocus={e => e.target.style.borderColor = 'rgba(0,255,194,0.7)'}
                 onBlur={e => e.target.style.borderColor = err ? 'rgba(224,85,85,0.6)' : 'rgba(0,255,194,0.2)'}
               />
-              <button type="button" onClick={() => setShowPw(v => !v)}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(0,255,194,0.4)', fontSize: 15, cursor: 'pointer', padding: 4 }}>
-                {showPw ? '🙈' : '👁'}
-              </button>
             </div>
           </div>
 

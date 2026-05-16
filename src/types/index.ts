@@ -47,7 +47,7 @@ export const PERMISSIONS = {
   SECTION_EDIT_GLOBAL:     ['superadmin', 'admin'],
   APPEARANCE_THEME_GLOBAL: ['superadmin'],
   APPEARANCE_EMOJI_AVATAR: ['superadmin', 'admin'],
-  APPEARANCE_OPTIONS_PANEL:['superadmin', 'admin'],
+  APPEARANCE_OPTIONS_PANEL:['superadmin', 'admin', 'user', 'guest'], // semua role bisa akses options
   BADGE_VISIBILITY:        ['superadmin', 'admin'],
 } as const
 
@@ -85,6 +85,7 @@ export interface LinkItem {
   newTab:      boolean
   iconUrl?:    string
   useFavicon?: boolean
+  isFavorite?: boolean  // item ini di-pin sebagai favorit
 }
 
 export interface Section {
@@ -102,7 +103,10 @@ export interface Section {
   accentColor?: string
   type?:        SectionType
   widgetType?:  WidgetType
+  isFavorite?:  boolean  // section ini di-pin sebagai favorit
 }
+
+
 
 // ── Appearance ────────────────────────────────
 export type IconSize       = 'small' | 'medium' | 'large' | 'xl'
@@ -167,8 +171,11 @@ export interface JateamConfig {
 }
 
 // ── Grid constants ────────────────────────────
-export const GRID_ROW_HEIGHT   = 70
-export const SECTION_MIN_W     = 2
-export const SECTION_MIN_H     = 3
-export const SECTION_DEFAULT_W = 3
-export const SECTION_DEFAULT_H = 5
+// GRID_ROW_HEIGHT: tinggi 1 baris grid dalam pixel
+export const GRID_ROW_HEIGHT   = 60  // 60px per baris — 3 baris = 180px
+// Default lebar: 4 kolom (3 section × 4 = 12 kolom penuh di layar)
+export const SECTION_MIN_W     = 1
+export const SECTION_MIN_H     = 2
+export const SECTION_DEFAULT_W = 4
+// Default tinggi: h:3 = 3×60 = 180px — muat 3 baris icon large (44px+label)
+export const SECTION_DEFAULT_H = 3

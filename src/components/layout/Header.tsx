@@ -13,14 +13,14 @@ interface Props {
 
 export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }: Props) {
   const {
-    config, editMode, toggleEditMode,
-    searchQuery, setSearch, currentPage, setCurrentPage,
-    previewUnit, setPreviewUnit,
+    editMode, toggleEditMode,
+    searchQuery, setSearch,
+    previewFilter, setPreviewFilter,
   } = useStore()
   const { profile: session } = useAuthStore()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
-  const [previewOpen,     setPreviewOpen]     = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const fileRef    = useRef<HTMLInputElement>(null)
@@ -31,13 +31,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
   const badge        = getDisplayBadge(session as any)
   const emoji        = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
 
-  const subtitle = (config.meta.subtitle || 'Selamat datang, {username}')
-    .replace('{username}', session?.username ?? '')
 
-  useEffect(() => {
-    const safePage = sanitizePage(currentPage, ['beranda'])
-    if (safePage !== currentPage) setCurrentPage('beranda')
-  }, [session?.role, currentPage])
+
+
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -83,6 +79,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
     { value: 'ae',    label: 'AE'         },
   ]
 
+
   return (
     <>
       <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
@@ -91,21 +88,10 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
         {/* LEFT — Brand */}
         <div className="header-left">
           <div className="header-brand">
-            {config.meta.logoUrl ? (
-              <div style={{ background: '#fff', borderRadius: 8, padding: 3, width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <img src={config.meta.logoUrl} alt="Logo" style={{ width: 34, height: 34, objectFit: 'contain', borderRadius: 4 }}
-                  onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }} />
-              </div>
-            ) : (
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(0,255,194,0.1)', border: '1.5px solid rgba(0,255,194,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 12px rgba(0,255,194,0.1)' }}>
-                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                  <path d="M5 11h12M11 5v12" stroke="var(--mint)" strokeWidth="2.2" strokeLinecap="round"/>
-                </svg>
-              </div>
-            )}
+
             <div>
-              <h1 className="header-title">{config.meta.title || 'JateamHub'}</h1>
-              <div className="header-sub">{subtitle}</div>
+              <h1 className="header-title" style={{ fontSize: 22, fontWeight: 800 }}>JateamHub</h1>
+              <div className="header-sub">Selamat datang, {session?.username ?? ''}{emoji ? ` ${emoji}` : ''}</div>
             </div>
           </div>
 
@@ -115,44 +101,105 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
         {/* RIGHT — view mode > filter > edit > options > profile */}
         <div className="header-right">
 
-          {/* View mode — hanya admin/superadmin, SEBELUM filter */}
+          {/* View mode preview — hanya admin, filter: role + region + unit */}
           {isAdminLevel && (
             <div className="preview-dropdown" ref={previewRef}>
-              <button className={`preview-btn${previewUnit !== null ? ' active' : ''}`} onClick={() => setPreviewOpen(v => !v)}>
+              <button
+                className={`preview-btn${(previewFilter.role || previewFilter.region || previewFilter.unit) ? ' active' : ''}`}
+                onClick={() => setPreviewOpen(v => !v)}
+                title="Preview tampilan user lain"
+              >
                 <span style={{ fontSize: 13 }}>👁</span>
-                <span style={{ fontSize: 11 }}>{previewUnit !== null ? (PREVIEW_OPTS.find(o => o.value === previewUnit)?.label ?? 'Preview') : 'View'}</span>
+                <span style={{ fontSize: 11 }}>View</span>
                 <span style={{ opacity: .5, fontSize: 9 }}>▾</span>
               </button>
               {previewOpen && (
-                <div className="preview-menu">
-                  {PREVIEW_OPTS.map(opt => (
-                    <button key={String(opt.value)} className={previewUnit === opt.value ? 'active' : ''}
-                      onClick={() => { setPreviewUnit(opt.value); setPreviewOpen(false) }}>{opt.label}</button>
-                  ))}
+                <div className="preview-menu" style={{ minWidth: 220, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--silver3)', marginBottom: 8, fontFamily: 'var(--mono)', letterSpacing: '1px' }}>PREVIEW SEBAGAI</div>
+                  {/* Filter Role */}
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 10, color: 'var(--silver3)', marginBottom: 4 }}>Role</div>
+                    <select
+                      value={previewFilter.role}
+                      onChange={e => setPreviewFilter({ ...previewFilter, role: e.target.value })}
+                      style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 4, padding: '5px 8px', color: 'var(--silver)', fontSize: 12 }}>
+                      <option value="">Semua Role</option>
+                      <option value="admin">Admin</option>
+                      <option value="user">User</option>
+                      <option value="guest">Guest</option>
+                    </select>
+                  </div>
+                  {/* Filter Wilayah */}
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 10, color: 'var(--silver3)', marginBottom: 4 }}>Wilayah</div>
+                    <select
+                      value={previewFilter.region}
+                      onChange={e => setPreviewFilter({ ...previewFilter, region: e.target.value })}
+                      style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 4, padding: '5px 8px', color: 'var(--silver)', fontSize: 12 }}>
+                      <option value="">Semua Wilayah</option>
+                      <option value="global">Global</option>
+                      <option value="sby">Surabaya</option>
+                      <option value="mks">Makassar</option>
+                      <option value="jkt">Jakarta</option>
+                      <option value="dps">Denpasar</option>
+                      <option value="mdn">Medan</option>
+                      <option value="pkb">Pekanbaru</option>
+                      <option value="plb">Palembang</option>
+                      <option value="btk">Botabek</option>
+                      <option value="bdg">Bandung</option>
+                      <option value="smg">Semarang</option>
+                      <option value="bpn">Balikpapan</option>
+                    </select>
+                  </div>
+                  {/* Filter Unit */}
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: 'var(--silver3)', marginBottom: 4 }}>Unit</div>
+                    <select
+                      value={previewFilter.unit}
+                      onChange={e => setPreviewFilter({ ...previewFilter, unit: e.target.value })}
+                      style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 4, padding: '5px 8px', color: 'var(--silver)', fontSize: 12 }}>
+                      <option value="">Semua Unit</option>
+                      <option value="general">General</option>
+                      <option value="pro">PRO</option>
+                      <option value="cro">CRO</option>
+                      <option value="klaim">Klaim</option>
+                      <option value="ae">AE</option>
+                    </select>
+                  </div>
+                  {/* Tombol reset dan terapkan filter */}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => { setPreviewFilter({ role: '', region: '', unit: '' }); setPreviewOpen(false) }}
+                      style={{ flex: 1, padding: '6px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 4, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                      Reset
+                    </button>
+                    <button onClick={() => setPreviewOpen(false)}
+                      style={{ flex: 1, padding: '6px', background: 'var(--mint-bg)', border: '1px solid var(--mint)', borderRadius: 4, color: 'var(--mint)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 700 }}>
+                      Terapkan
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Filter — semua role */}
-          <div className="search-wrap">
+          {/* Filter — 10px dari profile area */}
+          <div className="search-wrap" style={{ marginRight: 10 }}>
             <input className="search-input" placeholder="Filter..." value={searchQuery} onChange={e => setSearch(e.target.value)} />
             <span className="search-icon">⌕</span>
           </div>
 
-          {/* Edit mode — hanya admin/superadmin */}
-          {isEditable && (
-            <button className={`icon-btn${editMode ? ' active' : ''}`} onClick={toggleEditMode} title="Edit Mode">✏️</button>
-          )}
+          {/* Edit mode — 5px dari filter */}
+          <button className={`icon-btn${editMode ? ' active' : ''}`} onClick={toggleEditMode} title="Edit Mode"
+            style={{ marginLeft: 5 }}>✏️</button>
 
-          {/* Options — hanya admin/superadmin */}
-          {showOptions && (
-            <button id="options-btn" className={`icon-btn${optionsOpen ? ' active' : ''}`} onClick={onToggleOptions} title="Options">⚙️</button>
-          )}
+          {/* Options — 10px dari edit mode */}
+          <button id="options-btn" className={`icon-btn${optionsOpen ? ' active' : ''}`} onClick={onToggleOptions} title="Options"
+            style={{ marginLeft: 10 }}>⚙️</button>
 
-          {/* Profile dropdown */}
-          <div className="preview-dropdown" ref={profileRef}>
-            <button className="profile-btn" onClick={() => setProfileDropdown(v => !v)} title="Profil">
+          {/* Profile dropdown — lebih besar dari tombol lain */}
+          <div className="preview-dropdown" ref={profileRef} style={{ marginLeft: 16 }}>
+            <button className="profile-btn" onClick={() => setProfileDropdown(v => !v)} title="Profil"
+              style={{ width: 46, height: 46, borderRadius: '50%' }}>
               {(session as any)?.avatar_url ? (
                 <img src={(session as any).avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : emoji ? (
@@ -181,7 +228,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                   📷 Ganti Foto
                 </button>
-                {(canSeeOptions(session as any)) && (
+                {(session?.role === 'admin' || session?.role === 'superadmin') && (
                   <button onClick={() => { onOpenAdvanced(); setProfileDropdown(false) }}
                     style={{ display: 'block', width: '100%', padding: '9px 14px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--silver2)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--mint-bg)')}
@@ -202,17 +249,19 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
         </div>
       </header>
 
-      {/* Preview banner */}
-      {previewUnit !== null && (
+      {/* Preview banner — tampil jika ada filter aktif */}
+      {(previewFilter.role || previewFilter.region || previewFilter.unit) && (
         <div style={{
           background: 'rgba(199,125,255,0.08)', borderBottom: '1px solid rgba(199,125,255,0.2)',
           padding: '5px 20px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: '#C77DFF',
         }}>
-          <span style={{ fontWeight: 700 }}>👁 Preview: {previewUnit ? previewUnit.toUpperCase() : 'User Umum'}</span>
-          <button onClick={() => setPreviewUnit(null)} style={{
+          <span style={{ fontWeight: 700 }}>
+            👁 Preview: {[previewFilter.role, previewFilter.region, previewFilter.unit].filter(Boolean).map(s => s!.toUpperCase()).join(' · ') || 'Semua'}
+          </span>
+          <button onClick={() => setPreviewFilter({ role: '', region: '', unit: '' })} style={{
             marginLeft: 'auto', background: 'none', border: '1px solid rgba(199,125,255,0.3)',
             borderRadius: 4, color: '#C77DFF', padding: '2px 8px', fontSize: 10, cursor: 'pointer', fontWeight: 600,
-          }}>✕ Keluar</button>
+          }}>✕ Reset</button>
         </div>
       )}
     </>

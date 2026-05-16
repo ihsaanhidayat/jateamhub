@@ -69,11 +69,12 @@ export default function OptionsPanel({ open, onClose }: Props) {
     return () => document.removeEventListener('mousedown', handler)
   }, [open, onClose])
 
-  if (!open || !canSeeOptions(session as any)) return null
+  if (!open) return null  // Options tersedia untuk semua user yang login
 
   const isSuperAdmin   = session?.role === 'superadmin'
   const isFolderGrid   = appearance.itemDisplayMode === 'folderGrid'
-  const canThemeGlobal = can(session as any, 'SYSTEM_THEME_GLOBAL')
+  // Theme global hanya bisa diganti superadmin
+  const canThemeGlobal = session?.role === 'superadmin'
 
   return (
     <div className="options-panel" ref={ref} style={{ maxHeight: 'calc(100vh - 60px)', overflowY: 'auto' }}>
