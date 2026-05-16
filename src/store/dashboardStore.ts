@@ -44,12 +44,38 @@ const setDevicePref   = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
 const uid = () => Math.random().toString(36).slice(2, 10)
 
 // ── Default config ────────────────────────────
+const makeDefaultSections = () => {
+  const COLS = 12
+  const W    = 4  // 3 section × 4 = 12 kolom penuh
+  const H    = 5
+  return [
+    {
+      id: 'sdefault1', title: 'Section 1', icon: '📁', subtitle: '',
+      items: [], layout: { x: 0, y: 0, w: W, h: H },
+      visibility: 'all' as const, targetUnits: [],
+      pageId: 'beranda', type: 'section' as const,
+    },
+    {
+      id: 'sdefault2', title: 'Section 2', icon: '📁', subtitle: '',
+      items: [], layout: { x: W, y: 0, w: W, h: H },
+      visibility: 'all' as const, targetUnits: [],
+      pageId: 'beranda', type: 'section' as const,
+    },
+    {
+      id: 'sdefault3', title: 'Section 3', icon: '📁', subtitle: '',
+      items: [], layout: { x: W * 2, y: 0, w: W, h: H },
+      visibility: 'all' as const, targetUnits: [],
+      pageId: 'beranda', type: 'section' as const,
+    },
+  ]
+}
+
 const defaultConfig: JateamConfig = {
-  version:        CONFIG_VERSION,
+  version: CONFIG_VERSION,
   meta: { title: 'JateamHub', subtitle: 'Selamat datang, {username}', logoUrl: '', coffeeUrl: '', adminKey: '' },
   pages:          [...DEFAULT_PAGES],
-  sections:       [],
-  appearance:     { ...DEFAULT_APPEARANCE },
+  sections:       makeDefaultSections(),
+  appearance:     { ...DEFAULT_APPEARANCE, folderGridCols: 5, iconSize: 'large' },
   displayOptions: { ...defaultDisplayOptions },
   presets:        [],
 }

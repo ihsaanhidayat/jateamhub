@@ -88,7 +88,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
       <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
 
       <header className="header">
-        {/* LEFT — Brand + Nav */}
+        {/* LEFT — Brand */}
         <div className="header-left">
           <div className="header-brand">
             {config.meta.logoUrl ? (
@@ -109,33 +109,18 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
             </div>
           </div>
 
-          {/* Nav */}
-          <nav className="header-nav">
-            <button className={`nav-link${currentPage === 'beranda' ? ' active' : ''}`} onClick={() => setCurrentPage('beranda')}>
-              BERANDA
-            </button>
-          </nav>
+
         </div>
 
-        {/* RIGHT — Tools kiri ke kanan: Search > Edit > Preview > Options > Profile */}
+        {/* RIGHT — view mode > filter > edit > options > profile */}
         <div className="header-right">
 
-          {/* Search */}
-          <div className="search-wrap">
-            <input className="search-input" placeholder="Filter..." value={searchQuery} onChange={e => setSearch(e.target.value)} />
-            <span className="search-icon">⌕</span>
-          </div>
-
-          {/* Edit mode */}
-          {isEditable && (
-            <button className={`icon-btn${editMode ? ' active' : ''}`} onClick={toggleEditMode} title="Edit Mode">✏️</button>
-          )}
-
-          {/* Preview unit */}
+          {/* View mode — hanya admin/superadmin, SEBELUM filter */}
           {isAdminLevel && (
             <div className="preview-dropdown" ref={previewRef}>
               <button className={`preview-btn${previewUnit !== null ? ' active' : ''}`} onClick={() => setPreviewOpen(v => !v)}>
-                <span style={{ fontSize: 12 }}>{previewUnit !== null ? (PREVIEW_OPTS.find(o => o.value === previewUnit)?.label ?? 'Preview') : '👁'}</span>
+                <span style={{ fontSize: 13 }}>👁</span>
+                <span style={{ fontSize: 11 }}>{previewUnit !== null ? (PREVIEW_OPTS.find(o => o.value === previewUnit)?.label ?? 'Preview') : 'View'}</span>
                 <span style={{ opacity: .5, fontSize: 9 }}>▾</span>
               </button>
               {previewOpen && (
@@ -149,7 +134,18 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
             </div>
           )}
 
-          {/* Options */}
+          {/* Filter — semua role */}
+          <div className="search-wrap">
+            <input className="search-input" placeholder="Filter..." value={searchQuery} onChange={e => setSearch(e.target.value)} />
+            <span className="search-icon">⌕</span>
+          </div>
+
+          {/* Edit mode — hanya admin/superadmin */}
+          {isEditable && (
+            <button className={`icon-btn${editMode ? ' active' : ''}`} onClick={toggleEditMode} title="Edit Mode">✏️</button>
+          )}
+
+          {/* Options — hanya admin/superadmin */}
           {showOptions && (
             <button id="options-btn" className={`icon-btn${optionsOpen ? ' active' : ''}`} onClick={onToggleOptions} title="Options">⚙️</button>
           )}
