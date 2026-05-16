@@ -1,46 +1,23 @@
 import { useRef, useEffect } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
-import { canEdit, canCreateUser, getDisplayBadge } from '../../utils/roles'
-import type { ItemDisplayMode, IconSize, LabelMode, SectionDensity } from '../../types'
+import { can, canSeeOptionsPanel } from '../../utils/roles'
+import type { ItemDisplayMode, IconSize, LabelMode, ThemeId } from '../../types'
+import { THEMES } from '../../types'
 
-interface Props {
-  open: boolean
-  onClose: () => void
-  onOpenConfig: () => void
-  onOpenUsers: () => void
-}
+interface Props { open: boolean; onClose: () => void }
 
 const ITEM_VIEWS: { key: ItemDisplayMode; label: string; icon: string }[] = [
-  { key: 'button', label: 'Button', icon: '▣' },
-  { key: 'list', label: 'List', icon: '☰' },
-  { key: 'iconText', label: 'Icon+Text', icon: '◫' },
-  { key: 'iconOnly', label: 'Icon Only', icon: '◉' },
-  { key: 'textOnly', label: 'Text Only', icon: '≡' },
+  { key: 'button',     label: 'Button',      icon: '▣' },
+  { key: 'list',       label: 'List',        icon: '☰' },
+  { key: 'iconText',   label: 'Icon+Text',   icon: '◫' },
   { key: 'folderGrid', label: 'Folder Grid', icon: '⊞' },
 ]
-const ICON_SIZES: { key: IconSize; label: string }[] = [
-  { key: 'small', label: 'S' },
-  { key: 'medium', label: 'M' },
-  { key: 'large', label: 'L' },
-  { key: 'xl', label: 'XL' },
-]
 const LABEL_MODES: { key: LabelMode; label: string }[] = [
-  { key: 'show', label: 'Show' },
-  { key: 'hide', label: 'Hide' },
-  { key: 'hover', label: 'Hover' },
+  { key: 'show', label: 'Show' }, { key: 'hide', label: 'Hide' }, { key: 'hover', label: 'Hover' },
 ]
-const DENSITIES: { key: SectionDensity; label: string }[] = [
-  { key: 'compact', label: 'Compact' },
-  { key: 'comfortable', label: 'Comfortable' },
-  { key: 'spacious', label: 'Spacious' },
-]
-const FOLDER_COLS: { cols: number; label: string }[] = [
-  { cols: 1, label: '1×' },
-  { cols: 2, label: '2×' },
-  { cols: 3, label: '3×' },
-  { cols: 4, label: '4×' },
-  { cols: 5, label: '5×' },
+const FOLDER_COLS = [
+  { cols: 2, label: '2×' }, { cols: 3, label: '3×' }, { cols: 4, label: '4×' }, { cols: 5, label: '5×' },
 ]
 
 function ToggleSwitch({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -49,8 +26,7 @@ function ToggleSwitch({ on, onClick }: { on: boolean; onClick: () => void }) {
 
 function ChipGroup<T extends string>({ options, value, onChange }: {
   options: { key: T; label: string; icon?: string }[]
-  value: T
-  onChange: (v: T) => void
+  value: T; onChange: (v: T) => void
 }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -62,31 +38,26 @@ function ChipGroup<T extends string>({ options, value, onChange }: {
           borderRadius: 'var(--radius-sm)',
           color: value === o.key ? 'var(--mint)' : 'var(--silver3)',
           cursor: 'pointer', transition: 'all .12s',
-          display: 'flex', alignItems: 'center', gap: 4,
-          fontFamily: 'var(--font)',
+          display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font)',
         }}>
-          {o.icon && <span style={{ fontSize: 12 }}>{o.icon}</span>}
-          {o.label}
+          {o.icon && <span style={{ fontSize: 12 }}>{o.icon}</span>}{o.label}
         </button>
       ))}
     </div>
   )
 }
 
-export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers }: Props) {
+export default function OptionsPanel({ open, onClose }: Props) {
   const {
-    logout: _logout,
-    editMode, toggleEditMode,
     presets, savePreset, applyPreset, deletePreset,
     displayOptions, setDisplayOptions,
     appearance, setAppearance,
-    previewUnit, setPreviewUnit,
+    setGlobalTheme, globalTheme,
     toast,
   } = useStore()
-
-  const { profile: session, logout: authLogout } = useAuthStore()
-  const logout = authLogout
+  const { profile: session } = useAuthStore()
   const ref = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (open && ref.current && !ref.current.contains(e.target as Node)) {
@@ -98,53 +69,52 @@ export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers 
     return () => document.removeEventListener('mousedown', handler)
   }, [open, onClose])
 
-  if (!open) return null
+  if (!open || !canSeeOptionsPanel(session as any)) return null
 
-  const isEditable = canEdit(session as any)
-  const canManageUsers = canCreateUser(session as any)
-  const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'
+  const isSuperAdmin   = session?.role === 'superadmin'
+  const isFolderGrid   = appearance.itemDisplayMode === 'folderGrid'
+  const canThemeGlobal = can(session as any, 'SYSTEM_THEME_GLOBAL')
 
   return (
-    <div className="options-panel" ref={ref} style={{ maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' }}>
+    <div className="options-panel" ref={ref} style={{ maxHeight: 'calc(100vh - 60px)', overflowY: 'auto' }}>
       <div className="options-header">
         <h3>Options</h3>
         <button className="close-btn" onClick={onClose}>×</button>
       </div>
-
       <div className="options-body">
 
-        {/* Edit & Config — admin/superadmin only */}
-        {isEditable && (
+        {/* Theme — hanya superadmin */}
+        {canThemeGlobal && (
           <>
-            <div className="options-label">Edit &amp; Config</div>
-            <div className="opt-row" style={{ marginBottom: 6 }}>
-              <button className={`opt-btn${editMode ? ' active' : ''}`} onClick={() => { toggleEditMode(); onClose() }}>
-                ✏️ Edit Mode
-              </button>
-              <button className="opt-btn" onMouseDown={e => e.stopPropagation()} onClick={() => { onOpenConfig(); onClose() }}>
-                ⚙️ Config
-              </button>
-            </div>
-            {canManageUsers && (
-              <div className="opt-row" style={{ marginBottom: 12 }}>
-                <button className="opt-btn" onMouseDown={e => e.stopPropagation()} onClick={() => { onOpenUsers(); onClose() }}>
-                  👥 Kelola Users
+            <div className="options-label">Theme Global</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+              {THEMES.map(t => (
+                <button key={t.id} onClick={() => setGlobalTheme(t.id as ThemeId)} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 10px', borderRadius: 'var(--radius-sm)',
+                  background: globalTheme === t.id ? 'var(--mint-bg)' : 'var(--bg3)',
+                  border: `1px solid ${globalTheme === t.id ? 'var(--mint)' : 'var(--border2)'}`,
+                  cursor: 'pointer', transition: 'all .15s', textAlign: 'left',
+                }}>
+                  <div style={{ width: 20, height: 20, borderRadius: 4, background: t.accent, flexShrink: 0, boxShadow: `0 0 6px ${t.accent}66` }} />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: globalTheme === t.id ? 'var(--mint)' : 'var(--silver2)' }}>{t.name}</div>
+                    <div style={{ fontSize: 10, color: 'var(--silver3)' }}>{t.description}</div>
+                  </div>
+                  {globalTheme === t.id && <span style={{ marginLeft: 'auto', color: 'var(--mint)', fontSize: 12 }}>✓</span>}
                 </button>
-              </div>
-            )}
+              ))}
+            </div>
+            <div className="options-divider" />
           </>
         )}
 
         {/* Appearance */}
-        <div className="options-label" style={{ marginTop: isEditable ? 0 : 4 }}>Appearance</div>
+        <div className="options-label">Appearance</div>
 
-        <div className="options-sublabel">Section Density</div>
-        <ChipGroup options={DENSITIES} value={appearance.sectionDensity} onChange={v => setAppearance({ sectionDensity: v })} />
-
-        <div className="options-sublabel" style={{ marginTop: 10 }}>Item View</div>
+        <div className="options-sublabel">Item View</div>
         <ChipGroup options={ITEM_VIEWS} value={appearance.itemDisplayMode} onChange={v => setAppearance({ itemDisplayMode: v })} />
 
-        {/* Folder grid column count */}
         {isFolderGrid && (
           <>
             <div className="options-sublabel" style={{ marginTop: 10 }}>Grid Columns</div>
@@ -158,13 +128,8 @@ export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers 
                     border: `1px solid ${active ? 'var(--mint)' : 'var(--border2)'}`,
                     borderRadius: 'var(--radius-sm)',
                     color: active ? 'var(--mint)' : 'var(--silver3)',
-                    cursor: 'pointer', transition: 'all .12s',
-                    fontFamily: 'var(--mono)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                  }}>
-                    <FolderGridIcon cols={cols} active={active} />
-                    <span>{label}</span>
-                  </button>
+                    cursor: 'pointer', transition: 'all .12s', fontFamily: 'var(--mono)',
+                  }}>{label}</button>
                 )
               })}
             </div>
@@ -172,28 +137,37 @@ export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers 
         )}
 
         <div className="options-sublabel" style={{ marginTop: 10 }}>Icon Size</div>
-        <ChipGroup options={ICON_SIZES} value={appearance.iconSize} onChange={v => setAppearance({ iconSize: v })} />
+        <div style={{ padding: '4px 2px' }}>
+          <input type="range" min={0} max={3}
+            value={['small','medium','large','xl'].indexOf(appearance.iconSize)}
+            onChange={e => {
+              const sizes: IconSize[] = ['small','medium','large','xl']
+              setAppearance({ iconSize: sizes[Number(e.target.value)] })
+            }}
+            style={{ width: '100%', accentColor: 'var(--mint)', cursor: 'pointer' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--silver3)', fontFamily: 'var(--mono)', marginTop: 2 }}>
+            <span>S</span><span>M</span><span>L</span><span>XL</span>
+          </div>
+        </div>
 
         <div className="options-sublabel" style={{ marginTop: 10 }}>Label</div>
         <ChipGroup options={LABEL_MODES} value={appearance.labelMode} onChange={v => setAppearance({ labelMode: v })} />
 
         <div style={{ marginTop: 10 }}>
-          <div className="toggle-row">
-            <span className="toggle-label">Tooltip</span>
-            <ToggleSwitch on={appearance.tooltipEnabled} onClick={() => setAppearance({ tooltipEnabled: !appearance.tooltipEnabled })} />
-          </div>
-          <div className="toggle-row">
-            <span className="toggle-label">App Icons / Favicon</span>
-            <ToggleSwitch on={appearance.faviconEnabled} onClick={() => setAppearance({ faviconEnabled: !appearance.faviconEnabled })} />
-          </div>
-          <div className="toggle-row">
-            <span className="toggle-label">Tampilkan deskripsi</span>
-            <ToggleSwitch on={displayOptions.showDesc} onClick={() => setDisplayOptions({ showDesc: !displayOptions.showDesc })} />
-          </div>
-          <div className="toggle-row">
-            <span className="toggle-label">Tampilkan tag badge</span>
-            <ToggleSwitch on={displayOptions.showTags} onClick={() => setDisplayOptions({ showTags: !displayOptions.showTags })} />
-          </div>
+          {[
+            { label: 'Tooltip',            val: appearance.tooltipEnabled,  key: 'tooltipEnabled'  as const },
+            { label: 'App Icons / Favicon',val: appearance.faviconEnabled,  key: 'faviconEnabled'  as const },
+            { label: 'Tampilkan deskripsi',val: displayOptions.showDesc,    key: 'showDesc'        as const, isDisplay: true },
+            { label: 'Tampilkan tag',      val: displayOptions.showTags,    key: 'showTags'        as const, isDisplay: true },
+          ].map(item => (
+            <div key={item.key} className="toggle-row">
+              <span className="toggle-label">{item.label}</span>
+              <ToggleSwitch on={item.val}
+                onClick={() => item.isDisplay
+                  ? setDisplayOptions({ [item.key]: !item.val })
+                  : setAppearance({ [item.key]: !item.val })} />
+            </div>
+          ))}
         </div>
 
         {/* Presets */}
@@ -204,91 +178,16 @@ export default function OptionsPanel({ open, onClose, onOpenConfig, onOpenUsers 
             : presets.map(p => (
               <div key={p.id} className="preset-item">
                 <span className="preset-name">{p.name}</span>
-                <button className="preset-apply" onClick={() => { applyPreset(p.id); toast('Preset "' + p.name + '" diterapkan.', 'success') }}>Apply</button>
+                <button className="preset-apply" onClick={() => { applyPreset(p.id); toast('Preset diterapkan.', 'success') }}>Apply</button>
                 <button className="preset-del" onClick={() => deletePreset(p.id)}>×</button>
               </div>
-            ))
-          }
+            ))}
         </div>
-        <button className="btn-save-preset" style={{ marginBottom: 10 }}
+        <button className="btn-save-preset" style={{ marginBottom: 4 }}
           onClick={() => { const n = prompt('Nama preset:'); if (n?.trim()) { savePreset(n.trim()); toast('Preset disimpan.', 'success') } }}>
           💾 Save Preset
         </button>
-
-        <div className="options-divider" />
-
-        {/* User info + role badge */}
-        {/* Preview unit selector — hanya untuk admin/superadmin */}
-        {(session?.role === 'admin' || session?.role === 'superadmin') && (
-          <div style={{ marginBottom: 12 }}>
-            <div className="options-sublabel">Preview Tampilan Unit</div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {[
-                { value: null, label: 'Admin View' },
-                { value: '', label: 'User Umum' },
-                { value: 'pro', label: 'PRO' },
-                { value: 'cro', label: 'CRO' },
-                { value: 'klaim', label: 'Klaim' },
-              ].map(opt => {
-                const active = previewUnit === opt.value
-                return (
-                  <button key={String(opt.value)} onClick={() => setPreviewUnit(opt.value)} style={{
-                    padding: '4px 9px', fontSize: 11, fontWeight: 600,
-                    background: active ? 'var(--mint-bg2)' : 'var(--bg3)',
-                    border: `1px solid ${active ? 'var(--mint)' : 'var(--border2)'}`,
-                    borderRadius: 'var(--radius-sm)',
-                    color: active ? 'var(--mint)' : 'var(--silver3)',
-                    cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .12s',
-                  }}>
-                    {opt.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-        <div className="user-row">
-          <div className="user-info" style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ color: 'var(--silver2)', fontSize: 12 }}>
-              Halo <strong style={{ color: 'var(--mint)' }}>{session?.username}</strong>{(session as any)?.avatar_emoji ? ` ${(session as any).avatar_emoji}` : ''}
-            </span>
-            {(() => {
-              const badge = getDisplayBadge(session as any)
-              return (
-                <span style={{
-                  fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 2,
-                  background: badge.color + '22', border: `1px solid ${badge.color}55`,
-                  color: badge.color, textTransform: 'uppercase', fontFamily: 'var(--mono)',
-                  alignSelf: 'flex-start', letterSpacing: '.5px',
-                }}>
-                  {badge.label}
-                </span>
-              )
-            })()}
-          </div>
-          <button className="signout-btn" onClick={logout}>Sign Out →</button>
-        </div>
       </div>
     </div>
-  )
-}
-
-function FolderGridIcon({ cols, active }: { cols: number; active: boolean }) {
-  const color = active ? 'var(--mint)' : 'var(--silver3)'
-  const size = 28
-  const gap = 2
-  const cellSize = Math.floor((size - gap * (cols - 1)) / cols)
-  const rows = cols <= 2 ? cols : 2
-  const cells = Array.from({ length: Math.min(cols * rows, 9) })
-  return (
-    <svg width={size} height={rows === 1 ? cellSize : cellSize * 2 + gap}
-      viewBox={`0 0 ${size} ${rows === 1 ? cellSize : cellSize * 2 + gap}`}>
-      {cells.map((_, i) => {
-        const col = i % cols
-        const row = Math.floor(i / cols)
-        return <rect key={i} x={col * (cellSize + gap)} y={row * (cellSize + gap)}
-          width={cellSize} height={cellSize} rx={1} fill={color} opacity={0.7} />
-      })}
-    </svg>
   )
 }

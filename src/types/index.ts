@@ -1,171 +1,188 @@
-export interface LinkItem {
-  id: string
-  title: string
-  url: string
-  desc?: string
-  icon?: string
-  iconUrl?: string
-  useFavicon?: boolean
-  tags: string[]
-  newTab: boolean
-  accentColor?: string
+// ─────────────────────────────────────────────
+// JATEAMHUB — TYPE DEFINITIONS
+// ─────────────────────────────────────────────
+
+// ── Roles ────────────────────────────────────
+export type Role = 'superadmin' | 'admin' | 'admin_unit' | 'user'
+export type UnitId = '' | 'pro' | 'cro' | 'klaim'
+
+// ── RBAC Permissions ─────────────────────────
+export const PERMISSIONS = {
+  // System
+  SYSTEM_CONFIG:        ['superadmin'],
+  SYSTEM_THEME_GLOBAL:  ['superadmin'],
+  SYSTEM_FEATURE:       ['superadmin'],
+
+  // User management
+  USER_CREATE:          ['superadmin', 'admin'],
+  USER_CREATE_UNIT:     ['superadmin', 'admin', 'admin_unit'],
+  USER_READ_ALL:        ['superadmin', 'admin'],
+  USER_UPDATE_ROLE:     ['superadmin'],
+  USER_RESET_PASSWORD:  ['superadmin', 'admin'],
+  USER_SELF_PASSWORD:   ['superadmin', 'admin'],
+  USER_DELETE:          ['superadmin', 'admin'],
+
+  // Dashboard edit
+  DASHBOARD_EDIT_GLOBAL: ['superadmin', 'admin'],
+  DASHBOARD_EDIT_UNIT:   ['superadmin', 'admin', 'admin_unit'],
+
+  // Section
+  SECTION_EDIT_GLOBAL:  ['superadmin', 'admin'],
+  SECTION_EDIT_UNIT:    ['superadmin', 'admin', 'admin_unit'],
+
+  // Appearance
+  APPEARANCE_THEME_GLOBAL: ['superadmin'],
+  APPEARANCE_EMOJI_AVATAR: ['superadmin', 'admin'],
+  APPEARANCE_PERSONAL:     ['superadmin', 'admin', 'admin_unit', 'user'],
+  APPEARANCE_OPTIONS_PANEL:['superadmin', 'admin', 'admin_unit'],
+
+  // Content
+  CONTENT_PANDUAN_EDIT: ['superadmin', 'admin'],
+  BADGE_VISIBILITY:     ['superadmin', 'admin'],
+} as const
+
+export type Permission = keyof typeof PERMISSIONS
+
+export function hasPermission(role: Role, permission: Permission): boolean {
+  return (PERMISSIONS[permission] as readonly string[]).includes(role)
 }
 
-export interface SectionLayout {
-  x: number
-  y: number
-  w: number
-  h: number
-  minW?: number
-  minH?: number
+// ── Theme ─────────────────────────────────────
+export type ThemeId = 'dark-mint' | 'dark-soft' | 'enterprise'
+export interface ThemeConfig {
+  id: ThemeId
+  name: string
+  bg: string
+  accent: string
+  description: string
 }
-
-export type SectionVisibility = 'all' | 'admin' | 'unit'
-export type SectionType       = 'section' | 'widget'
-export type WidgetType        = 'clock' | 'notes'
-
-export interface Section {
-  _expandedH?: number
-  id: string
-  title: string
-  subtitle?: string
-  icon?: string
-  width: number
-  items: LinkItem[]
-  collapsed: boolean
-  accentColor?: string
-  layout: SectionLayout
-  pageId: string
-  // visibility system
-  visibility: SectionVisibility
-  targetUnits: string[]          // relevan kalau visibility='unit'
-  // widget system
-  type: SectionType
-  widgetType?: WidgetType
-  widgetData?: Record<string, unknown>
-  // legacy — tetap ada untuk backward compat
-  sharedRoles?: string[]
-}
-
-export interface PageConfig {
-  id: string
-  label: string
-}
-
-export const DEFAULT_PAGES: PageConfig[] = [
-  { id: 'beranda', label: 'BERANDA' },
-  { id: 'panduan', label: 'PANDUAN' },
-  { id: 'support', label: 'SUPPORT' },
-  { id: 'pro',     label: 'PRO'     },
-  { id: 'cro',     label: 'CRO'     },
-  { id: 'klaim',   label: 'KLAIM'   },
+export const THEMES: ThemeConfig[] = [
+  { id: 'dark-mint',   name: 'Dark Mint',   bg: '#0A0A0A', accent: '#00FFC2', description: 'Default — hitam pekat dengan aksen mint' },
+  { id: 'dark-soft',   name: 'Dark Soft',   bg: '#0d1117', accent: '#6366f1', description: 'Navy gelap dengan aksen indigo' },
+  { id: 'enterprise',  name: 'Enterprise',  bg: '#111827', accent: '#f59e0b', description: 'Charcoal profesional dengan aksen amber' },
 ]
 
-// Halaman yang selalu tampil untuk semua user
-export const USER_PAGES = ['beranda', 'panduan', 'support']
+// ── Section ───────────────────────────────────
+export type SectionVisibility = 'all' | 'admin' | 'unit'
+export type WidgetType = 'clock' | 'notes'
+export type SectionType = 'section' | 'widget'
+export interface SectionLayout { x: number; y: number; w: number; h: number }
 
-// Admin lihat semua
-export const ADMIN_PAGES = ['beranda', 'panduan', 'support', 'pro', 'cro', 'klaim']
-
-export interface NavLink {
-  label: string
-  url: string
+export interface LinkItem {
+  id:         string
+  title:      string
+  url:        string
+  icon:       string
+  desc:       string
+  tags:       string[]
+  newTab:     boolean
+  iconUrl?:   string
+  useFavicon?: boolean
 }
 
-export interface SiteMeta {
-  title: string
-  subtitle: string
-  adminKey: string
-  nav: NavLink[]
-  logoUrl?: string
+export interface Section {
+  id:          string
+  title:       string
+  icon:        string
+  subtitle:    string
+  items:       LinkItem[]
+  layout:      SectionLayout
+  _expandedH?: number
+  collapsed?:  boolean
+  visibility:  SectionVisibility
+  targetUnits: string[]
+  pageId:      string
+  accentColor?: string
+  type?:       SectionType
+  widgetType?: WidgetType
 }
 
-export interface DisplayOptions {
-  showTags: boolean
-  showDesc: boolean
-  compactHeader: boolean
-}
+// ── Appearance ────────────────────────────────
+export type IconSize      = 'small' | 'medium' | 'large' | 'xl'
+export type LabelMode     = 'show'  | 'hide'   | 'hover'
+export type ItemDisplayMode = 'button' | 'list' | 'iconText' | 'folderGrid'
+export type ColorMode     = 'dark' | 'light'
 
-export type ItemDisplayMode = 'button' | 'list' | 'iconText' | 'iconOnly' | 'textOnly' | 'folderGrid'
-export type IconSize        = 'small' | 'medium' | 'large' | 'xl'
-export type LabelMode       = 'show' | 'hide' | 'hover'
-export type SectionDensity  = 'compact' | 'comfortable' | 'spacious'
+export type SectionDensity = 'compact' | 'comfortable' | 'spacious'
 
 export interface AppearanceSettings {
-  sectionDensity: SectionDensity
-  itemDisplayMode: ItemDisplayMode
-  iconSize: IconSize
-  labelMode: LabelMode
-  tooltipEnabled: boolean
-  faviconEnabled: boolean
-  itemGridMinWidth: number
-  folderGridCols: number
+  itemDisplayMode:  ItemDisplayMode
+  iconSize:         IconSize
+  labelMode:        LabelMode
+  folderGridCols:   number
+  tooltipEnabled:   boolean
+  faviconEnabled:   boolean
+  colorMode:        ColorMode
+  theme:            ThemeId
+  sectionDensity?:  SectionDensity  // kept for backward compat
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
-  sectionDensity:  'comfortable',
-  itemDisplayMode: 'button',
-  iconSize:        'medium',
+  itemDisplayMode: 'folderGrid',
+  iconSize:        'large',
   labelMode:       'show',
+  folderGridCols:  4,
   tooltipEnabled:  true,
   faviconEnabled:  true,
-  itemGridMinWidth: 72,
-  folderGridCols:  3,
+  colorMode:       'dark',
+  theme:           'dark-mint',
 }
 
-export interface JateamConfig {
-  version: string
-  meta: SiteMeta
-  displayOptions: DisplayOptions
-  appearance: AppearanceSettings
-  sections: Section[]
-  pages: PageConfig[]
+// ── DisplayOptions ────────────────────────────
+export interface DisplayOptions {
+  showDesc: boolean
+  showTags: boolean
+}
+export const defaultDisplayOptions: DisplayOptions = {
+  showDesc: true,
+  showTags: false,
 }
 
-// Role hanya 3
-export type Role   = 'superadmin' | 'admin' | 'user'
-export type UnitId = 'pro' | 'cro' | 'klaim' | ''
+// ── Pages ─────────────────────────────────────
+export interface PageDef { id: string; label: string }
+export const DEFAULT_PAGES: PageDef[] = [
+  { id: 'beranda', label: 'BERANDA' },
+]
 
-export interface UserAccount {
-  username: string
-  password: string
-  role: Role
-  unitId?: UnitId
-}
-
-export interface UserSession {
-  username: string
-  role: Role
-  unitId?: UnitId
-  remember: 'never' | 'session' | 'always'
+// ── Config ────────────────────────────────────
+export interface MetaConfig {
+  title:    string
+  subtitle: string
+  logoUrl:  string
+  coffeeUrl: string
+  adminKey: string
 }
 
 export interface Preset {
-  id: string
+  id:   string
   name: string
-  ts: number
+  appearance: AppearanceSettings
 }
 
-export type GridBreakpoint = 'lg' | 'md' | 'sm' | 'xs' | 'xxs'
-
-export const GRID_COLS: Record<GridBreakpoint, number> = {
-  lg: 12, md: 8, sm: 4, xs: 2, xxs: 1,
-}
-export const GRID_BREAKPOINTS: Record<GridBreakpoint, number> = {
-  lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0,
-}
-export const GRID_ROW_HEIGHT = 40
-export const SECTION_MIN_W   = 2
-export const SECTION_MIN_H   = 4
-export const SECTION_DEFAULT_W = 4
-export const SECTION_DEFAULT_H = 8
-
-export const ICON_SIZE_MAP: Record<IconSize, { wrapper: number; img: number }> = {
-  small:  { wrapper: 28, img: 16 },
-  medium: { wrapper: 36, img: 22 },
-  large:  { wrapper: 48, img: 30 },
-  xl:     { wrapper: 60, img: 40 },
+export interface JateamConfig {
+  version:        string
+  meta:           MetaConfig
+  pages:          PageDef[]
+  sections:       Section[]
+  appearance:     AppearanceSettings
+  displayOptions: DisplayOptions
+  presets:        Preset[]
 }
 
-export type SizeMode   = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
-export type LayoutMode = 'default' | 'minimal' | 'compact' | 'wide'
+// ── Icon size map ────────────────────────────────
+export const ICON_SIZE_MAP: Record<string, { wrapper: number; img: number }> = {
+  small:  { wrapper: 24, img: 16 },
+  medium: { wrapper: 30, img: 20 },
+  large:  { wrapper: 38, img: 28 },
+  xl:     { wrapper: 48, img: 36 },
+}
+
+// ── Grid constants ────────────────────────────
+export const GRID_ROW_HEIGHT   = 70
+export const SECTION_MIN_W     = 2
+export const SECTION_MIN_H     = 3
+export const SECTION_DEFAULT_W = 3
+export const SECTION_DEFAULT_H = 5
+
+// ── User pages (visible to all) ───────────────
+export const USER_PAGES = ['beranda']

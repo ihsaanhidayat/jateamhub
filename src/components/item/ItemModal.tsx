@@ -39,8 +39,8 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
     if (!title.trim() || !url.trim()) { toast('Title dan URL wajib diisi.', 'error'); return }
     const data: Omit<LinkItem, 'id'> = {
       title: title.trim(), url: url.trim(),
-      desc: desc.trim() || undefined,
-      icon: icon.trim() || undefined,
+      desc: desc.trim(),
+      icon: icon.trim(),
       iconUrl: iconUrl.trim() || undefined,
       useFavicon,
       newTab,
@@ -62,7 +62,7 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
   // preview item
   const previewItem: LinkItem = {
     id: 'preview', title: title || 'Preview', url: url || '#',
-    icon, iconUrl: iconUrl || undefined, useFavicon, tags: [], newTab,
+    icon, desc: '', iconUrl: iconUrl || undefined, useFavicon, tags: [], newTab,
   }
 
   return (

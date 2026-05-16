@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ConfirmDialog from '../ui/ConfirmDialog'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import type { Section, LinkItem, AppearanceSettings } from '../../types'
@@ -26,8 +27,9 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
   const isAdminRole = session?.role === 'admin' || session?.role === 'superadmin'
   const isAdmin = canEditProp !== undefined ? canEditProp : isAdminRole
   const [headerHovered, setHeaderHovered] = useState(false)
+  const [confirmDel, setConfirmDel] = useState<{ open: boolean; type: 'section' | 'item'; itemId?: string; msg: string }>({ open: false, type: 'section', msg: '' })
   const accent   = section.accentColor || 'var(--mint)'
-  const density  = DENSITY[appearance.sectionDensity] || DENSITY.comfortable
+  const density  = DENSITY[(appearance as any).sectionDensity ?? 'compact'] || DENSITY.compact
   const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'
 
   // item drag state (native HTML DnD — tidak konflik dengan RGL)
@@ -67,6 +69,7 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
     : section.items
 
   return (
+    <>
     <div
       className="section-card"
       style={{
@@ -130,9 +133,7 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
                 onMouseDown={e => e.stopPropagation()}
                 onClick={e => {
                   e.stopPropagation()
-                  if (!confirm(`Hapus section "${section.title}"?`)) return
-                  deleteSection(section.id)
-                  toast('Section dihapus.', 'success')
+                  setConfirmDel({ open: true, type: 'section', msg: `Hapus section "${section.title}" beserta semua item di dalamnya?` })
                 }}
                 title="Hapus section"
               >🗑</button>
@@ -180,11 +181,7 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
                 onDrop={onItemDrop}
                 onDragLeave={() => setItemDragOver(null)}
                 onEdit={() => onEditItem(section.id, item)}
-                onDelete={() => {
-                  if (!confirm(`Hapus "${item.title}"?`)) return
-                  deleteItem(section.id, item.id)
-                  toast(`"${item.title}" dihapus.`, 'success')
-                }}
+                onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
               />
             ))}
           </div>
@@ -209,11 +206,7 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
                 onDrop={onItemDrop}
                 onDragLeave={() => setItemDragOver(null)}
                 onEdit={() => onEditItem(section.id, item)}
-                onDelete={() => {
-                  if (!confirm(`Hapus "${item.title}"?`)) return
-                  deleteItem(section.id, item.id)
-                  toast(`"${item.title}" dihapus.`, 'success')
-                }}
+                onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
               />
             ))}
           </div>
@@ -235,6 +228,26 @@ export default function SectionCard({ section, canEdit: canEditProp, onEditSecti
         </div>
       )}
     </div>
+
+      <ConfirmDialog
+        open={confirmDel.open}
+        title={confirmDel.type === 'section' ? 'Hapus Section' : 'Hapus Item'}
+        message={confirmDel.msg}
+        confirmLabel="Ya, Hapus"
+        danger
+        onConfirm={() => {
+          if (confirmDel.type === 'section') {
+            deleteSection(section.id)
+            toast('Section dihapus.', 'success')
+          } else if (confirmDel.itemId) {
+            deleteItem(section.id, confirmDel.itemId)
+            toast('Item dihapus.', 'success')
+          }
+          setConfirmDel({ open: false, type: 'section', msg: '' })
+        }}
+        onCancel={() => setConfirmDel({ open: false, type: 'section', msg: '' })}
+      />
+    </>
   )
 }
 
@@ -267,8 +280,8 @@ interface ListItemProps {
 function ListItem({ item, searchQuery, editMode, dragOver, appearance, showDesc, showTags, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete }: ListItemProps) {
   const [hovered, setHovered] = useState(false)
   const isCompact  = appearance.itemDisplayMode === 'list'
-  const isTextOnly = appearance.itemDisplayMode === 'textOnly'
-  const isIconOnly = appearance.itemDisplayMode === 'iconOnly'
+  const isTextOnly = false  // removed: textOnly mode deprecated
+  const isIconOnly = false  // removed: iconOnly mode deprecated
   const showLabel  = appearance.labelMode === 'show' || (appearance.labelMode === 'hover' && hovered)
   const showTooltip = appearance.tooltipEnabled && hovered && (
     isIconOnly || appearance.labelMode === 'hide' || (appearance.labelMode === 'hover' && item.desc)

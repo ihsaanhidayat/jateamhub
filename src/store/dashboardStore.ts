@@ -1,619 +1,264 @@
+// ─────────────────────────────────────────────
+// DASHBOARD STORE — split global + unit config
+// ─────────────────────────────────────────────
 import { create } from 'zustand'
 import type {
-  JateamConfig, UserSession, UserAccount, Preset,
-  DisplayOptions, Section, SectionLayout, AppearanceSettings, LinkItem,
-  Role, UnitId
+  JateamConfig, Section, LinkItem, AppearanceSettings,
+  DisplayOptions, Preset, ThemeId, PageDef,
 } from '../types'
 import {
-  DEFAULT_APPEARANCE, SECTION_DEFAULT_W, SECTION_DEFAULT_H,
-  SECTION_MIN_W, SECTION_MIN_H, DEFAULT_PAGES, USER_PAGES
+  DEFAULT_APPEARANCE, defaultDisplayOptions, DEFAULT_PAGES,
+  GRID_ROW_HEIGHT, SECTION_DEFAULT_W, SECTION_DEFAULT_H,
 } from '../types'
-import { uid } from '../utils/helpers'
-import { sanitizeRole, sanitizePage } from '../utils/security'
-import { loadConfigFromDB, saveConfigToDB, saveUserAppearance, loadUserAppearance } from '../utils/supabaseClient'
+import {
+  loadGlobalConfig, saveGlobalConfig,
+  loadUnitConfig, saveUnitConfig,
+  saveUserAppearance, loadUserAppearance,
+  saveGlobalTheme, loadGlobalTheme,
+} from '../utils/supabaseClient'
 
-const DATA_KEY = 'jateamhub-data'
+const DATA_KEY       = 'jateamhub-data'
 const APPEARANCE_KEY = 'jateamhub-appearance'
+const CONFIG_VERSION = '4.0'
+const MAX_HISTORY    = 20
 
-// Appearance tersimpan per device — tidak sync ke DB
+// ── Local appearance ──────────────────────────
 const loadLocalAppearance = (): Partial<AppearanceSettings> => {
-  try {
-    const a = localStorage.getItem(APPEARANCE_KEY)
-    return a ? JSON.parse(a) : {}
-  } catch { return {} }
+  try { const a = localStorage.getItem(APPEARANCE_KEY); return a ? JSON.parse(a) : {} } catch { return {} }
 }
 const saveLocalAppearance = (a: AppearanceSettings) =>
   localStorage.setItem(APPEARANCE_KEY, JSON.stringify(a))
-const AUTH_KEY = 'jateamhub-auth'
-const USERS_KEY = 'jateamhub-users'
-const PRESET_KEY = 'jateamhub-presets'
-const ADMIN_KEY_DEFAULT = 'jateamhub2024'
-const COLLAPSED_H = 1
-const CONFIG_VERSION = '4.0'
 
-// Migrate section lama ke struktur baru
-const migrateSection = (s: Section): Section => ({
-  ...s,
-  subtitle: s.subtitle ?? '',
-  sharedRoles: s.sharedRoles ?? [],
-  visibility: s.visibility ?? (s.sharedRoles?.length ? 'unit' : 'all'),
-  targetUnits: s.targetUnits ?? (s.sharedRoles ?? []),
-  type: s.type ?? 'section',
-  widgetType: s.widgetType,
-  collapsed: s.collapsed ?? false,
-  pageId: s.pageId ?? 'beranda',
-  _expandedH: s._expandedH ?? (s.collapsed ? SECTION_DEFAULT_H : (s.layout?.h ?? SECTION_DEFAULT_H)),
-})
-
-const autoLayout = (sections: Section[]): Section[] => {
-  let col = 0, row = 0
-  const cols = 12
-  const result: Section[] = []
-  for (const s of sections) {
-    const migrated = migrateSection(s)
-    const w = migrated.layout?.w ?? SECTION_DEFAULT_W
-    const h = migrated.layout?.h ?? SECTION_DEFAULT_H
-    const layout = migrated.layout ?? { x: col, y: row, w, h }
-    col += w
-    if (col >= cols) { col = 0; row += h }
-    result.push({
-      ...migrated,
-      layout: { ...layout, minW: SECTION_MIN_W, minH: SECTION_MIN_H },
-    })
-  }
-  return result
-}
-
-const defaultDisplayOptions: DisplayOptions = { showTags: false, showDesc: true, compactHeader: false }
-
-const mkSections = (): Section[] => autoLayout([
-  {
-    id: 's1', title: 'LAYANAN BERSAMA', subtitle: 'Layanan internal perusahaan',
-    icon: '🌐', width: 280, collapsed: false, accentColor: undefined,
-    layout: { x: 0, y: 0, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
-    pageId: 'beranda', visibility: 'all', targetUnits: [],
-    type: 'section', items: [
-      { id: 'i1', title: 'Email Korporat', url: 'https://mail.google.com', desc: 'Gmail perusahaan', icon: '', tags: ['email'], newTab: true },
-      { id: 'i2', title: 'Jateam Jira', url: 'https://jira.atlassian.com', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i3', title: 'Kalender', url: 'https://calendar.google.com', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i4', title: 'JIRA', url: 'https://jira.atlassian.com', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i5', title: 'APPS', url: 'https://workspace.google.com', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i6', title: 'Office 365', url: 'https://office.com', desc: '', icon: '', tags: [], newTab: true },
-    ],
-  },
-  {
-    id: 's2', title: 'ADMIN PANEL', subtitle: 'Manajemen sistem',
-    icon: '⚙️', width: 280, collapsed: false, accentColor: undefined,
-    layout: { x: 4, y: 0, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
-    pageId: 'beranda', visibility: 'admin', targetUnits: [],
-    type: 'section', items: [
-      { id: 'i7', title: 'PAM', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i8', title: 'Usma', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i9', title: 'Usma 2', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i10', title: 'Usma 3', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i11', title: 'Gemini', url: 'https://gemini.google.com', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i12', title: 'Edit Dashboard', url: '#', desc: '', icon: '', tags: [], newTab: true },
-    ],
-  },
-  {
-    id: 's3', title: 'MONITORING', subtitle: '',
-    icon: '📊', width: 280, collapsed: false, accentColor: undefined,
-    layout: { x: 8, y: 0, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
-    pageId: 'beranda', visibility: 'admin', targetUnits: [],
-    type: 'section', items: [
-      { id: 'i13', title: 'RJTP', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i14', title: 'COB', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i15', title: 'PKS', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i16', title: 'Less Config', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i17', title: 'UR', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i18', title: 'Rekap Efisiensi', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i19', title: 'Big Cases', url: '#', desc: '', icon: '', tags: [], newTab: true },
-    ],
-  },
-  {
-    id: 's4', title: 'FEEDING', subtitle: '',
-    icon: '📡', width: 280, collapsed: false, accentColor: undefined,
-    layout: { x: 0, y: 8, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
-    pageId: 'beranda', visibility: 'admin', targetUnits: [],
-    type: 'section', items: [
-      { id: 'i20', title: 'COB 2024', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i21', title: 'Analisa', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i22', title: 'Matrix C', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i23', title: 'UC', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i24', title: 'Morbrief', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i25', title: 'Status K', url: '#', desc: '', icon: '', tags: [], newTab: true },
-      { id: 'i26', title: 'Efisiensi', url: '#', desc: '', icon: '', tags: [], newTab: true },
-    ],
-  },
-])
-
-const defaultConfig: JateamConfig = {
-  version: CONFIG_VERSION,
-  meta: {
-    title: 'JateamHub', subtitle: 'Selamat datang, {username}',
-    adminKey: ADMIN_KEY_DEFAULT, logoUrl: '',
-    nav: [
-      { label: 'BERANDA', url: '#' }, { label: 'PANDUAN', url: '#' },
-      { label: 'SUPPORT', url: '#' }, { label: 'PRO', url: '#' },
-      { label: 'CRO', url: '#' }, { label: 'KLAIM', url: '#' },
-    ],
-  },
-  displayOptions: defaultDisplayOptions,
-  appearance: { ...DEFAULT_APPEARANCE },
-  sections: mkSections(),
-  pages: [...DEFAULT_PAGES],
-}
-
-const defaultUsers: UserAccount[] = [
-  { username: 'superadmin', password: 'admin123', role: 'superadmin', unitId: '' },
-  { username: 'admin', password: 'admin456', role: 'admin', unitId: '' },
-  { username: 'user', password: 'user123', role: 'user', unitId: '' },
-]
-
-// ── storage ──────────────────────────────────────────────
-// Auto-detect appearance preset berdasarkan lebar layar
-const getDeviceAppearance = (): Partial<AppearanceSettings> => {
+// ── Device preset ─────────────────────────────
+const getDevicePreset = (): Partial<AppearanceSettings> => {
   const w = window.innerWidth
-  if (w < 480) return {
-    itemDisplayMode: 'iconText',
-    sectionDensity: 'compact',
-    iconSize: 'small',
-    itemGridMinWidth: 56,
-  }
-  if (w < 768) return {
-    itemDisplayMode: 'button',
-    sectionDensity: 'comfortable',
-    iconSize: 'medium',
-    itemGridMinWidth: 64,
-  }
-  return {} // desktop — pakai yang tersimpan
+  if (w < 480) return { itemDisplayMode: 'folderGrid', iconSize: 'medium', folderGridCols: 2 }
+  if (w < 768) return { itemDisplayMode: 'folderGrid', iconSize: 'large',  folderGridCols: 3 }
+  return {}
+}
+const DEVICE_PREF_KEY = 'jateamhub-device-pref'
+const hasDevicePref   = () => !!localStorage.getItem(DEVICE_PREF_KEY)
+const setDevicePref   = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
+
+// ── uid ───────────────────────────────────────
+const uid = () => Math.random().toString(36).slice(2, 10)
+
+// ── Default config ────────────────────────────
+const defaultConfig: JateamConfig = {
+  version:        CONFIG_VERSION,
+  meta: { title: 'JateamHub', subtitle: 'Selamat datang, {username}', logoUrl: '', coffeeUrl: '', adminKey: '' },
+  pages:          [...DEFAULT_PAGES],
+  sections:       [],
+  appearance:     { ...DEFAULT_APPEARANCE },
+  displayOptions: { ...defaultDisplayOptions },
+  presets:        [],
 }
 
-// Cek apakah device sudah punya preference tersimpan
-const DEVICE_PREF_KEY = 'jateamhub-device-pref'
-const hasDevicePref = () => !!localStorage.getItem(DEVICE_PREF_KEY)
-const setDevicePref = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
-
-const loadConfig = (): JateamConfig => {
+// ── Persist ───────────────────────────────────
+const persist = (cfg: JateamConfig) => {
+  try { localStorage.setItem(DATA_KEY, JSON.stringify(cfg)) } catch {}
+}
+const loadLocal = (): JateamConfig => {
   try {
     const d = localStorage.getItem(DATA_KEY)
     if (!d) return structuredClone(defaultConfig)
     const p = JSON.parse(d)
-    const savedMajor = String(p.version ?? '0').split('.')[0]
-    const currentMajor = CONFIG_VERSION.split('.')[0]
-    if (savedMajor !== currentMajor) {
-      console.info('[JateamHub] Config version mismatch, resetting.')
-      localStorage.removeItem(DATA_KEY)
+    if (String(p.version ?? '0').split('.')[0] !== CONFIG_VERSION.split('.')[0]) {
       return structuredClone(defaultConfig)
     }
-    p.sections = autoLayout(p.sections || [])
+    p.appearance     = { ...DEFAULT_APPEARANCE,    ...(p.appearance    ?? {}) }
     p.displayOptions = { ...defaultDisplayOptions, ...(p.displayOptions ?? {}) }
-    p.appearance = { ...DEFAULT_APPEARANCE, ...(p.appearance ?? {}) }
-    p.meta = { ...defaultConfig.meta, ...(p.meta ?? {}) }
-    p.pages = (Array.isArray(p.pages) && p.pages.length > 0) ? p.pages : [...DEFAULT_PAGES]
+    p.pages          = Array.isArray(p.pages) && p.pages.length > 0 ? p.pages : [...DEFAULT_PAGES]
     return p
-  } catch (e) {
-    console.error('[JateamHub] Config load failed, resetting.', e)
-    localStorage.removeItem(DATA_KEY)
-    return structuredClone(defaultConfig)
-  }
+  } catch { return structuredClone(defaultConfig) }
 }
 
-const persist = (cfg: JateamConfig) => localStorage.setItem(DATA_KEY, JSON.stringify(cfg))
-
-const loadUsers = (): UserAccount[] => {
-  try {
-    const u = localStorage.getItem(USERS_KEY)
-    if (!u || JSON.parse(u).length === 0) {
-      localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers))
-      return defaultUsers
-    }
-    const users: UserAccount[] = JSON.parse(u)
-    // Migrate: role lama pro/cro/klaim → user + unitId
-    return users.map(u => {
-      if (u.role === ('pro' as string)) return { ...u, role: 'user' as Role, unitId: 'pro' as UnitId }
-      if (u.role === ('cro' as string)) return { ...u, role: 'user' as Role, unitId: 'cro' as UnitId }
-      if (u.role === ('klaim' as string)) return { ...u, role: 'user' as Role, unitId: 'klaim' as UnitId }
-      if (u.username === 'admin' && u.role === ('admin' as string) && !u.unitId) return u
-      return { ...u, unitId: u.unitId ?? '' }
-    })
-  } catch {
-    localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers))
-    return defaultUsers
-  }
+// ── Auto layout ───────────────────────────────
+const autoLayout = (sections: Section[]): Section[] => {
+  const COLS = 12; let col = 0, row = 0, rowH = 0
+  return sections.map(s => {
+    const w = Math.min(s.layout?.w ?? SECTION_DEFAULT_W, COLS)
+    const h = s.collapsed ? 1 : (s.layout?.h ?? SECTION_DEFAULT_H)
+    if (col + w > COLS) { row += rowH; col = 0; rowH = 0 }
+    const layout = { x: col, y: row, w, h }
+    col += w; rowH = Math.max(rowH, h)
+    return { ...s, layout }
+  })
 }
 
-const saveUsers = (u: UserAccount[]) => localStorage.setItem(USERS_KEY, JSON.stringify(u))
-const loadPresets = (): Preset[] => { try { const p = localStorage.getItem(PRESET_KEY); return p ? JSON.parse(p) : [] } catch { return [] } }
-const savePresets = (p: Preset[]) => localStorage.setItem(PRESET_KEY, JSON.stringify(p))
+// ── Debounce sync ─────────────────────────────
+let globalSyncTimer: ReturnType<typeof setTimeout> | null = null
+let unitSyncTimers: Record<string, ReturnType<typeof setTimeout>> = {}
 
-const loadSession = (): UserSession | null => {
-  try {
-    const s = localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY)
-    if (!s) return null
-    const sess = JSON.parse(s)
-    sess.role = sanitizeRole(sess.role) as Role
-    sess.unitId = sess.unitId ?? ''
-    return sess
-  } catch { return null }
-}
-
-// ── store interface ──────────────────────────────────────
+// ── Store interface ───────────────────────────
 interface DashboardStore {
-  session: UserSession | null
-  initSession: () => void
-  login: (u: string, p: string, r: UserSession['remember']) => string | null
-  register: (u: string, p: string, role: Role, unitId: UnitId, key: string) => string | null
-  logout: () => void
-  getUsers: () => UserAccount[]
-  updateUser: (username: string, role: Role, unitId: UnitId, newPassword?: string) => string | null
-  deleteUser: (username: string) => string | null
-
-  config: JateamConfig
-  setConfig: (cfg: JateamConfig) => void
-  resetConfig: () => void
-  loadRemoteConfig: () => Promise<void>
-  syncConfig: (cfg: JateamConfig) => void
-
-  addSection: (title: string, icon: string, subtitle: string, accentColor?: string, visibility?: string, targetUnits?: string[], pageId?: string, type?: string, widgetType?: string) => void
-  updateSection: (id: string, title: string, icon: string, subtitle: string, width: number, accentColor?: string, pageId?: string, visibility?: string, targetUnits?: string[]) => void
-  deleteSection: (id: string) => void
-  toggleCollapse: (id: string) => void
-  updateSectionLayout: (id: string, layout: SectionLayout) => void
-  batchUpdateLayouts: (layouts: Array<{ id: string; layout: SectionLayout }>) => void
-  resetLayout: () => void
-
-  addItem: (sectionId: string, data: Omit<LinkItem, 'id'>) => void
-  updateItem: (sectionId: string, itemId: string, data: Omit<LinkItem, 'id'>) => void
-  deleteItem: (sectionId: string, itemId: string) => void
-  moveItem: (srcSectionId: string, itemId: string, tgtSectionId: string, tgtItemId?: string) => void
-
-  editMode: boolean
-  toggleEditMode: () => void
-  searchQuery: string
-  setSearch: (q: string) => void
-  currentPage: string
-  setCurrentPage: (page: string) => void
-  // Preview mode — admin bisa preview + edit tampilan unit lain
-  previewUnit: string | null
-  setPreviewUnit: (unit: string | null) => void
-  currentUserId: string | null
-  setCurrentUserId: (id: string | null) => void
-  // Undo / Redo
-  history: JateamConfig[]
-  future: JateamConfig[]
-  undo: () => void
-  redo: () => void
-  canUndo: boolean
-  canRedo: boolean
-  // Sync status
-  isDirty: boolean
-  isSyncing: boolean
-  syncStatus: 'saved' | 'saving' | 'error' | 'idle'
-  syncToDb: () => Promise<void>
-
+  config:         JateamConfig
+  unitSections:   Record<string, Section[]>  // unit_id → sections
+  appearance:     AppearanceSettings
   displayOptions: DisplayOptions
-  setDisplayOptions: (o: Partial<DisplayOptions>) => void
-  appearance: AppearanceSettings
-  setAppearance: (o: Partial<AppearanceSettings>) => void
+  presets:        Preset[]
+  editMode:       boolean
+  searchQuery:    string
+  currentPage:    string
+  previewUnit:    string | null
+  currentUserId:  string | null
+  globalTheme:    ThemeId
+  history:        JateamConfig[]
+  future:         JateamConfig[]
+  canUndo:        boolean
+  canRedo:        boolean
+  isDirty:        boolean
+  isSyncing:      boolean
+  syncStatus:     'saved' | 'saving' | 'error' | 'idle'
 
-  presets: Preset[]
-  savePreset: (name: string) => void
-  applyPreset: (id: string) => void
+  // Init
+  loadRemoteConfig:  (userId: string, role: string, unitId: string) => Promise<void>
+  setCurrentUserId:  (id: string | null) => void
+
+  // Config
+  setConfig:     (cfg: JateamConfig) => void
+  resetConfig:   () => void
+  resetLayout:   () => void
+
+  // Section — global
+  addSection:          (...args: any[]) => void
+  updateSection:       (id: string, title: string, icon: string, subtitle: string, w: number, accent?: string, pageId?: string, visibility?: string, targetUnits?: string[]) => void
+  deleteSection:       (id: string) => void
+  toggleCollapse:      (id: string) => void
+  batchUpdateLayouts:  (layouts: Array<{ id: string; layout: any }>) => void
+  updateSectionLayout: (id: string, layout: any) => void
+
+  // Section — unit
+  addUnitSection:     (unitId: string, data: Partial<Section>) => void
+  updateUnitSection:  (unitId: string, sectionId: string, updates: Partial<Section>) => void
+  deleteUnitSection:  (unitId: string, sectionId: string) => void
+  batchUpdateUnitLayouts: (unitId: string, layouts: Array<{ id: string; layout: any }>) => void
+
+  // Items
+  addItem:     (sectionId: string, data: Omit<LinkItem, 'id'>, unitId?: string) => void
+  updateItem:  (sectionId: string, itemId: string, data: Omit<LinkItem, 'id'>, unitId?: string) => void
+  deleteItem:  (sectionId: string, itemId: string, unitId?: string) => void
+  moveItem:    (srcId: string, itemId: string, tgtId: string, tgtItemId?: string) => void
+
+  // UI
+  toggleEditMode:    () => void
+  setSearch:         (q: string) => void
+  setCurrentPage:    (p: string) => void
+  setPreviewUnit:    (u: string | null) => void
+
+  // Appearance
+  setAppearance:     (o: Partial<AppearanceSettings>) => void
+  setDisplayOptions: (o: Partial<DisplayOptions>) => void
+  setGlobalTheme:    (theme: ThemeId) => void
+
+  // Presets
+  savePreset:   (name: string) => void
+  applyPreset:  (id: string) => void
   deletePreset: (id: string) => void
 
-  toasts: { id: string; msg: string; type: 'success' | 'error' | 'warn' }[]
+  // Undo/Redo
+  undo: () => void
+  redo: () => void
+
+  // Sync
+  syncGlobalToDb:   () => Promise<void>
+  syncUnitToDb:     (unitId: string) => Promise<void>
+
+  // Toast
   toast: (msg: string, type?: 'success' | 'error' | 'warn') => void
+  toasts: Array<{ id: string; msg: string; type: 'success' | 'error' | 'warn' }>
   removeToast: (id: string) => void
 }
 
-// Max history steps
-const MAX_HISTORY = 20
-
-// Push current config ke history sebelum mutasi
-const pushHistory = (get: () => DashboardStore, set: (s: Partial<DashboardStore>) => void) => {
-  const { config, history } = get()
-  const newHistory = [...history, structuredClone(config)].slice(-MAX_HISTORY)
-  set({ history: newHistory, future: [] })
-}
-
-// Debounce sync ke DB — hindari terlalu banyak request
-let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
-
 export const useStore = create<DashboardStore>((set, get) => ({
-  // ── auth ────────────────────────────────────────────────
-  session: null,
-  initSession: () => { const s = loadSession(); if (s) set({ session: s }) },
+  config:         loadLocal(),
+  unitSections:   {},
+  appearance:     { ...DEFAULT_APPEARANCE, ...loadLocalAppearance() },
+  displayOptions: { ...defaultDisplayOptions },
+  presets:        [],
+  editMode:       false,
+  searchQuery:    '',
+  currentPage:    'beranda',
+  previewUnit:    null,
+  currentUserId:  null,
+  globalTheme:    'dark-mint',
+  history:        [],
+  future:         [],
+  canUndo:        false,
+  canRedo:        false,
+  isDirty:        false,
+  isSyncing:      false,
+  syncStatus:     'idle',
+  toasts:         [],
 
-  login: (username, password, remember) => {
-    const found = loadUsers().find(u => u.username === username && u.password === password)
-    if (!found) return 'Username atau password salah.'
-    const session: UserSession = { username, role: found.role, unitId: found.unitId ?? '', remember }
-    const data = JSON.stringify(session)
-    if (remember === 'always') localStorage.setItem(AUTH_KEY, data)
-    else sessionStorage.setItem(AUTH_KEY, data)
-    set({ session, currentPage: 'beranda', previewUnit: null })
-    return null
+  // ── Toast ─────────────────────────────────
+  toast: (msg, type = 'success') => {
+    const id = uid()
+    set(s => ({ toasts: [...s.toasts.slice(-2), { id, msg, type }] }))
+    setTimeout(() => get().removeToast(id), 4000)
   },
+  removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 
-  register: (username, password, role, unitId, key) => {
-    const adminKey = get().config.meta.adminKey || ADMIN_KEY_DEFAULT
-    const session = get().session
-    if (!username || !password) return 'Username dan password wajib diisi.'
-    if (password.length < 6) return 'Password minimal 6 karakter.'
-    if (role === 'superadmin') return 'Role superadmin tidak bisa didaftarkan.'
-    if (role === 'admin') {
-      if (session?.role !== 'superadmin') return 'Hanya superadmin yang bisa membuat admin.'
-      if (key !== adminKey) return 'Admin key salah.'
-    }
-    const canCreate = session?.role === 'superadmin' || session?.role === 'admin'
-    if (!canCreate) return 'Tidak ada izin.'
-    if (session?.role === 'admin' && role === 'admin') return 'Admin tidak bisa membuat admin.'
-    const users = loadUsers()
-    if (users.find(u => u.username === username)) return 'Username sudah digunakan.'
-    users.push({ username, password, role, unitId })
-    saveUsers(users); return null
-  },
+  setCurrentUserId: (id) => set({ currentUserId: id }),
 
-  logout: () => {
-    localStorage.removeItem(AUTH_KEY); sessionStorage.removeItem(AUTH_KEY)
-    set({ session: null, editMode: false, previewUnit: null })
-  },
-
-  getUsers: () => loadUsers(),
-
-  updateUser: (username, role, unitId, newPassword) => {
-    const session = get().session
-    if (username === session?.username && role !== session.role) return 'Tidak bisa ubah role diri sendiri.'
-    if (role === 'superadmin') return 'Tidak bisa assign superadmin.'
-    if (role === 'admin' && session?.role !== 'superadmin') return 'Hanya superadmin yang bisa assign admin.'
-    const users = loadUsers()
-    const target = users.find(u => u.username === username)
-    if (!target) return 'User tidak ditemukan.'
-    if (target.role === 'superadmin' && session?.role !== 'superadmin') return 'Tidak bisa ubah superadmin.'
-    target.role = role
-    target.unitId = unitId
-    if (newPassword && newPassword.length >= 6) target.password = newPassword
-    else if (newPassword && newPassword.length > 0) return 'Password minimal 6 karakter.'
-    saveUsers(users); return null
-  },
-
-  deleteUser: (username) => {
-    const session = get().session
-    if (username === session?.username) return 'Tidak bisa hapus akun sendiri.'
-    const users = loadUsers()
-    const target = users.find(u => u.username === username)
-    if (!target) return 'User tidak ditemukan.'
-    if (target.role === 'superadmin') return 'Tidak bisa hapus superadmin.'
-    if (target.role === 'admin' && session?.role !== 'superadmin') return 'Hanya superadmin yang bisa hapus admin.'
-    saveUsers(users.filter(u => u.username !== username)); return null
-  },
-
-  // ── config ───────────────────────────────────────────────
-  config: loadConfig(),
-  setConfig: (cfg) => {
-    cfg.appearance = { ...DEFAULT_APPEARANCE, ...(cfg.appearance ?? {}) }
-    cfg.sections = autoLayout(cfg.sections || [])
-    cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
-    cfg.pages = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
-    persist(cfg)
-    set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions, isDirty: true })
-    get().syncToDb()
-  },
-  resetConfig: () => {
-    const fresh = structuredClone(defaultConfig)
-    persist(fresh)
-    set({ config: fresh, appearance: fresh.appearance, displayOptions: fresh.displayOptions, currentPage: 'beranda', previewUnit: null, isDirty: true })
-    get().syncToDb()
-  },
-
-  // Load config dari Supabase DB — dipanggil saat app init
-  loadRemoteConfig: async () => {
+  // ── Load remote config ────────────────────
+  loadRemoteConfig: async (userId, role, unitId) => {
     try {
-      const remote = await loadConfigFromDB()
-      if (!remote || !Array.isArray((remote as any).sections)) return
-      const cfg = remote as unknown as JateamConfig
-      cfg.appearance = { ...DEFAULT_APPEARANCE, ...(cfg.appearance ?? {}) }
-      cfg.sections = autoLayout(cfg.sections || [])
-      cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
-      cfg.pages = (Array.isArray(cfg.pages) && cfg.pages.length > 0) ? cfg.pages : [...DEFAULT_PAGES]
+      // Load global config
+      const remote = await loadGlobalConfig()
+      if (remote && Array.isArray((remote as any).sections)) {
+        const cfg = remote as unknown as JateamConfig
+        cfg.appearance     = { ...DEFAULT_APPEARANCE, ...(cfg.appearance ?? {}) }
+        cfg.sections       = autoLayout(cfg.sections || [])
+        cfg.displayOptions = { ...defaultDisplayOptions, ...(cfg.displayOptions ?? {}) }
+        cfg.pages          = Array.isArray(cfg.pages) && cfg.pages.length ? cfg.pages : [...DEFAULT_PAGES]
+        cfg.presets        = Array.isArray(cfg.presets) ? cfg.presets : []
 
-      // Appearance per user: load dari DB profil user
-      const userId = get().currentUserId
-      if (userId) {
+        // Load appearance per user
         const userAppearance = await loadUserAppearance(userId)
         if (userAppearance && Object.keys(userAppearance).length > 0) {
-          // Pakai appearance yang tersimpan di profil user
           cfg.appearance = { ...DEFAULT_APPEARANCE, ...cfg.appearance, ...userAppearance }
-          saveLocalAppearance(cfg.appearance)
-        } else {
-          // Belum ada — cek localStorage atau device preset
-          const localAppearance = loadLocalAppearance()
-          if (Object.keys(localAppearance).length > 0) {
-            cfg.appearance = { ...DEFAULT_APPEARANCE, ...cfg.appearance, ...localAppearance }
-          } else if (!hasDevicePref()) {
-            const devicePreset = getDeviceAppearance()
-            if (Object.keys(devicePreset).length > 0) {
-              cfg.appearance = { ...cfg.appearance, ...devicePreset }
-              setDevicePref()
-            }
+        } else if (!hasDevicePref()) {
+          const preset = getDevicePreset()
+          if (Object.keys(preset).length > 0) {
+            cfg.appearance = { ...cfg.appearance, ...preset }
+            setDevicePref()
           }
-          // Simpan ke profil user di DB
-          if (userId) saveUserAppearance(userId, cfg.appearance as unknown as Record<string, unknown>)
-          saveLocalAppearance(cfg.appearance)
+        }
+        saveLocalAppearance(cfg.appearance)
+        persist(cfg)
+        set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions, presets: cfg.presets })
+      }
+
+      // Load unit config jika user punya unit
+      if (unitId && unitId !== '') {
+        const unitCfg = await loadUnitConfig(unitId)
+        if (unitCfg) {
+          const sections = autoLayout(((unitCfg as any).sections ?? []) as Section[])
+          set(s => ({ unitSections: { ...s.unitSections, [unitId]: sections } }))
         }
       }
 
-      persist(cfg)
-      set({ config: cfg, appearance: cfg.appearance, displayOptions: cfg.displayOptions })
+      // Load global theme
+      const theme = await loadGlobalTheme()
+      set({ globalTheme: theme })
+      applyThemeToDOM(theme)
+
     } catch (e) {
       console.error('[JateamHub] loadRemoteConfig failed:', e)
     }
   },
 
-  // Sync config ke DB (dipanggil dari setConfig)
-  syncConfig: (cfg) => {
-    saveConfigToDB(cfg as unknown as Record<string, unknown>)
-      .then(({ error }) => { if (error) console.error('[JateamHub] syncConfig error:', error) })
-  },
-
-  // ── sections ─────────────────────────────────────────────
-  addSection: (title, icon, subtitle, accentColor, visibility = 'all', targetUnits = [], pageId, type = 'section', widgetType) => {
-    pushHistory(get, set)
-    const cfg = structuredClone(get().config)
-    const maxY = cfg.sections.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
-    const lastRowSections = cfg.sections.filter(s => s.layout.y + s.layout.h === maxY)
-    const lastX = lastRowSections.length > 0
-      ? Math.max(...lastRowSections.map(s => s.layout.x + s.layout.w)) % 12
-      : 0
-    const resolvedPageId = pageId ?? get().currentPage
-    cfg.sections.push({
-      id: 's' + uid(), title, subtitle, icon: icon || (type === 'widget' ? '🧩' : '📁'),
-      width: 280, collapsed: false, accentColor, _expandedH: SECTION_DEFAULT_H,
-      layout: { x: lastX, y: maxY - SECTION_DEFAULT_H, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H, minW: SECTION_MIN_W, minH: SECTION_MIN_H },
-      pageId: resolvedPageId, visibility: visibility as 'all' | 'admin' | 'unit',
-      targetUnits, type: type as 'section' | 'widget', widgetType: widgetType as 'clock' | 'notes' | undefined,
-      items: [],
-    })
-    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
-  },
-
-  updateSection: (id, title, icon, subtitle, width, accentColor, pageId, visibility, targetUnits) => {
-    pushHistory(get, set)
-    const cfg = structuredClone(get().config)
-    const s = cfg.sections.find(s => s.id === id)
-    if (s) {
-      s.title = title; s.subtitle = subtitle; s.icon = icon; s.width = width
-      s.accentColor = accentColor
-      if (pageId) s.pageId = pageId
-      if (visibility) s.visibility = visibility as 'all' | 'admin' | 'unit'
-      if (targetUnits) s.targetUnits = targetUnits
-    }
-    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
-  },
-
-  deleteSection: (id) => {
-    pushHistory(get, set)
-    const cfg = structuredClone(get().config)
-    cfg.sections = cfg.sections.filter(s => s.id !== id)
-    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
-  },
-
-  toggleCollapse: (id) => {
-    const cfg = structuredClone(get().config)
-    const s = cfg.sections.find(s => s.id === id)
-    if (!s) return
-    if (s.collapsed) {
-      s.collapsed = false
-      s.layout = { ...s.layout, h: Math.max(s._expandedH ?? SECTION_DEFAULT_H, SECTION_MIN_H), minH: SECTION_MIN_H }
-    } else {
-      s._expandedH = s.layout.h
-      s.collapsed = true
-      s.layout = { ...s.layout, h: COLLAPSED_H, minH: COLLAPSED_H }
-    }
-    persist(cfg); set({ config: cfg })
-  },
-
-  updateSectionLayout: (id, layout) => {
-    const cfg = structuredClone(get().config)
-    const s = cfg.sections.find(s => s.id === id)
-    if (s) s.layout = { ...s.layout, ...layout }
-    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
-  },
-
-  batchUpdateLayouts: (layouts) => {
-    const cfg = structuredClone(get().config)
-    layouts.forEach(({ id, layout }) => {
-      const s = cfg.sections.find(s => s.id === id)
-      if (s && !s.collapsed) { s.layout = { ...s.layout, ...layout }; s._expandedH = layout.h }
-    })
-    persist(cfg)
-    // Layout changes: debounce lebih panjang (3 detik) karena dipanggil terus saat drag
-    set({ config: cfg, isDirty: true })
-    if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
-    syncDebounceTimer = setTimeout(async () => {
-      set({ isSyncing: true, syncStatus: 'saving' })
-      try {
-        const result = await saveConfigToDB(cfg as unknown as Record<string, unknown>)
-        if (result?.error) {
-          set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-        } else {
-          set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
-          setTimeout(() => set({ syncStatus: 'idle' }), 3000)
-        }
-      } catch {
-        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-      }
-    }, 3000)
-  },
-
-  resetLayout: () => {
-    const cfg = structuredClone(get().config)
-    cfg.sections = autoLayout(cfg.sections.map(s => ({
-      ...s, collapsed: false, _expandedH: SECTION_DEFAULT_H,
-      layout: { x: 0, y: 0, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
-    })))
-    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
-  },
-
-  // ── items ────────────────────────────────────────────────
-  addItem: (sectionId, data) => {
-    pushHistory(get, set)
-    const cfg = structuredClone(get().config)
-    const sec = cfg.sections.find(s => s.id === sectionId)
-    if (sec) sec.items.push({ id: 'i' + uid(), ...data })
-    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
-  },
-  updateItem: (sectionId, itemId, data) => {
-    pushHistory(get, set)
-    const cfg = structuredClone(get().config)
-    const sec = cfg.sections.find(s => s.id === sectionId)
-    if (!sec) return
-    const idx = sec.items.findIndex(i => i.id === itemId)
-    if (idx >= 0) sec.items[idx] = { id: itemId, ...data }
-    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
-  },
-  deleteItem: (sectionId, itemId) => {
-    pushHistory(get, set)
-    const cfg = structuredClone(get().config)
-    const sec = cfg.sections.find(s => s.id === sectionId)
-    if (sec) sec.items = sec.items.filter(i => i.id !== itemId)
-    persist(cfg); set({ config: cfg, isDirty: true }); get().syncToDb()
-  },
-  moveItem: (srcSectionId, itemId, tgtSectionId, tgtItemId) => {
-    const cfg = structuredClone(get().config)
-    const src = cfg.sections.find(s => s.id === srcSectionId)
-    const tgt = cfg.sections.find(s => s.id === tgtSectionId)
-    if (!src || !tgt) return
-    const si = src.items.findIndex(i => i.id === itemId)
-    if (si < 0) return
-    const [item] = src.items.splice(si, 1)
-    if (tgtItemId) {
-      const ti = tgt.items.findIndex(i => i.id === tgtItemId)
-      tgt.items.splice(ti >= 0 ? ti : tgt.items.length, 0, item)
-    } else tgt.items.push(item)
-    persist(cfg); set({ config: cfg })
-  },
-
-  // ── ui ───────────────────────────────────────────────────
-  history: [],
-  future: [],
-  canUndo: false,
-  canRedo: false,
-  isDirty: false,
-  isSyncing: false,
-  syncStatus: 'idle' as const,
-
-  syncToDb: async () => {
-    // Debounce — tunggu 1.5 detik setelah mutasi terakhir baru sync
-    if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
+  // ── Sync global ───────────────────────────
+  syncGlobalToDb: async () => {
+    if (globalSyncTimer) clearTimeout(globalSyncTimer)
     set({ isDirty: true, syncStatus: 'saving' })
-    syncDebounceTimer = setTimeout(async () => {
+    globalSyncTimer = setTimeout(async () => {
       const cfg = get().config
       set({ isSyncing: true })
       try {
-        const result = await saveConfigToDB(cfg as unknown as Record<string, unknown>)
-        if (result?.error) {
+        const result = await saveGlobalConfig(cfg as unknown as Record<string, unknown>)
+        if ((result as any)?.error) {
           set({ isSyncing: false, syncStatus: 'error', isDirty: true })
         } else {
           set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
@@ -625,77 +270,309 @@ export const useStore = create<DashboardStore>((set, get) => ({
     }, 1500)
   },
 
+  // ── Sync unit ─────────────────────────────
+  syncUnitToDb: async (unitId) => {
+    if (unitSyncTimers[unitId]) clearTimeout(unitSyncTimers[unitId])
+    set({ isDirty: true, syncStatus: 'saving' })
+    unitSyncTimers[unitId] = setTimeout(async () => {
+      const sections = get().unitSections[unitId] ?? []
+      set({ isSyncing: true })
+      try {
+        const result = await saveUnitConfig(unitId, { sections } as unknown as Record<string, unknown>)
+        if ((result as any)?.error) {
+          set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+        } else {
+          set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
+          setTimeout(() => set({ syncStatus: 'idle' }), 3000)
+        }
+      } catch {
+        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+      }
+    }, 1500)
+  },
+
+  // ── History ───────────────────────────────
+  setConfig: (cfg) => {
+    const prev = get().config
+    const history = [...get().history, structuredClone(prev)].slice(-MAX_HISTORY)
+    persist(cfg)
+    get().syncGlobalToDb()
+    set({ config: cfg, history, future: [], canUndo: true, canRedo: false, appearance: cfg.appearance, displayOptions: cfg.displayOptions })
+  },
+
+  resetConfig: () => {
+    const fresh = structuredClone(defaultConfig)
+    persist(fresh)
+    get().syncGlobalToDb()
+    set({ config: fresh, appearance: fresh.appearance, displayOptions: fresh.displayOptions, currentPage: 'beranda', previewUnit: null, history: [], future: [], canUndo: false, canRedo: false })
+  },
+
+  resetLayout: () => {
+    const cfg = structuredClone(get().config)
+    cfg.sections = autoLayout(cfg.sections)
+    persist(cfg)
+    get().syncGlobalToDb()
+    set({ config: cfg })
+  },
+
   undo: () => {
     const { history, config, future } = get()
     if (!history.length) return
     const prev = history[history.length - 1]
     const newHistory = history.slice(0, -1)
-    const newFuture = [structuredClone(config), ...future].slice(0, MAX_HISTORY)
+    const newFuture  = [structuredClone(config), ...future].slice(0, MAX_HISTORY)
     persist(prev)
     set({ config: prev, history: newHistory, future: newFuture, canUndo: newHistory.length > 0, canRedo: true })
   },
 
   redo: () => {
-    const { future, config, history } = get()
+    const { history, config, future } = get()
     if (!future.length) return
     const next = future[0]
-    const newFuture = future.slice(1)
+    const newFuture  = future.slice(1)
     const newHistory = [...history, structuredClone(config)].slice(-MAX_HISTORY)
     persist(next)
     set({ config: next, history: newHistory, future: newFuture, canUndo: true, canRedo: newFuture.length > 0 })
   },
 
-  editMode: false,
-  toggleEditMode: () => set(s => ({ editMode: !s.editMode })),
-  searchQuery: '',
-  setSearch: (q) => set({ searchQuery: q }),
-  currentPage: 'beranda',
-  setCurrentPage: (page) => set({ currentPage: page, searchQuery: '' }),
-  previewUnit: null,
-  setPreviewUnit: (unit) => set({ previewUnit: unit, editMode: false }),
-  currentUserId: null,
-  setCurrentUserId: (id) => set({ currentUserId: id }),
+  toggleEditMode: () => set(s => ({ editMode: !s.editMode, searchQuery: '' })),
+  setSearch:      (q) => set({ searchQuery: q }),
+  setCurrentPage: (p) => set({ currentPage: p, searchQuery: '' }),
+  setPreviewUnit: (u) => set({ previewUnit: u, editMode: false }),
 
-  displayOptions: loadConfig().displayOptions,
+  // ── Global sections ───────────────────────
+  addSection: (title, icon, subtitle, accent, visibility, targetUnits, pageId, type, widgetType) => {
+    const cfg = structuredClone(get().config)
+    const COLS = 12
+    const existing = cfg.sections.filter(s => (s.pageId ?? 'beranda') === (pageId ?? 'beranda'))
+    const maxY = existing.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
+    cfg.sections.push({
+      id: 's' + uid(), title, icon, subtitle, items: [],
+      layout: { x: 0, y: maxY, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
+      visibility: visibility ?? 'all', targetUnits: targetUnits ?? [],
+      pageId: pageId ?? 'beranda', accentColor: accent, type: type ?? 'section', widgetType,
+    })
+    const prev = get().config
+    const history = [...get().history, structuredClone(prev)].slice(-MAX_HISTORY)
+    persist(cfg)
+    get().syncGlobalToDb()
+    set({ config: cfg, history, future: [], canUndo: true, canRedo: false })
+  },
+
+  updateSection: (id, title, icon, subtitle, w, accent, pageId, visibility, targetUnits) => {
+    const cfg = structuredClone(get().config)
+    const s = cfg.sections.find(s => s.id === id)
+    if (s) {
+      s.title = title; s.icon = icon; s.subtitle = subtitle
+      s.layout.w = Math.floor(w / 70) || s.layout.w
+      if (accent !== undefined) s.accentColor = accent
+      if (pageId) s.pageId = pageId
+      if (visibility) s.visibility = visibility as any
+      if (targetUnits) s.targetUnits = targetUnits
+    }
+    persist(cfg); get().syncGlobalToDb()
+    set({ config: cfg })
+  },
+
+  deleteSection: (id) => {
+    const cfg = structuredClone(get().config)
+    cfg.sections = cfg.sections.filter(s => s.id !== id)
+    const prev = get().config
+    const history = [...get().history, structuredClone(prev)].slice(-MAX_HISTORY)
+    persist(cfg); get().syncGlobalToDb()
+    set({ config: cfg, history, future: [], canUndo: true, canRedo: false })
+  },
+
+  toggleCollapse: (id) => {
+    const cfg = structuredClone(get().config)
+    const s = cfg.sections.find(s => s.id === id)
+    if (s) {
+      if (!s.collapsed) { s._expandedH = s.layout.h; s.layout.h = 1; s.collapsed = true }
+      else { s.layout.h = s._expandedH ?? SECTION_DEFAULT_H; s.collapsed = false }
+    }
+    persist(cfg); get().syncGlobalToDb()
+    set({ config: cfg })
+  },
+
+  batchUpdateLayouts: (layouts) => {
+    const cfg = structuredClone(get().config)
+    layouts.forEach(({ id, layout }) => {
+      const s = cfg.sections.find(s => s.id === id)
+      if (s && !s.collapsed) { s.layout = { ...s.layout, ...layout }; s._expandedH = layout.h }
+    })
+    persist(cfg)
+    if (globalSyncTimer) clearTimeout(globalSyncTimer)
+    set({ config: cfg, isDirty: true, syncStatus: 'saving' })
+    globalSyncTimer = setTimeout(async () => {
+      set({ isSyncing: true })
+      try {
+        const result = await saveGlobalConfig(cfg as unknown as Record<string, unknown>)
+        if ((result as any)?.error) set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+        else { set({ isSyncing: false, syncStatus: 'saved', isDirty: false }); setTimeout(() => set({ syncStatus: 'idle' }), 3000) }
+      } catch { set({ isSyncing: false, syncStatus: 'error', isDirty: true }) }
+    }, 3000)
+  },
+
+  updateSectionLayout: (id, layout) => {
+    const cfg = structuredClone(get().config)
+    const s = cfg.sections.find(s => s.id === id)
+    if (s) s.layout = { ...s.layout, ...layout }
+    persist(cfg); get().syncGlobalToDb()
+    set({ config: cfg })
+  },
+
+  // ── Unit sections ─────────────────────────
+  addUnitSection: (unitId, data) => {
+    const current = structuredClone(get().unitSections[unitId] ?? [])
+    const maxY = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
+    current.push({
+      id: 's' + uid(), title: data.title ?? 'New Section',
+      icon: data.icon ?? '📁', subtitle: data.subtitle ?? '', items: [],
+      layout: { x: 0, y: maxY, w: SECTION_DEFAULT_W, h: SECTION_DEFAULT_H },
+      visibility: 'unit', targetUnits: [unitId],
+      pageId: 'beranda', accentColor: data.accentColor, type: 'section',
+    })
+    set(s => ({ unitSections: { ...s.unitSections, [unitId]: current } }))
+    get().syncUnitToDb(unitId)
+  },
+
+  updateUnitSection: (unitId, sectionId, updates) => {
+    const current = structuredClone(get().unitSections[unitId] ?? [])
+    const idx = current.findIndex(s => s.id === sectionId)
+    if (idx >= 0) current[idx] = { ...current[idx], ...updates }
+    set(s => ({ unitSections: { ...s.unitSections, [unitId]: current } }))
+    get().syncUnitToDb(unitId)
+  },
+
+  deleteUnitSection: (unitId, sectionId) => {
+    const current = (get().unitSections[unitId] ?? []).filter(s => s.id !== sectionId)
+    set(s => ({ unitSections: { ...s.unitSections, [unitId]: current } }))
+    get().syncUnitToDb(unitId)
+  },
+
+  batchUpdateUnitLayouts: (unitId, layouts) => {
+    const current = structuredClone(get().unitSections[unitId] ?? [])
+    layouts.forEach(({ id, layout }) => {
+      const s = current.find(s => s.id === id)
+      if (s) { s.layout = { ...s.layout, ...layout }; s._expandedH = layout.h }
+    })
+    set(s => ({ unitSections: { ...s.unitSections, [unitId]: current } }))
+    if (unitSyncTimers[unitId]) clearTimeout(unitSyncTimers[unitId])
+    unitSyncTimers[unitId] = setTimeout(async () => {
+      await saveUnitConfig(unitId, { sections: current } as unknown as Record<string, unknown>)
+    }, 3000)
+  },
+
+  // ── Items ─────────────────────────────────
+  addItem: (sectionId, data, unitId) => {
+    if (unitId) {
+      const current = structuredClone(get().unitSections[unitId] ?? [])
+      const s = current.find(s => s.id === sectionId)
+      if (s) s.items.push({ id: 'i' + uid(), ...data })
+      set(st => ({ unitSections: { ...st.unitSections, [unitId]: current } }))
+      get().syncUnitToDb(unitId)
+    } else {
+      const cfg = structuredClone(get().config)
+      const s = cfg.sections.find(s => s.id === sectionId)
+      if (s) s.items.push({ id: 'i' + uid(), ...data })
+      persist(cfg); get().syncGlobalToDb(); set({ config: cfg })
+    }
+  },
+
+  updateItem: (sectionId, itemId, data, unitId) => {
+    if (unitId) {
+      const current = structuredClone(get().unitSections[unitId] ?? [])
+      const s = current.find(s => s.id === sectionId)
+      if (s) { const idx = s.items.findIndex(i => i.id === itemId); if (idx >= 0) s.items[idx] = { id: itemId, ...data } }
+      set(st => ({ unitSections: { ...st.unitSections, [unitId]: current } }))
+      get().syncUnitToDb(unitId)
+    } else {
+      const cfg = structuredClone(get().config)
+      const s = cfg.sections.find(s => s.id === sectionId)
+      if (s) { const idx = s.items.findIndex(i => i.id === itemId); if (idx >= 0) s.items[idx] = { id: itemId, ...data } }
+      persist(cfg); get().syncGlobalToDb(); set({ config: cfg })
+    }
+  },
+
+  deleteItem: (sectionId, itemId, unitId) => {
+    if (unitId) {
+      const current = structuredClone(get().unitSections[unitId] ?? [])
+      const s = current.find(s => s.id === sectionId)
+      if (s) s.items = s.items.filter(i => i.id !== itemId)
+      set(st => ({ unitSections: { ...st.unitSections, [unitId]: current } }))
+      get().syncUnitToDb(unitId)
+    } else {
+      const cfg = structuredClone(get().config)
+      const s = cfg.sections.find(s => s.id === sectionId)
+      if (s) s.items = s.items.filter(i => i.id !== itemId)
+      persist(cfg); get().syncGlobalToDb(); set({ config: cfg })
+    }
+  },
+
+  moveItem: (srcId, itemId, tgtId, tgtItemId) => {
+    const cfg = structuredClone(get().config)
+    const src = cfg.sections.find(s => s.id === srcId)
+    const tgt = cfg.sections.find(s => s.id === tgtId)
+    if (!src || !tgt) return
+    const item = src.items.find(i => i.id === itemId)
+    if (!item) return
+    src.items = src.items.filter(i => i.id !== itemId)
+    if (tgtItemId) {
+      const tgtIdx = tgt.items.findIndex(i => i.id === tgtItemId)
+      tgt.items.splice(tgtIdx >= 0 ? tgtIdx : tgt.items.length, 0, item)
+    } else tgt.items.push(item)
+    persist(cfg); get().syncGlobalToDb(); set({ config: cfg })
+  },
+
+  // ── Appearance ────────────────────────────
+  setAppearance: (o) => {
+    const next = { ...get().appearance, ...o }
+    const cfg  = structuredClone(get().config)
+    cfg.appearance = next
+    saveLocalAppearance(next)
+    persist(cfg)
+    const userId = get().currentUserId
+    if (userId) saveUserAppearance(userId, next)
+    set({ appearance: next, config: cfg })
+  },
+
   setDisplayOptions: (o) => {
     const next = { ...get().displayOptions, ...o }
-    const cfg = structuredClone(get().config)
+    const cfg  = structuredClone(get().config)
     cfg.displayOptions = next
     persist(cfg)
     set({ displayOptions: next, config: cfg })
   },
-  appearance: loadConfig().appearance,
-  setAppearance: (o) => {
-    const next: AppearanceSettings = { ...get().appearance, ...o }
-    const cfg = structuredClone(get().config)
-    cfg.appearance = next
-    // Simpan ke localStorage device
-    saveLocalAppearance(next)
-    persist(cfg)
-    // Sync ke profil user di DB
-    const userId = get().currentUserId
-    if (userId) saveUserAppearance(userId, next as unknown as Record<string, unknown>)
-    set({ appearance: next, config: cfg })
+
+  setGlobalTheme: (theme) => {
+    saveGlobalTheme(theme)
+    applyThemeToDOM(theme)
+    set({ globalTheme: theme })
+    get().setAppearance({ theme })
   },
 
-  // ── presets ──────────────────────────────────────────────
-  presets: loadPresets(),
+  // ── Presets ───────────────────────────────
   savePreset: (name) => {
-    const presets = [...get().presets, { id: uid(), name, ts: Date.now() }]
-    savePresets(presets); set({ presets })
+    const preset: Preset = { id: uid(), name, appearance: { ...get().appearance } }
+    const cfg = structuredClone(get().config)
+    cfg.presets = [...(cfg.presets ?? []), preset]
+    persist(cfg); get().syncGlobalToDb()
+    set({ config: cfg, presets: cfg.presets })
   },
-  applyPreset: (_id) => { },
+  applyPreset: (id) => {
+    const preset = get().presets.find(p => p.id === id)
+    if (!preset) return
+    get().setAppearance(preset.appearance)
+  },
   deletePreset: (id) => {
-    const presets = get().presets.filter(x => x.id !== id)
-    savePresets(presets); set({ presets })
+    const cfg = structuredClone(get().config)
+    cfg.presets = (cfg.presets ?? []).filter(p => p.id !== id)
+    persist(cfg); get().syncGlobalToDb()
+    set({ config: cfg, presets: cfg.presets })
   },
-
-  // ── toasts ───────────────────────────────────────────────
-  toasts: [],
-  toast: (msg, type = 'success') => {
-    const id = uid()
-    set(s => ({ toasts: [...s.toasts, { id, msg, type }] }))
-    setTimeout(() => get().removeToast(id), 4000)
-  },
-  removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 }))
+
+// ── Theme DOM ─────────────────────────────────
+export function applyThemeToDOM(theme: ThemeId) {
+  document.documentElement.setAttribute('data-theme', theme)
+}

@@ -1,41 +1,57 @@
-import { useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
-import { getAccessiblePages, canEdit } from '../../utils/roles'
+import { canEdit, canSeeOptionsPanel } from '../../utils/roles'
 import { sanitizePage } from '../../utils/security'
-import { USER_PAGES } from '../../types'
 
 interface Props {
   onToggleOptions: () => void
   optionsOpen: boolean
-  onOpenConfig: () => void
+  onOpenProfile: () => void
 }
 
-export default function Header({ onToggleOptions, optionsOpen, onOpenConfig }: Props) {
+export default function Header({ onToggleOptions, optionsOpen, onOpenProfile }: Props) {
   const {
     config, editMode, toggleEditMode,
     searchQuery, setSearch, currentPage, setCurrentPage,
     previewUnit, setPreviewUnit,
   } = useStore()
-  const { profile: session, logout } = useAuthStore()
+  const { profile: session } = useAuthStore()
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const previewRef = useRef<HTMLDivElement>(null)
 
-  const isEditable = canEdit(session as any)
-  const emoji = (session as any)?.avatar_emoji ?? ''
-  const subtitle = (config.meta.subtitle || 'Selamat datang')
-    .replace('{username}', `${session?.username || ''}${emoji ? ' ' + emoji : ''}`)
+  const isEditable   = canEdit(session as any)
+  const showOptions  = canSeeOptionsPanel(session as any)
+  const isAdminLevel = session?.role === 'admin' || session?.role === 'superadmin'
 
-  // Navbar: admin lihat semua, user hanya USER_PAGES
-  const accessiblePageIds = getAccessiblePages(session as any)
-  const visiblePages = (config.pages ?? []).filter(p => accessiblePageIds.includes(p.id))
+  // Only beranda in nav
+  const pages = (config.pages ?? [{ id: 'beranda', label: 'BERANDA' }]).filter(p => p.id === 'beranda')
 
-  // Auto-redirect kalau currentPage tidak accessible
   useEffect(() => {
     const validPageIds = (config.pages ?? []).map(p => p.id)
     const safePage = sanitizePage(currentPage, validPageIds)
-    if (!accessiblePageIds.includes(currentPage) || safePage !== currentPage) {
-      setCurrentPage('beranda')
+    if (safePage !== currentPage) setCurrentPage('beranda')
+  }, [session?.role, currentPage])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (previewRef.current && !previewRef.current.contains(e.target as Node)) {
+        setPreviewOpen(false)
+      }
     }
-  }, [session?.role, (session as any)?.unit_id, currentPage, config.pages])
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const PREVIEW_OPTS = [
+    { value: null,    label: '👁 Admin View' },
+    { value: '',      label: 'User Umum' },
+    { value: 'pro',   label: 'PRO' },
+    { value: 'cro',   label: 'CRO' },
+    { value: 'klaim', label: 'Klaim' },
+  ]
+
+  const activePreview = PREVIEW_OPTS.find(o => o.value === previewUnit)
 
   return (
     <>
@@ -43,108 +59,100 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenConfig }: P
         {/* Brand */}
         <div className="header-brand">
           {config.meta.logoUrl ? (
-            <div style={{
-              background: '#ffffff',
-              borderRadius: 6,
-              padding: '2px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 36, height: 36,
-              flexShrink: 0,
-              boxShadow: '0 0 0 1px rgba(255,255,255,0.15)',
-            }}>
-              <img
-                src={config.meta.logoUrl}
-                alt="Logo"
-                style={{ width: 30, height: 30, objectFit: 'contain', borderRadius: 4 }}
-                onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }}
-              />
+            <div style={{ background: '#fff', borderRadius: 6, padding: 2, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <img src={config.meta.logoUrl} alt="Logo" style={{ width: 30, height: 30, objectFit: 'contain', borderRadius: 4 }}
+                onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }} />
             </div>
           ) : (
-            <div className="header-logo-placeholder" title="Klik untuk atur logo" onClick={onOpenConfig} style={{ cursor: 'pointer' }}>
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <rect width="28" height="28" rx="6" fill="rgba(0,255,194,0.1)" stroke="rgba(0,255,194,0.3)" strokeWidth="1" />
-                <path d="M8 14h12M14 8v12" stroke="var(--mint)" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            </div>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <rect width="28" height="28" rx="6" fill="rgba(0,255,194,0.1)" stroke="rgba(0,255,194,0.3)" strokeWidth="1"/>
+              <path d="M8 14h12M14 8v12" stroke="var(--mint)" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
           )}
           <div>
-            <h1 className="header-title">JateamHub</h1>
-            <div className="header-sub">{subtitle}</div>
+            <h1 className="header-title">{config.meta.title || 'JateamHub'}</h1>
           </div>
         </div>
 
         {/* Nav */}
         <nav className="header-nav">
-          {visiblePages.map(page => (
-            <button
-              key={page.id}
-              className={`nav-link${currentPage === page.id ? ' active' : ''}`}
-              onClick={() => setCurrentPage(page.id)}
-            >
+          {pages.map(page => (
+            <button key={page.id} className={`nav-link${currentPage === page.id ? ' active' : ''}`}
+              onClick={() => setCurrentPage(page.id)}>
               {page.label}
             </button>
           ))}
         </nav>
 
-        {/* Right */}
+        {/* Right controls */}
         <div className="header-right">
+          {/* Search */}
           <div className="search-wrap">
-            <input className="search-input" placeholder="Filter halaman ini..." value={searchQuery} onChange={e => setSearch(e.target.value)} />
+            <input className="search-input" placeholder="Filter..." value={searchQuery} onChange={e => setSearch(e.target.value)} />
             <span className="search-icon">⌕</span>
           </div>
+
+          {/* Edit mode */}
           {isEditable && (
             <button className={`icon-btn${editMode ? ' active' : ''}`} onClick={toggleEditMode} title="Edit Mode">✏️</button>
           )}
-          {/* Options hanya untuk admin, superadmin, unit_admin */}
-          {(session?.role === 'superadmin' || session?.role === 'admin' || (session as any)?.is_unit_admin) && (
+
+          {/* Preview unit dropdown — hanya admin/superadmin */}
+          {isAdminLevel && (
+            <div className="preview-dropdown" ref={previewRef}>
+              <button
+                className={`preview-btn${previewUnit !== null ? ' active' : ''}`}
+                onClick={() => setPreviewOpen(v => !v)}
+              >
+                <span>{previewUnit !== null ? (PREVIEW_OPTS.find(o => o.value === previewUnit)?.label ?? 'Preview') : '👁 View'}</span>
+                <span style={{ opacity: .5, fontSize: 9 }}>▾</span>
+              </button>
+              {previewOpen && (
+                <div className="preview-menu">
+                  {PREVIEW_OPTS.map(opt => (
+                    <button
+                      key={String(opt.value)}
+                      className={previewUnit === opt.value ? 'active' : ''}
+                      onClick={() => { setPreviewUnit(opt.value); setPreviewOpen(false) }}
+                    >{opt.label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Options */}
+          {showOptions && (
             <button id="options-btn" className={`icon-btn${optionsOpen ? ' active' : ''}`} onClick={onToggleOptions} title="Options">⚙️</button>
           )}
-          {/* Logout untuk user biasa — admin logout via options panel */}
-          {session?.role === 'user' && !(session as any)?.is_unit_admin && (
-            <button
-              onClick={() => logout()}
-              title="Logout"
-              style={{
-                background: 'var(--bg3)', border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)', color: 'var(--silver3)',
-                width: 32, height: 32, display: 'flex', alignItems: 'center',
-                justifyContent: 'center', fontSize: 14, cursor: 'pointer',
-                transition: 'all .15s',
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--red)'
-                  ; (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)'
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'
-                  ; (e.currentTarget as HTMLButtonElement).style.color = 'var(--silver3)'
-              }}
-            >⏻</button>
-          )}
+
+          {/* Profile */}
+          <button className="profile-btn" onClick={onOpenProfile} title="Profil saya">
+            {session?.avatar_url ? (
+              <img src={session.avatar_url} alt="avatar" />
+            ) : session?.avatar_emoji ? (
+              <span style={{ fontSize: 18 }}>{session.avatar_emoji}</span>
+            ) : (
+              <span style={{ fontSize: 16 }}>👤</span>
+            )}
+          </button>
         </div>
       </header>
 
       {/* Preview banner */}
       {previewUnit !== null && (
         <div style={{
-          background: 'rgba(199,125,255,0.12)', borderBottom: '1px solid rgba(199,125,255,0.3)',
-          padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 10,
-          fontSize: 12, color: '#C77DFF',
+          background: 'rgba(199,125,255,0.1)', borderBottom: '1px solid rgba(199,125,255,0.3)',
+          padding: '5px 20px', display: 'flex', alignItems: 'center', gap: 10,
+          fontSize: 11, color: '#C77DFF',
         }}>
-          <span style={{ fontWeight: 700 }}>👁 Preview Mode:</span>
-          <span>Melihat sebagai User {previewUnit ? previewUnit.toUpperCase() : 'Umum'}</span>
-          <button
-            onClick={() => setPreviewUnit(null)}
-            style={{
-              marginLeft: 'auto', background: 'none', border: '1px solid rgba(199,125,255,0.4)',
-              borderRadius: 4, color: '#C77DFF', padding: '2px 10px', fontSize: 11,
-              cursor: 'pointer', fontWeight: 600,
-            }}
-          >
-            ✕ Keluar Preview
-          </button>
+          <span style={{ fontWeight: 700 }}>👁 Preview:</span>
+          <span>{previewUnit !== null ? (previewUnit ? previewUnit.toUpperCase() : 'User Umum') : 'Admin'}</span>
+          <button onClick={() => setPreviewUnit(null)} style={{
+            marginLeft: 'auto', background: 'none', border: '1px solid rgba(199,125,255,0.4)',
+            borderRadius: 4, color: '#C77DFF', padding: '2px 8px', fontSize: 10,
+            cursor: 'pointer', fontWeight: 600,
+          }}>✕ Keluar</button>
         </div>
       )}
     </>

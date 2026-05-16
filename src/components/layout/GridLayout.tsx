@@ -12,8 +12,10 @@ import type { Section, LinkItem } from '../../types'
 import { GRID_ROW_HEIGHT, SECTION_MIN_W, SECTION_MIN_H, SECTION_DEFAULT_W, SECTION_DEFAULT_H } from '../../types'
 import { canEdit, canViewSection } from '../../utils/roles'
 
-const ReactGridLayout = WidthProvider(RGL)
 const ADD_KEY = '__add_section__'
+
+const ReactGridLayout = WidthProvider(RGL)
+
 
 // Deteksi mobile
 const useIsMobile = () => {
@@ -31,9 +33,9 @@ export default function GridLayout() {
   const { profile: session } = useAuthStore()
   const isMobile = useIsMobile()
 
-  const isEditable  = canEdit(session as any)
+  const isEditable = canEdit(session as any)
   const isUnitAdmin = (session as any)?.is_unit_admin === true && (session as any)?.role === 'user'
-  const myUnit      = (session as any)?.unit_id ?? ''
+  const myUnit = (session as any)?.unit_id ?? ''
 
   const canEditSection = (s: Section) => {
     if (isEditable) return true
@@ -47,7 +49,7 @@ export default function GridLayout() {
     : session
 
   const [sectionModal, setSectionModal] = useState<{ open: boolean; section: Section | null }>({ open: false, section: null })
-  const [itemModal,    setItemModal]    = useState<{ open: boolean; sectionId: string; item: LinkItem | null }>({ open: false, sectionId: '', item: null })
+  const [itemModal, setItemModal] = useState<{ open: boolean; sectionId: string; item: LinkItem | null }>({ open: false, sectionId: '', item: null })
 
   const pageSections = useMemo(() => {
     const UNIT_PAGES = ['pro', 'cro', 'klaim']
@@ -55,8 +57,8 @@ export default function GridLayout() {
 
     const filtered = config.sections.filter(s => {
       const sPageId = s.pageId ?? 'beranda'
-      const sVis    = s.visibility ?? 'all'
-      const sUnits  = s.targetUnits ?? []
+      const sVis = s.visibility ?? 'all'
+      const sUnits = s.targetUnits ?? []
 
       if (previewUnit === null && isEditable) {
         if (!isUnitPage) return sPageId === currentPage && sVis !== 'unit'
@@ -102,22 +104,7 @@ export default function GridLayout() {
     )
   }, [pageSections, q])
 
-  // Ghost section — ukuran kecil fixed, posisi setelah section terakhir
-  const addButtonLayout: Layout = useMemo(() => {
-    const GHOST_W = 2
-    const GHOST_H = 4
-    if (!pageSections.length) return { i: ADD_KEY, x: 0, y: 0, w: GHOST_W, h: GHOST_H }
-    const maxY = pageSections.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
-    const bottomSections = pageSections.filter(s => s.layout.y + s.layout.h === maxY)
-    const rightmost = bottomSections.reduce<Section | null>((prev, s) =>
-      !prev || (s.layout.x + s.layout.w) > (prev.layout.x + prev.layout.w) ? s : prev, null)
-    const rightmostX = rightmost ? rightmost.layout.x + rightmost.layout.w : 0
-    const refY = rightmost?.layout.y ?? 0
-    // Coba taruh di sebelah kanan section terakhir
-    if (rightmostX + GHOST_W <= 12) return { i: ADD_KEY, x: rightmostX, y: refY, w: GHOST_W, h: GHOST_H }
-    // Tidak muat — taruh di baris baru
-    return { i: ADD_KEY, x: 0, y: maxY, w: GHOST_W, h: GHOST_H }
-  }, [pageSections])
+
 
   const canEditAnything = isEditable || isUnitAdmin
 
@@ -145,39 +132,7 @@ export default function GridLayout() {
       resizeHandles: ['se'] as ['se'],
     }))
 
-    if (canEditAnything && editMode) {
-      // Ghost section — kecil, menempel di sebelah kanan section terakhir di baris terbawah
-      const GHOST_W = 2, GHOST_H = 3
-      const lastNorm = normalized[normalized.length - 1]
-      if (lastNorm) {
-        const rightX = lastNorm.x + lastNorm.w
-        // Masih muat di baris yang sama
-        if (rightX + GHOST_W <= COLS) {
-          // Vertikal center terhadap section tetangga
-          const centerY = lastNorm.y + Math.floor((lastNorm.h - GHOST_H) / 2)
-          base.push({
-            i: ADD_KEY, x: rightX, y: Math.max(lastNorm.y, centerY),
-            w: GHOST_W, h: GHOST_H,
-            minW: GHOST_W, minH: GHOST_H, maxH: GHOST_H,
-            isDraggable: false, isResizable: false, resizeHandles: [] as unknown as ['se'],
-          })
-        } else {
-          // Baris baru — kiri bawah
-          base.push({
-            i: ADD_KEY, x: 0, y: lastNorm.y + lastNorm.h,
-            w: GHOST_W, h: GHOST_H,
-            minW: GHOST_W, minH: GHOST_H, maxH: GHOST_H,
-            isDraggable: false, isResizable: false, resizeHandles: [] as unknown as ['se'],
-          })
-        }
-      } else {
-        base.push({
-          i: ADD_KEY, x: 0, y: 0, w: GHOST_W, h: GHOST_H,
-          minW: GHOST_W, minH: GHOST_H, maxH: GHOST_H,
-          isDraggable: false, isResizable: false, resizeHandles: [] as unknown as ['se'],
-        })
-      }
-    }
+
     return base
   }, [pageSections, editMode, isEditable, isUnitAdmin, previewUnit])
 
@@ -286,11 +241,7 @@ export default function GridLayout() {
             </div>
           ))}
 
-          {canEditAnything && editMode && (
-            <div key={ADD_KEY}>
-              <AddSectionCard onClick={() => setSectionModal({ open: true, section: null })} />
-            </div>
-          )}
+
         </ReactGridLayout>
       )}
 
@@ -315,9 +266,9 @@ function SectionBadge({ section, isAdmin }: { section: Section; isAdmin: boolean
   if (vis === 'admin' && !isAdmin) return null
 
   const BADGE: Record<string, { label: string; color: string; bg: string; border: string; glow: string }> = {
-    all:   { label: 'ALL', color: '#0A0A0A', bg: '#00FFC2',  border: '#00FFC2', glow: 'rgba(0,255,194,0.5)'  },
-    admin: { label: 'ADM', color: '#0A0A0A', bg: '#00BFFF',  border: '#00BFFF', glow: 'rgba(0,191,255,0.5)'  },
-    unit:  {
+    all: { label: 'ALL', color: '#0A0A0A', bg: '#00FFC2', border: '#00FFC2', glow: 'rgba(0,255,194,0.5)' },
+    admin: { label: 'ADM', color: '#0A0A0A', bg: '#00BFFF', border: '#00BFFF', glow: 'rgba(0,191,255,0.5)' },
+    unit: {
       label: (section.targetUnits ?? []).map(u => u.toUpperCase()).join('/') || 'UNIT',
       color: '#0A0A0A', bg: '#C77DFF', border: '#C77DFF', glow: 'rgba(199,125,255,0.5)',
     },
@@ -353,7 +304,7 @@ function WidgetWrapper({ section, editMode, onEdit }: { section: Section; editMo
             <button className="sec-action-btn" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onEdit(section) }}>✏️</button>
           )}
           <button className={`sec-collapse-btn${section.collapsed ? '' : ' open'}`} onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); toggleCollapse(section.id) }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5L7 9L11 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5L7 9L11 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         </div>
       </div>

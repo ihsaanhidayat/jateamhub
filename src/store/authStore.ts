@@ -1,38 +1,35 @@
 import { create } from 'zustand'
 import {
   supabase, getProfile, signIn, signOut,
-  createUser, getAllProfiles, updateProfile, updateUserPassword,
+  createUser, getAllProfiles, getUnitProfiles,
+  updateProfile, updateUserPassword,
 } from '../utils/supabaseClient'
 import type { Profile } from '../utils/supabaseClient'
 import type { Role, UnitId } from '../types'
+import { can } from '../utils/roles'
 
 interface AuthState {
-  profile: Profile | null
-  loading: boolean
+  profile:     Profile | null
+  loading:     boolean
   initialized: boolean
-
-  init: () => Promise<void>
-  login: (username: string, password: string) => Promise<string | null>
-  logout: () => Promise<void>
-
-  users: Profile[]
-  loadUsers: () => Promise<void>
-  addUser: (username: string, password: string, role: Role, unitId: UnitId, adminKey: string) => Promise<string | null>
-  updateUser: (userId: string, role: Role, unitId: UnitId, newPassword?: string, avatarEmoji?: string, isUnitAdmin?: boolean) => Promise<string | null>
-  removeUser: (userId: string) => Promise<string | null>
-
+  users:       Profile[]
   _toast: ((msg: string, type?: 'success' | 'error' | 'warn') => void) | null
-  setToastFn: (fn: (msg: string, type?: 'success' | 'error' | 'warn') => void) => void
+  setToastFn:  (fn: (msg: string, type?: 'success' | 'error' | 'warn') => void) => void
+  init:        () => Promise<void>
+  login:       (username: string, password: string) => Promise<string | null>
+  logout:      () => Promise<void>
+  loadUsers:   () => Promise<void>
+  addUser:     (username: string, password: string, role: Role, unitId: UnitId) => Promise<string | null>
+  updateUser:  (userId: string, role: Role, unitId: UnitId, newPassword?: string, avatarEmoji?: string) => Promise<string | null>
+  removeUser:  (userId: string) => Promise<string | null>
 }
 
-const ADMIN_KEY_DEFAULT = 'jateamhub2024'
-
 export const useAuthStore = create<AuthState>((set, get) => ({
-  profile: null,
-  loading: false,
+  profile:     null,
+  loading:     false,
   initialized: false,
-  users: [],
-  _toast: null,
+  users:       [],
+  _toast:      null,
 
   setToastFn: (fn) => set({ _toast: fn }),
 
@@ -63,8 +60,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (data.user) {
       const profile = await getProfile(data.user.id)
       set({ profile, loading: false })
-      // Reset semua UI state — sesi baru bersih
-      window.location.reload()
     }
     return null
   },
@@ -75,60 +70,67 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   loadUsers: async () => {
-    const profiles = await getAllProfiles()
-    set({ users: profiles })
+    const myProfile = get().profile
+    if (!myProfile) return
+    // admin_unit hanya lihat user di unitnya
+    if (myProfile.role === 'admin_unit') {
+      const profiles = await getUnitProfiles(myProfile.unit_id)
+      set({ users: profiles })
+    } else {
+      const profiles = await getAllProfiles()
+      set({ users: profiles })
+    }
   },
 
-  addUser: async (username, password, role, unitId, adminKey) => {
+  addUser: async (username, password, role, unitId) => {
     const myProfile = get().profile
     if (!myProfile) return 'Tidak ada sesi.'
+
+    // Permission check
     if (role === 'superadmin') return 'Role superadmin tidak bisa dibuat.'
-    if (role === 'admin') {
-      if (myProfile.role !== 'superadmin') return 'Hanya superadmin yang bisa membuat admin.'
-      // Admin key tidak diperlukan untuk superadmin — skip validasi
+    if (role === 'admin' && myProfile.role !== 'superadmin') return 'Hanya superadmin yang bisa membuat admin.'
+    if (myProfile.role === 'admin_unit') {
+      // admin_unit hanya bisa buat user di unitnya
+      if (role !== 'user') return 'Admin unit hanya bisa membuat user biasa.'
+      if (unitId !== myProfile.unit_id) return 'Admin unit hanya bisa membuat user di unitnya.'
     }
-    if (myProfile.role === 'admin' && role === 'admin') return 'Admin tidak bisa membuat admin.'
+
     const { error } = await createUser(username, password, role, unitId)
     if (error) return error.message
     await get().loadUsers()
     return null
   },
 
-  updateUser: async (userId, role, unitId, newPassword, avatarEmoji, isUnitAdmin) => {
+  updateUser: async (userId, role, unitId, newPassword, avatarEmoji) => {
     const myProfile = get().profile
     if (!myProfile) return 'Tidak ada sesi.'
     const target = get().users.find(u => u.id === userId)
 
-    // Tidak boleh assign superadmin ke orang lain
+    // Permission checks
     if (role === 'superadmin' && target?.role !== 'superadmin') return 'Tidak bisa assign superadmin.'
-    // Tidak boleh downgrade superadmin
-    if (target?.role === 'superadmin' && role !== 'superadmin') return 'Tidak bisa ubah role superadmin.'
-    if (role === 'admin' && myProfile.role !== 'superadmin') return 'Hanya superadmin yang bisa assign admin.'
+    if (target?.role === 'superadmin' && role !== 'superadmin')  return 'Tidak bisa ubah role superadmin.'
+    if (role === 'admin' && myProfile.role !== 'superadmin')     return 'Hanya superadmin yang bisa assign admin.'
+    if (myProfile.role === 'admin_unit' && target?.unit_id !== myProfile.unit_id) return 'Tidak bisa edit user unit lain.'
 
-    // Update role, unit, dan emoji
+    // Update profile
     if (target?.role !== 'superadmin') {
-      const { error } = await updateProfile(userId, {
-        role,
-        unit_id: role === 'user' ? unitId : '',
-        avatar_emoji: avatarEmoji ?? '',
-        is_unit_admin: isUnitAdmin ?? false,
-      })
+      const updates: Partial<Profile> = { role, unit_id: unitId }
+      if (avatarEmoji !== undefined && can({ role: myProfile.role }, 'APPEARANCE_EMOJI_AVATAR')) {
+        updates.avatar_emoji = avatarEmoji
+      }
+      const { error } = await updateProfile(userId, updates)
       if (error) return error.message
     } else {
-      // Superadmin hanya update emoji
-      const { error } = await updateProfile(userId, {
-        avatar_emoji: avatarEmoji ?? '',
-        is_unit_admin: false,
-      })
-      if (error) return error.message
+      if (avatarEmoji !== undefined) {
+        await updateProfile(userId, { avatar_emoji: avatarEmoji })
+      }
     }
 
-    // Update password via Edge Function
+    // Update password — hanya superadmin dan admin
     if (newPassword && newPassword.length >= 6) {
+      if (!can({ role: myProfile.role }, 'USER_RESET_PASSWORD')) return 'Tidak ada akses untuk reset password.'
       const { error } = await updateUserPassword(userId, newPassword)
       if (error) return error.message
-    } else if (newPassword && newPassword.length > 0) {
-      return 'Password minimal 6 karakter.'
     }
 
     await get().loadUsers()
@@ -142,6 +144,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const target = get().users.find(u => u.id === userId)
     if (target?.role === 'superadmin') return 'Tidak bisa hapus superadmin.'
     if (target?.role === 'admin' && myProfile.role !== 'superadmin') return 'Hanya superadmin yang bisa hapus admin.'
+    if (myProfile.role === 'admin_unit' && target?.unit_id !== myProfile.unit_id) return 'Tidak bisa hapus user unit lain.'
+
     const { error } = await supabase.functions.invoke('delete-user', { body: { userId } })
     if (error) await supabase.from('profiles').delete().eq('id', userId)
     await get().loadUsers()

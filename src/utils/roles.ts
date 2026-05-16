@@ -1,108 +1,139 @@
-import { USER_PAGES, ADMIN_PAGES } from '../types'
+// ─────────────────────────────────────────────
+// CENTRALIZED PERMISSION SYSTEM
+// ─────────────────────────────────────────────
+import { hasPermission, PERMISSIONS } from '../types'
+import type { Role, UnitId, Permission } from '../types'
 
-// Minimal session type — kompatibel dengan UserSession maupun Profile
-interface SessionLike {
-  role: string
-  unitId?: string
-  unit_id?: string
+export { hasPermission }
+
+// ── Compatible session interface ──────────────
+export interface SessionLike {
+  role:    Role
+  unit_id?: UnitId
+  unitId?:  UnitId
 }
 
-import type { Role, UnitId } from '../types'
-export type { Role, UnitId }
+const getUnit = (s: SessionLike): UnitId =>
+  (s.unit_id ?? s.unitId ?? '') as UnitId
 
-// Unit display info
-export const UNIT_LABELS: Record<string, string> = {
-  pro:   'PRO',
-  cro:   'CRO',
-  klaim: 'Klaim',
-  '':    'User',
+// ── Permission helpers ────────────────────────
+export const can = (session: SessionLike | null, permission: Permission): boolean => {
+  if (!session) return false
+  return hasPermission(session.role, permission)
 }
 
-export const UNIT_BADGE_COLOR: Record<string, string> = {
-  pro:   '#C77DFF',
-  cro:   '#FF9F40',
-  klaim: '#FF6B6B',
-  '':    '#999999',
-}
+export const canEdit = (session: SessionLike | null): boolean =>
+  can(session, 'DASHBOARD_EDIT_GLOBAL')
 
-// Role display info
-export const ROLE_LABELS: Record<Role, string> = {
-  superadmin: 'Super Admin',
-  admin:      'Admin',
-  user:       'User',
-}
+export const canEditUnit = (session: SessionLike | null): boolean =>
+  can(session, 'DASHBOARD_EDIT_UNIT')
 
-export const ROLE_BADGE_COLOR: Record<Role, string> = {
-  superadmin: '#00FFC2',
-  admin:      '#00BFFF',
-  user:       '#999999',
-}
+export const canCreateUser = (session: SessionLike | null): boolean =>
+  can(session, 'USER_CREATE')
 
-export const ROLE_DESC: Record<Role, string> = {
-  superadmin: 'Godmode — semua akses + kelola admin & semua role',
-  admin:      'Edit dashboard + kelola users',
-  user:       'Read-only, akses sesuai unit',
-}
+export const canResetPassword = (session: SessionLike | null): boolean =>
+  can(session, 'USER_RESET_PASSWORD')
 
-// Badge label di options panel — tampilkan unit kalau ada, role kalau tidak
-export const getDisplayBadge = (session: SessionLike | null): { label: string; color: string } => {
-  if (!session) return { label: 'Guest', color: '#555' }
-  if (session.role === 'superadmin') return { label: 'Super Admin', color: ROLE_BADGE_COLOR.superadmin }
-  if (session.role === 'admin')      return { label: 'Admin',       color: ROLE_BADGE_COLOR.admin }
-  // user — tampilkan unit (support Profile.unit_id dan UserSession.unitId)
-  const unit = (session as any).unit_id ?? (session as any).unitId ?? ''
-  return {
-    label: UNIT_LABELS[unit] ?? 'User',
-    color: UNIT_BADGE_COLOR[unit] ?? '#999',
+export const canSelfPassword = (session: SessionLike | null): boolean =>
+  can(session, 'USER_SELF_PASSWORD')
+
+export const canUseEmojiAvatar = (session: SessionLike | null): boolean =>
+  can(session, 'APPEARANCE_EMOJI_AVATAR')
+
+export const canSeeOptionsPanel = (session: SessionLike | null): boolean =>
+  can(session, 'APPEARANCE_OPTIONS_PANEL')
+
+export const canSeeBadge = (session: SessionLike | null): boolean =>
+  can(session, 'BADGE_VISIBILITY')
+
+export const canEditGlobal = (session: SessionLike | null): boolean =>
+  can(session, 'SECTION_EDIT_GLOBAL')
+
+export const canEditUnitSection = (
+  session: SessionLike | null,
+  sectionTargetUnits: string[],
+): boolean => {
+  if (!session) return false
+  if (can(session, 'SECTION_EDIT_GLOBAL')) return true
+  if (session.role === 'admin_unit') {
+    const unit = getUnit(session)
+    return unit !== '' && sectionTargetUnits.includes(unit)
   }
+  return false
 }
 
-// Halaman yang bisa diakses berdasarkan session
-export const getAccessiblePages = (session: SessionLike | null): string[] => {
-  if (!session) return USER_PAGES
-  // Admin & superadmin: hanya BERANDA, PANDUAN, SUPPORT di navbar
-  // PRO/CRO/KLAIM dikelola via section visibility — tidak perlu halaman terpisah di navbar
-  if (session.role === 'superadmin' || session.role === 'admin') return USER_PAGES
-  // user → beranda, panduan, support saja di navbar
-  return USER_PAGES
-}
-
-export const canAccessPage = (session: SessionLike | null, pageId: string): boolean =>
-  getAccessiblePages(session).includes(pageId)
-
-// Permission checks
-export const canEdit        = (s: SessionLike | null) => s?.role === 'superadmin' || s?.role === 'admin'
-export const canCreateUser  = (s: SessionLike | null) => s?.role === 'superadmin' || s?.role === 'admin'
-export const canCreateAdmin = (s: SessionLike | null) => s?.role === 'superadmin'
-export const isSuperAdmin   = (s: SessionLike | null) => s?.role === 'superadmin'
-export const isAdmin        = (s: SessionLike | null) => s?.role === 'admin'
-
-// Roles yang bisa dibuat admin
-export const ADMIN_CREATABLE_ROLES: Role[] = ['user']
-export const SUPERADMIN_CREATABLE_ROLES: Role[] = ['admin', 'user']
-
-// Unit options
-export const UNIT_OPTIONS: { value: UnitId; label: string }[] = [
-  { value: '',      label: 'Tidak ada unit (user umum)' },
-  { value: 'pro',   label: 'PRO' },
-  { value: 'cro',   label: 'CRO' },
-  { value: 'klaim', label: 'Klaim' },
-]
-
-// Cek apakah section boleh tampil untuk session ini
+// ── Section visibility ────────────────────────
 export const canViewSection = (
   session: SessionLike | null,
   visibility: string,
   targetUnits: string[],
 ): boolean => {
   if (!session) return false
-  // Admin & superadmin lihat semua
   if (session.role === 'superadmin' || session.role === 'admin') return true
-  // User
   if (visibility === 'all')   return true
   if (visibility === 'admin') return false
-  // Support both Profile (unit_id) dan UserSession (unitId)
-  const userUnit = (session as any).unit_id ?? (session as any).unitId ?? ''
-  if (visibility === 'unit')  return targetUnits.includes(userUnit)
+  if (visibility === 'unit') {
+    const unit = getUnit(session)
+    return targetUnits.includes(unit)
+  }
   return false
+}
+
+// ── Accessible pages ──────────────────────────
+export const getAccessiblePages = (session: SessionLike | null): string[] => {
+  // Semua role dapat beranda
+  return ['beranda']
+}
+
+// ── Display badge ─────────────────────────────
+export const ROLE_LABELS: Record<Role, string> = {
+  superadmin: 'Super Admin',
+  admin:      'Admin',
+  admin_unit: 'Unit Admin',
+  user:       'User',
+}
+
+export const ROLE_BADGE_COLOR: Record<Role, string> = {
+  superadmin: '#FF6B6B',
+  admin:      '#00BFFF',
+  admin_unit: '#C77DFF',
+  user:       '#888',
+}
+
+export const UNIT_LABELS: Record<string, string> = {
+  '':     'User Umum',
+  pro:    'PRO',
+  cro:    'CRO',
+  klaim:  'Klaim',
+}
+
+export const UNIT_BADGE_COLOR: Record<string, string> = {
+  '':     '#888',
+  pro:    '#00FFC2',
+  cro:    '#FFD93D',
+  klaim:  '#FF8C42',
+}
+
+export const UNIT_OPTIONS = [
+  { value: '' as UnitId,      label: 'Tidak ada unit (user umum)' },
+  { value: 'pro' as UnitId,   label: 'PRO' },
+  { value: 'cro' as UnitId,   label: 'CRO' },
+  { value: 'klaim' as UnitId, label: 'Klaim' },
+]
+
+export const getDisplayBadge = (session: SessionLike | null) => {
+  if (!session) return { label: 'Guest', color: '#888' }
+  const unit = getUnit(session)
+  if (session.role === 'superadmin') return { label: 'Super Admin', color: ROLE_BADGE_COLOR.superadmin }
+  if (session.role === 'admin')      return { label: 'Admin',       color: ROLE_BADGE_COLOR.admin }
+  if (unit) return { label: UNIT_LABELS[unit] ?? unit.toUpperCase(), color: UNIT_BADGE_COLOR[unit] ?? '#888' }
+  return { label: 'User', color: '#888' }
+}
+
+// ── Role descriptions ─────────────────────────
+export const ROLE_DESC: Record<Role, string> = {
+  superadmin: 'Full access seluruh sistem',
+  admin:      'Kelola dashboard & user',
+  admin_unit: 'Kelola unit sendiri saja',
+  user:       'Akses fitur utama',
 }
