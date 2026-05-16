@@ -17,6 +17,7 @@ export interface Profile {
   username:     string
   role:         'superadmin' | 'admin' | 'admin_unit' | 'user'
   unit_id:      '' | 'pro' | 'cro' | 'klaim'
+  branch_id:    string
   avatar_emoji: string
   avatar_url:   string
   appearance:   Record<string, unknown>
@@ -50,7 +51,7 @@ export const getUnitProfiles = async (unitId: string): Promise<Profile[]> => {
 
 export const updateProfile = async (
   userId: string,
-  updates: Partial<Pick<Profile, 'role' | 'unit_id' | 'username' | 'avatar_emoji' | 'avatar_url' | 'appearance'>>
+  updates: Partial<Pick<Profile, 'role' | 'unit_id' | 'branch_id' | 'username' | 'avatar_emoji' | 'avatar_url' | 'appearance'>>
 ) => supabase.from('profiles').update(updates).eq('id', userId)
 
 // ── Appearance per user ───────────────────────
