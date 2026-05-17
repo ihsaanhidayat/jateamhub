@@ -4,7 +4,9 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from './store/authStore'
 import { useStore, applyThemeToDOM } from './store/dashboardStore'
-import LoginPage    from './components/layout/LoginPage'
+import LoginPage           from './components/layout/LoginPage'
+import RegisterPage        from './components/layout/RegisterPage'
+import SuperadminDashboard from './components/layout/SuperadminDashboard'
 import Header       from './components/layout/Header'
 import OptionsPanel from './components/layout/OptionsPanel'
 import EditBar      from './components/layout/EditBar'
@@ -28,6 +30,7 @@ export default function App() {
 
   // State UI lokal
   const [optionsOpen,    setOptionsOpen]    = useState(false)
+  const [showRegister,   setShowRegister]   = useState(false)
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [addSectionOpen, setAddSectionOpen] = useState(false)
   const [coffeeOpen,     setCoffeeOpen]     = useState(false)
@@ -62,10 +65,12 @@ export default function App() {
       // Inject fungsi toast ke authStore agar bisa tampilkan notifikasi
       useAuthStore.getState().setToastFn(toast)
 
-      // Tampilkan coffee modal sekali per session untuk user dan guest
+      // Tampilkan coffee modal sekali per session — semua role kecuali admin global
       const sessionKey = `coffee-shown-${profile.id}`
-      if (!sessionStorage.getItem(sessionKey) &&
-          (profile.role === 'user' || profile.role === 'guest')) {
+      const _isAdminGlobal = profile.role === 'admin' &&
+        (profile as any).region_scope === 'global' &&
+        ((profile as any).unit_scope === 'general' || !(profile as any).unit_scope)
+      if (!sessionStorage.getItem(sessionKey) && !_isAdminGlobal) {
         sessionStorage.setItem(sessionKey, '1')
         setTimeout(() => setCoffeeOpen(true), 1500)
       }
@@ -87,13 +92,16 @@ export default function App() {
     </div>
   )
 
-  // Tampilkan halaman login jika belum login
-  if (!profile) return <LoginPage />
+  // Tampilkan halaman register jika diminta
+  if (!profile && showRegister) return <RegisterPage onBack={() => setShowRegister(false)} />
 
-  // Superadmin: langsung tampilkan halaman user management tanpa dashboard
+  // Tampilkan halaman login jika belum login
+  if (!profile) return <LoginPage onRegister={() => setShowRegister(true)} />
+
+  // Superadmin: tampilkan dashboard khusus
   if (profile.role === 'superadmin') return (
     <>
-      <ProfilePage onClose={() => {}} />
+      <SuperadminDashboard />
       <ToastContainer />
     </>
   )

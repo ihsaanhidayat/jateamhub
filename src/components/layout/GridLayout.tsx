@@ -59,6 +59,7 @@ export default function GridLayout({ onAddSection }: Props) {
     editMode, batchUpdateLayouts, searchQuery, toggleCollapse,
     addItem, updateItem, deleteItem, moveItem,
     deletePersonalSection, updatePersonalSection, toast,
+    addPersonalSectionAuto,
   } = useStore()
   const { profile: session } = useAuthStore()
   const isMobile = useIsMobile()
@@ -292,7 +293,7 @@ export default function GridLayout({ onAddSection }: Props) {
           ))}
           {/* Tombol tambah section di mobile saat edit mode */}
           {editMode && (
-            <button className="mobile-add-section" onClick={onAddSection}>
+            <button className="mobile-add-section" onClick={() => addPersonalSectionAuto()}>
               ＋ Tambah Section
             </button>
           )}
@@ -356,7 +357,8 @@ export default function GridLayout({ onAddSection }: Props) {
           {/* Ghost + section untuk tambah section baru */}
           {editMode && (
             <div key={GHOST_ADD_KEY}>
-              <GhostAddSection onClick={onAddSection} />
+              {/* Klik ghost → langsung tambah section tanpa modal */}
+              <GhostAddSection onClick={() => addPersonalSectionAuto()} />
             </div>
           )}
         </ReactGridLayout>

@@ -58,16 +58,44 @@ export function hasPermission(role: Role, permission: Permission): boolean {
 }
 
 // ── Theme ─────────────────────────────────────
-export type ThemeId = 'dark-mint' | 'dark-soft' | 'enterprise'
+// ThemeBase: pilihan tema user (Pearl/Ivory/Sage/Obsidian)
+export type ThemeBase = 'pearl' | 'ivory' | 'sage' | 'obsidian'
+// ThemeId mencakup semua format: base, light/dark variants, dan legacy
+export type ThemeId =
+  | ThemeBase
+  | 'pearl-light' | 'pearl-dark'
+  | 'ivory-light' | 'ivory-dark'
+  | 'sage-light'  | 'sage-dark'
+  | 'dark-mint' | 'dark-soft' | 'enterprise'  // legacy compat
+
 export interface ThemeConfig {
-  id: ThemeId; name: string
-  colors: string[]; description: string
+  id:          ThemeBase
+  name:        string
+  accent:      string   // warna aksen — sama untuk light dan dark
+  bgLight:     string   // background versi terang
+  bgDark:      string   // background versi gelap
+  standalone?: boolean  // true = selalu gelap, tidak punya versi terang
 }
+
 export const THEMES: ThemeConfig[] = [
-  { id: 'dark-mint',  name: 'Dark Mint',  colors: ['#0A0A0A', '#00FFC2'], description: 'Hitam pekat + Mint' },
-  { id: 'dark-soft',  name: 'Dark Soft',  colors: ['#0d1117', '#6366f1'], description: 'Navy gelap + Indigo' },
-  { id: 'enterprise', name: 'Enterprise', colors: ['#111827', '#f59e0b'], description: 'Charcoal + Amber'   },
+  { id: 'pearl',    name: 'Pearl',    accent: '#0EA5E9', bgLight: '#F8FAFC', bgDark: '#0A1628' },
+  { id: 'ivory',    name: 'Ivory',    accent: '#6366F1', bgLight: '#FAFAF9', bgDark: '#0E0E1A' },
+  { id: 'sage',     name: 'Sage',     accent: '#059669', bgLight: '#F0FDF4', bgDark: '#041A0E' },
+  { id: 'obsidian', name: 'Obsidian', accent: '#6EE7B7', bgLight: '#0E0E0E', bgDark: '#0E0E0E', standalone: true },
 ]
+
+// Helper: terapkan tema ke DOM berdasarkan base + darkMode
+export const applyTheme = (base: ThemeBase, isDark: boolean) => {
+  const theme = THEMES.find(t => t.id === base) ?? THEMES[0]
+  const isActuallyDark = base === 'obsidian' || isDark
+  const bg     = isActuallyDark ? theme.bgDark  : theme.bgLight
+  const accent = theme.accent
+  const root   = document.documentElement
+  root.setAttribute('data-theme', `${base}${isActuallyDark ? '-dark' : '-light'}`)
+  root.style.setProperty('--bg-base',    bg)
+  root.style.setProperty('--accent-base', accent)
+  root.style.setProperty('--is-dark',    isActuallyDark ? '1' : '0')
+}
 
 // ── Section ───────────────────────────────────
 export type SectionVisibility = 'all' | 'admin' | 'unit'
@@ -124,6 +152,8 @@ export interface AppearanceSettings {
   faviconEnabled:   boolean
   colorMode:        ColorMode
   theme:            ThemeId
+  themeBase:        ThemeBase   // tema aktif: pearl/ivory/sage/obsidian
+  isDarkMode:       boolean     // toggle dark mode
   sectionDensity?:  SectionDensity
 }
 
@@ -131,11 +161,13 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   itemDisplayMode: 'folderGrid',
   iconSize:        'large',
   labelMode:       'show',
-  folderGridCols:  4,
+  folderGridCols:  5,
   tooltipEnabled:  true,
   faviconEnabled:  true,
-  colorMode:       'dark',
-  theme:           'dark-mint',
+  colorMode:       'light',
+  theme:           'pearl-light' as ThemeId,  // default: Pearl Light
+  themeBase:       'pearl',
+  isDarkMode:      false,
 }
 
 // ── Display options ───────────────────────────

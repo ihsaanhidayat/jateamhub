@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useAuthStore } from '../../store/authStore'
+import { isAdminGlobal } from '../../utils/roles'
 
 const PANDUAN = [
   { icon: '🏠', title: 'Beranda', content: 'Halaman utama JateamHub. Semua link dan tools yang kamu butuhkan sesuai unit kerja tampil di sini. Section disesuaikan otomatis berdasarkan unitmu.' },
@@ -14,6 +16,9 @@ const PANDUAN = [
 
 export default function PanduanFAB() {
   const [open, setOpen] = useState(false)
+  const { profile } = useAuthStore()
+  // FAB hanya muncul untuk admin global
+  if (!isAdminGlobal(profile as any)) return null
 
   return (
     <>

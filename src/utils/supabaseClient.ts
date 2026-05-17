@@ -288,3 +288,67 @@ export const loadCoffeeUrl = async (): Promise<string> => {
     .from('dashboard_config').select('config').eq('id', GLOBAL_CONFIG_ID).single()
   return (((data?.config as any)?.coffeeUrl) ?? '') as string
 }
+
+// ── Pending Registrations ─────────────────────────────────────
+
+export interface PendingRegistration {
+  id:            string
+  full_name:     string
+  username:      string
+  phone:         string
+  region_scope:  string
+  unit_scope:    string
+  temp_password: string
+  status:        'pending' | 'approved' | 'rejected'
+  notes?:        string
+  created_at:    string
+  reviewed_at?:  string
+}
+
+// Submit pendaftaran baru dari halaman register
+export const submitRegistration = async (
+  data: Omit<PendingRegistration, 'id' | 'status' | 'created_at'>
+) => supabase.from('pending_registrations').insert(data)
+
+// Ambil semua pending registrations — hanya superadmin
+export const getPendingRegistrations = async (): Promise<PendingRegistration[]> => {
+  const { data, error } = await supabase
+    .from('pending_registrations')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) { console.error('getPendingRegistrations:', error); return [] }
+  return (data ?? []) as PendingRegistration[]
+}
+
+// Approve registration — buat akun dan update status
+export const approveRegistration = async (
+  regId:      string,
+  reg:        PendingRegistration,
+  reviewerId: string,
+) => {
+  const result = await createUser(
+    reg.username, reg.temp_password, 'user',
+    reg.unit_scope, reg.region_scope, reg.unit_scope
+  )
+  if ((result as any).error) return result
+
+  // Update status jadi approved
+  await supabase.from('pending_registrations').update({
+    status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: reviewerId,
+  }).eq('id', regId)
+
+  return result
+}
+
+// Reject registration
+export const rejectRegistration = async (regId: string, reviewerId: string, notes?: string) =>
+  supabase.from('pending_registrations').update({
+    status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: reviewerId,
+    notes,
+  }).eq('id', regId)
+
+// Kirim notif WA via Fonnte (dipanggil dari edge function nanti)
+export const sendWaNotification = async (phone: string, message: string) => {
+  // TODO: panggil edge function send-wa saat token Fonnte sudah ada
+  console.log('[WA Notif placeholder]', phone, message)
+}

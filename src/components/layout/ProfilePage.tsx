@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { useStore } from '../../store/dashboardStore'
-import { canManageUser, canAssignRole, canResetPwd, getAllowedRegions, getAllowedUnits, getAllowedRoles, getDisplayBadge, REGION_LABELS, UNIT_LABELS } from '../../utils/roles'
+import { canManageUser, canAssignRole, getAllowedRegions, getAllowedUnits, getAllowedRoles, getDisplayBadge, REGION_LABELS, UNIT_LABELS } from '../../utils/roles'
 import { REGIONS, UNITS } from '../../types'
 import { updateProfile } from '../../utils/supabaseClient'
 import type { Role } from '../../types'
@@ -9,7 +9,7 @@ import type { Profile } from '../../utils/supabaseClient'
 
 interface Props { onClose: () => void }
 
-const EMOJI_PRESETS = ['', '🌸', '🔥', '⭐', '🎯', '💎', '🚀', '🌊', '🦁', '🐯', '🌺', '🎨', '💡', '🍀', '🎭', '🏆', '🦋', '🌙', '☀️', '🍉']
+const EMOJI_PRESETS = ['','🌸','🔥','⭐','🎯','💎','🚀','🌊','🦁','🐯','🌺','🎨','💡','🍀','🎭','🏆','🦋','🌙','☀️','🍉']
 
 export default function ProfilePage({ onClose }: Props) {
   const { profile, users, loadUsers, addUser, updateUser, removeUser } = useAuthStore()
@@ -17,53 +17,53 @@ export default function ProfilePage({ onClose }: Props) {
 
   const isSuperAdmin = profile?.role === 'superadmin'
   const isAdminLevel = profile?.role === 'admin' || isSuperAdmin
-  const canManage = isAdminLevel
+  const canManage    = isAdminLevel
 
   const [tab, setTab] = useState<'users' | 'settings'>(canManage ? 'users' : 'settings')
 
   // Users state
-  const [search, setSearch] = useState('')
-  const [filterRegion, setFilterRegion] = useState('')
-  const [filterUnit, setFilterUnit] = useState('')
-  const [filterRole, setFilterRole] = useState('')
-  const [page, setPage] = useState(0)
-  const [editTarget, setEditTarget] = useState<Profile | null>(null)
-  const [editRole, setEditRole] = useState<Role>('user')
-  const [editUnit, setEditUnit] = useState('')
-  const [editRegion, setEditRegion] = useState('global')
-  const [editUnitScope, setEditUnitScope] = useState('general')
-  const [editPass, setEditPass] = useState('')
-  const [editEmoji, setEditEmoji] = useState('')
-  const [addMode, setAddMode] = useState(false)
-  const [newUser, setNewUser] = useState('')
-  const [newUPass, setNewUPass] = useState('')
-  const [newRole, setNewRole] = useState<Role>('user')
-  const [newRegion, setNewRegion] = useState('global')
-  const [newUnitScope, setNewUnitScope] = useState('general')
-  const [newUnitId, setNewUnitId] = useState('')
+  const [search,      setSearch]      = useState('')
+  const [filterRegion,setFilterRegion]= useState('')
+  const [filterUnit,  setFilterUnit]  = useState('')
+  const [filterRole,  setFilterRole]  = useState('')
+  const [page,        setPage]        = useState(0)
+  const [editTarget,  setEditTarget]  = useState<Profile | null>(null)
+  const [editRole,    setEditRole]    = useState<Role>('user')
+  const [editUnit,    setEditUnit]    = useState('')
+  const [editRegion,  setEditRegion]  = useState('global')
+  const [editUnitScope,setEditUnitScope]=useState('general')
+  const [editPass,    setEditPass]    = useState('')
+  const [editEmoji,   setEditEmoji]   = useState('')
+  const [addMode,     setAddMode]     = useState(false)
+  const [newUser,     setNewUser]     = useState('')
+  const [newUPass,    setNewUPass]    = useState('')
+  const [newRole,     setNewRole]     = useState<Role>('user')
+  const [newRegion,   setNewRegion]   = useState('global')
+  const [newUnitScope,setNewUnitScope]= useState('general')
+  const [newUnitId,   setNewUnitId]   = useState('')
   const [err, setErr] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Settings state
-  const [siteTitle, setSiteTitle] = useState('')
+  const [siteTitle,    setSiteTitle]    = useState('')
   const [siteSubtitle, setSiteSubtitle] = useState('')
-  const [coffeeUrl, setCoffeeUrl] = useState('')
-  const [logoUrl, setLogoUrl] = useState('')
+  const [coffeeUrl,    setCoffeeUrl]    = useState('')
+  const [logoUrl,      setLogoUrl]      = useState('')
 
   const PER_PAGE = 50
 
   useEffect(() => { if (canManage) loadUsers() }, [])
 
   const allowedRegions = getAllowedRegions(profile as any)
-  const allowedUnits = getAllowedUnits(profile as any)
-  const allowedRoles = getAllowedRoles(profile as any)
+  const allowedUnits   = getAllowedUnits(profile as any)
+  const allowedRoles   = getAllowedRoles(profile as any)
 
   const filteredUsers = users.filter(u => {
     const matchSearch = !search || u.username.toLowerCase().includes(search.toLowerCase()) ||
       (u.full_name ?? '').toLowerCase().includes(search.toLowerCase())
     const matchRegion = !filterRegion || (u.region_scope ?? 'global') === filterRegion
-    const matchUnit = !filterUnit || (u.unit_scope ?? 'general') === filterUnit
-    const matchRole = !filterRole || u.role === filterRole
+    const matchUnit   = !filterUnit   || (u.unit_scope ?? 'general') === filterUnit
+    const matchRole   = !filterRole   || u.role === filterRole
     return matchSearch && matchRegion && matchUnit && matchRole
   })
   const pagedUsers = filteredUsers.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
@@ -108,10 +108,10 @@ export default function ProfilePage({ onClose }: Props) {
     const CONFIG_ID = '00000000-0000-0000-0000-000000000001'
     const { data } = await supabase.from('dashboard_config').select('config').eq('id', CONFIG_ID).single()
     const cfg = (data?.config ?? {}) as Record<string, unknown>
-    cfg.title = siteTitle
+    cfg.title    = siteTitle
     cfg.subtitle = siteSubtitle
-    cfg.coffeeUrl = coffeeUrl
-    cfg.logoUrl = logoUrl
+    cfg.coffeeUrl= coffeeUrl
+    cfg.logoUrl  = logoUrl
     await supabase.from('dashboard_config').update({ config: cfg }).eq('id', CONFIG_ID)
     toast('Settings disimpan.', 'success')
   }
@@ -195,7 +195,7 @@ export default function ProfilePage({ onClose }: Props) {
                 </select>
                 <select value={filterUnit} onChange={e => { setFilterUnit(e.target.value); setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Unit</option>
-                  {(UNITS as readonly { label: string; value: string }[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                  {(UNITS as readonly {label: string; value: string}[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                 </select>
                 <select value={filterRole} onChange={e => { setFilterRole(e.target.value); setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Role</option>
@@ -264,7 +264,7 @@ export default function ProfilePage({ onClose }: Props) {
                   </div>
 
                   {/* Reset password — hanya saat edit */}
-                  {!addMode && canResetPwd(profile as any) && (
+                  {!addMode && profile?.role === 'admin' || profile?.role === 'superadmin' && (
                     <div style={{ marginBottom: 10 }}>
                       <label style={labelStyle}>Reset Password (kosong = tidak berubah)</label>
                       <input type="password" value={editPass} onChange={e => setEditPass(e.target.value)} placeholder="Password baru min. 6 karakter" style={inputStyle} />
@@ -304,15 +304,15 @@ export default function ProfilePage({ onClose }: Props) {
               {/* User list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {pagedUsers.map(u => {
-                  const b = getBadge(u)
-                  const isMe = u.id === profile?.id
+                  const b       = getBadge(u)
+                  const isMe    = u.id === profile?.id
                   // Pastikan field scope tersedia untuk permission check
                   const currentUser = { ...profile, region_scope: (profile as any).region_scope ?? 'global', unit_scope: (profile as any).unit_scope ?? 'general' }
-                  const targetUser = { ...u, region_scope: u.region_scope ?? 'global', unit_scope: u.unit_scope ?? 'general' }
+                  const targetUser  = { ...u,       region_scope: u.region_scope ?? 'global',                unit_scope: u.unit_scope ?? 'general'                }
                   const canEdit_ = canManageUser(currentUser as any, targetUser as any)
-                  const region = REGION_LABELS[u.region_scope ?? 'global'] ?? u.region_scope
-                  const unit = UNIT_LABELS[u.unit_scope ?? 'general'] ?? u.unit_scope
-                  const emoji_ = u.emoji || u.avatar_emoji || ''
+                  const region  = REGION_LABELS[u.region_scope ?? 'global'] ?? u.region_scope
+                  const unit    = UNIT_LABELS[u.unit_scope ?? 'general'] ?? u.unit_scope
+                  const emoji_  = u.emoji || u.avatar_emoji || ''
 
                   return (
                     <div key={u.id} style={{
@@ -379,10 +379,10 @@ export default function ProfilePage({ onClose }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: 11, color: 'var(--silver3)', marginBottom: 4 }}>Pengaturan global — hanya superadmin</div>
               {[
-                { label: 'Site Title', val: siteTitle, set: setSiteTitle, ph: 'JateamHub' },
-                { label: 'Subtitle / Greeting', val: siteSubtitle, set: setSiteSubtitle, ph: 'Selamat datang, {username}' },
-                { label: 'Logo URL', val: logoUrl, set: setLogoUrl, ph: 'https://...' },
-                { label: 'Coffee / Donasi URL', val: coffeeUrl, set: setCoffeeUrl, ph: 'https://trakteer.id/...' },
+                { label: 'Site Title',              val: siteTitle,    set: setSiteTitle,    ph: 'JateamHub' },
+                { label: 'Subtitle / Greeting',     val: siteSubtitle, set: setSiteSubtitle, ph: 'Selamat datang, {username}' },
+                { label: 'Logo URL',                val: logoUrl,      set: setLogoUrl,      ph: 'https://...' },
+                { label: 'Coffee / Donasi URL',     val: coffeeUrl,    set: setCoffeeUrl,    ph: 'https://trakteer.id/...' },
               ].map(f => (
                 <div key={f.label}>
                   <label style={{ ...labelStyle, fontWeight: 700 }}>{f.label}</label>

@@ -71,7 +71,7 @@ function MatrixRain() {
   )
 }
 
-export default function LoginPage() {
+export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
   const { login } = useAuthStore()
   const [showPw, setShowPw] = useState(false)
   const [username, setUsername] = useState('')
@@ -266,8 +266,10 @@ export default function LoginPage() {
         </form>
 
         <div style={{ marginTop: 24, textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.2)', lineHeight: 1.8, fontFamily: 'var(--mono)' }}>
-          Tidak punya akun?<br />
-          Hubungi <span style={{ color: 'rgba(0,255,194,0.6)', fontWeight: 600 }}>Admin</span> untuk mendapatkan akses.
+          Tidak punya akun?{' '}
+          <span onClick={onRegister} style={{ color: 'rgba(0,255,194,0.9)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
+            Daftar di sini
+          </span>
         </div>
       </div>
     </div>

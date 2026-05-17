@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
-import { canEdit, canSeeOptions, getDisplayBadge, isSuperAdmin, isAdmin } from '../../utils/roles'
+import { canEdit, canSeeOptions, getDisplayBadge, isAdmin, isAdminGlobal } from '../../utils/roles'
 import { sanitizePage } from '../../utils/security'
 import { uploadAvatar, updateProfile } from '../../utils/supabaseClient'
 
@@ -51,26 +51,35 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
     const file = e.target.files?.[0]
     if (!file || !session) return
     e.target.value = ''
-    const canvas = document.createElement('canvas')
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = async () => {
-      URL.revokeObjectURL(url)
-      const max = 400
-      const ratio = Math.min(max / img.width, max / img.height, 1)
-      canvas.width  = Math.floor(img.width  * ratio)
-      canvas.height = Math.floor(img.height * ratio)
-      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-      canvas.toBlob(async blob => {
-        if (!blob) return
-        const avatarUrl = await uploadAvatar(session.id, blob)
-        if (avatarUrl) {
-          await updateProfile(session.id, { avatar_url: avatarUrl })
-          window.location.reload()
-        }
-      }, 'image/webp', 0.85)
+
+    // Pakai FileReader → data URL (aman untuk CSP, tidak pakai blob URL)
+    const reader = new FileReader()
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string
+      if (!dataUrl) return
+      const img = new Image()
+      img.onload = async () => {
+        const canvas = document.createElement('canvas')
+        const max   = 400
+        const ratio = Math.min(max / img.width, max / img.height, 1)
+        canvas.width  = Math.floor(img.width  * ratio)
+        canvas.height = Math.floor(img.height * ratio)
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+        canvas.toBlob(async blob => {
+          if (!blob) { useStore.getState().toast('Gagal memproses foto.', 'error'); return }
+          const avatarUrl = await uploadAvatar(session.id, blob)
+          if (avatarUrl) {
+            await updateProfile(session.id, { avatar_url: avatarUrl })
+            useStore.getState().toast('Foto profil berhasil diperbarui! 🎉', 'success')
+            setTimeout(() => window.location.reload(), 1000)
+          } else {
+            useStore.getState().toast('Gagal upload foto. Coba lagi.', 'error')
+          }
+        }, 'image/webp', 0.85)
+      }
+      img.src = dataUrl  // data URL, bukan blob URL — aman untuk CSP
     }
-    img.src = url
+    reader.readAsDataURL(file)
   }
 
   const PREVIEW_OPTS = [

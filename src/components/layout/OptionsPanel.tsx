@@ -2,8 +2,10 @@ import { useRef, useEffect } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import { can, canSeeOptions } from '../../utils/roles'
-import type { ItemDisplayMode, IconSize, LabelMode, ThemeId } from '../../types'
+import { applyThemeToDOM } from '../../store/dashboardStore'
 import { THEMES } from '../../types'
+import type { ThemeId } from '../../types'
+import type { ItemDisplayMode, IconSize, LabelMode } from '../../types'
 
 interface Props { open: boolean; onClose: () => void }
 
@@ -84,31 +86,72 @@ export default function OptionsPanel({ open, onClose }: Props) {
       </div>
       <div className="options-body">
 
-        {/* Theme — hanya superadmin */}
-        {canThemeGlobal && (
-          <>
-            <div className="options-label">Theme Global</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-              {THEMES.map(t => (
-                <button key={t.id} onClick={() => setGlobalTheme(t.id as ThemeId)} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '8px 10px', borderRadius: 'var(--radius-sm)',
-                  background: globalTheme === t.id ? 'var(--mint-bg)' : 'var(--bg3)',
-                  border: `1px solid ${globalTheme === t.id ? 'var(--mint)' : 'var(--border2)'}`,
-                  cursor: 'pointer', transition: 'all .15s', textAlign: 'left',
-                }}>
-                  <div style={{ width: 20, height: 20, borderRadius: 4, background: t.colors[1], flexShrink: 0, boxShadow: `0 0 6px ${t.colors[1]}66` }} />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: globalTheme === t.id ? 'var(--mint)' : 'var(--silver2)' }}>{t.name}</div>
-                    <div style={{ fontSize: 10, color: 'var(--silver3)' }}>{t.description}</div>
-                  </div>
-                  {globalTheme === t.id && <span style={{ marginLeft: 'auto', color: 'var(--mint)', fontSize: 12 }}>✓</span>}
-                </button>
-              ))}
+        {/* Tema — tersedia untuk semua user */}
+        <div className="options-label">Tema</div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+          {THEMES.map(t => {
+            const currentBase = (appearance.themeBase ?? 'aurora') as string
+            const isActive    = currentBase === t.id
+            const isDark      = appearance.isDarkMode ?? false
+            return (
+              <button key={t.id} onClick={() => {
+                // Obsidian: standalone dark, jangan ubah isDarkMode state
+                const newIsDark = t.standalone ? false : isDark  // reset toggle state
+                const themeId   = t.standalone ? 'obsidian' : `${t.id}-${isDark ? 'dark' : 'light'}`
+                setAppearance({
+                  themeBase: t.id as any,
+                  theme:     themeId as any,
+                  isDarkMode: t.standalone ? false : isDark,  // Obsidian tidak pakai isDarkMode
+                })
+                applyThemeToDOM(themeId)
+              }} title={t.name} style={{
+                flex: 1, padding: '8px 4px',
+                borderRadius: 'var(--radius-sm)',
+                background: isActive ? 'var(--mint-bg2)' : 'var(--bg3)',
+                border: `1.5px solid ${isActive ? 'var(--mint)' : 'var(--border2)'}`,
+                cursor: 'pointer', transition: 'all .15s',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+              }}>
+                {/* Swatch light | dark */}
+                <div style={{ display: 'flex', borderRadius: 4, overflow: 'hidden', width: 34, height: 16, border: '1px solid rgba(0,0,0,0.08)' }}>
+                  <div style={{ flex: 1, background: t.standalone ? '#1a1a1a' : t.bgLight }} />
+                  <div style={{ flex: 1, background: t.bgDark }} />
+                </div>
+                <span style={{ fontSize: 9, fontWeight: 700, color: isActive ? 'var(--mint)' : 'var(--silver2)', letterSpacing: '.3px' }}>
+                  {t.name}
+                </span>
+                {/* Font preview */}
+                <span style={{ fontSize: 8, color: 'var(--silver3)', fontFamily: (t as any).font, opacity: 0.7 }}>Aa</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Toggle dark mode — HANYA untuk Aurora/Sand/Slate, TIDAK untuk Obsidian */}
+        {(appearance.themeBase ?? 'aurora') !== 'obsidian' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', marginBottom: 10 }}>
+            <span style={{ fontSize: 12, color: 'var(--silver2)', fontWeight: 500 }}>🌙 Dark Mode</span>
+            <div onClick={() => {
+              const base    = (appearance.themeBase ?? 'aurora') as string
+              const isDark  = !(appearance.isDarkMode ?? false)
+              const themeId = `${base}-${isDark ? 'dark' : 'light'}`
+              setAppearance({ isDarkMode: isDark, theme: themeId as any })
+              applyThemeToDOM(themeId)
+            }} style={{
+              width: 40, height: 22, borderRadius: 11, cursor: 'pointer',
+              background: (appearance.isDarkMode ?? false) ? 'var(--mint)' : 'var(--border2)',
+              position: 'relative', transition: 'background 0.25s', flexShrink: 0,
+            }}>
+              <div style={{
+                width: 16, height: 16, borderRadius: '50%', background: 'white',
+                position: 'absolute', top: 3,
+                left: (appearance.isDarkMode ?? false) ? 21 : 3,
+                transition: 'left 0.25s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+              }} />
             </div>
-            <div className="options-divider" />
-          </>
+          </div>
         )}
+        <div className="options-divider" />
 
         {/* Appearance */}
         <div className="options-label">Appearance</div>
@@ -156,17 +199,13 @@ export default function OptionsPanel({ open, onClose }: Props) {
 
         <div style={{ marginTop: 10 }}>
           {[
-            { label: 'Tooltip',            val: appearance.tooltipEnabled,  key: 'tooltipEnabled'  as const },
-            { label: 'App Icons / Favicon',val: appearance.faviconEnabled,  key: 'faviconEnabled'  as const },
-            { label: 'Tampilkan deskripsi',val: displayOptions.showDesc,    key: 'showDesc'        as const, isDisplay: true },
-            { label: 'Tampilkan tag',      val: displayOptions.showTags,    key: 'showTags'        as const, isDisplay: true },
+            { label: 'Tampilkan deskripsi', val: displayOptions.showDesc, key: 'showDesc' as const, isDisplay: true },
+            { label: 'Tampilkan tag',       val: displayOptions.showTags, key: 'showTags' as const, isDisplay: true },
           ].map(item => (
             <div key={item.key} className="toggle-row">
               <span className="toggle-label">{item.label}</span>
               <ToggleSwitch on={item.val}
-                onClick={() => item.isDisplay
-                  ? setDisplayOptions({ [item.key]: !item.val })
-                  : setAppearance({ [item.key]: !item.val })} />
+                onClick={() => setDisplayOptions({ [item.key]: !item.val })} />
             </div>
           ))}
         </div>

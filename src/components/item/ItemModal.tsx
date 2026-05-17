@@ -18,9 +18,9 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
   const [desc, setDesc]           = useState('')
   const [icon, setIcon]           = useState('')
   const [iconUrl, setIconUrl]     = useState('')
-  const [useFavicon, setUseFavicon] = useState(true)
+  const useFavicon = true  // selalu true
   const [tags, setTags]           = useState('')
-  const [newTab, setNewTab]       = useState(true)
+  const newTab = true      // selalu buka tab baru
 
   useEffect(() => {
     if (open) {
@@ -29,9 +29,9 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
       setDesc(item?.desc ?? '')
       setIcon(item?.icon ?? '')
       setIconUrl(item?.iconUrl ?? '')
-      setUseFavicon(item?.useFavicon ?? true)
+      // useFavicon always true
       setTags(item?.tags.join(',') ?? '')
-      setNewTab(item?.newTab ?? true)
+      // newTab always true
     }
   }, [open, item])
 
@@ -106,10 +106,7 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
           </div>
         </div>
 
-        <div className="checkbox-row" style={{ marginBottom: 10 }}>
-          <input type="checkbox" id="useFavicon" checked={useFavicon} onChange={e => setUseFavicon(e.target.checked)} />
-          <label htmlFor="useFavicon">Auto-fetch favicon dari URL</label>
-        </div>
+
 
         {/* Icon preview */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -125,12 +122,7 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
           <input value={tags} onChange={e => setTags(e.target.value)} placeholder="tag1,tag2" />
         </div>
       </div>
-      <div className="field">
-        <div className="checkbox-row">
-          <input type="checkbox" id="newtab" checked={newTab} onChange={e => setNewTab(e.target.checked)} />
-          <label htmlFor="newtab">Buka di tab baru</label>
-        </div>
-      </div>
+
     </Modal>
   )
 }
