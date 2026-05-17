@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore'
 import { canEdit, canSeeOptions, getDisplayBadge, isAdmin, isAdminGlobal } from '../../utils/roles'
 import { sanitizePage } from '../../utils/security'
 import { uploadAvatar, updateProfile } from '../../utils/supabaseClient'
+import AvatarCropModal from '../ui/AvatarCropModal'
 
 interface Props {
   onToggleOptions: () => void
@@ -22,6 +23,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
   const [profileDropdown, setProfileDropdown] = useState(false)
   const [previewOpen,     setPreviewOpen]     = useState(false)
   const [hamburgerOpen,   setHamburgerOpen]   = useState(false)
+  const [cropDataUrl,     setCropDataUrl]     = useState<string | null>(null)
   const hamburgerRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
@@ -51,35 +53,29 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
     const file = e.target.files?.[0]
     if (!file || !session) return
     e.target.value = ''
-
-    // Pakai FileReader → data URL (aman untuk CSP, tidak pakai blob URL)
+    // Baca sebagai data URL → tampilkan crop modal
     const reader = new FileReader()
-    reader.onload = async (ev) => {
+    reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string
-      if (!dataUrl) return
-      const img = new Image()
-      img.onload = async () => {
-        const canvas = document.createElement('canvas')
-        const max   = 400
-        const ratio = Math.min(max / img.width, max / img.height, 1)
-        canvas.width  = Math.floor(img.width  * ratio)
-        canvas.height = Math.floor(img.height * ratio)
-        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-        canvas.toBlob(async blob => {
-          if (!blob) { useStore.getState().toast('Gagal memproses foto.', 'error'); return }
-          const avatarUrl = await uploadAvatar(session.id, blob)
-          if (avatarUrl) {
-            await updateProfile(session.id, { avatar_url: avatarUrl })
-            useStore.getState().toast('Foto profil berhasil diperbarui! 🎉', 'success')
-            setTimeout(() => window.location.reload(), 1000)
-          } else {
-            useStore.getState().toast('Gagal upload foto. Coba lagi.', 'error')
-          }
-        }, 'image/webp', 0.85)
-      }
-      img.src = dataUrl  // data URL, bukan blob URL — aman untuk CSP
+      if (dataUrl) setCropDataUrl(dataUrl)
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleCropConfirm = async (blob: Blob) => {
+    if (!session) return
+    setCropDataUrl(null)
+    const avatarUrl = await uploadAvatar(session.id, blob)
+    if (avatarUrl) {
+      await updateProfile(session.id, { avatar_url: avatarUrl })
+      // Update state authStore langsung tanpa reload halaman
+      useAuthStore.setState(s => ({
+        profile: s.profile ? { ...s.profile, avatar_url: avatarUrl } : s.profile
+      }))
+      useStore.getState().toast('Foto profil berhasil diperbarui! 🎉', 'success')
+    } else {
+      useStore.getState().toast('Gagal upload foto. Coba lagi.', 'error')
+    }
   }
 
   const PREVIEW_OPTS = [
@@ -199,6 +195,16 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
             <input className="search-input" placeholder="Filter..." value={searchQuery} onChange={e => setSearch(e.target.value)} />
             <span className="search-icon">⌕</span>
           </div>
+
+          {/* Tombol + Section — muncul di samping filter saat edit mode */}
+          {editMode && (
+            <button
+              className="icon-btn desktop-only"
+              onClick={() => useStore.getState().addPersonalSectionAuto()}
+              title="Tambah Section"
+              style={{ marginRight: 4, fontWeight: 700, fontSize: 16 }}
+            >＋</button>
+          )}
 
           {/* Edit mode */}
           <button className={`icon-btn desktop-only${editMode ? ' active' : ''}`} onClick={toggleEditMode} title="Edit Mode"
@@ -327,7 +333,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
         </div>
       </header>
 
-      {/* Preview banner — tampil jika ada filter aktif */}
+      {/* Preview banner */}
       {(previewFilter.role || previewFilter.region || previewFilter.unit) && (
         <div style={{
           background: 'rgba(199,125,255,0.08)', borderBottom: '1px solid rgba(199,125,255,0.2)',
@@ -341,6 +347,15 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
             borderRadius: 4, color: '#C77DFF', padding: '2px 8px', fontSize: 10, cursor: 'pointer', fontWeight: 600,
           }}>✕ Reset</button>
         </div>
+      )}
+
+      {/* Crop modal — muncul setelah user pilih foto */}
+      {cropDataUrl && (
+        <AvatarCropModal
+          imageDataUrl={cropDataUrl}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropDataUrl(null)}
+        />
       )}
     </>
   )

@@ -3,7 +3,7 @@
 // Shared sections (dari admin) di row pertama, terkunci
 // Personal sections (milik user) di bawahnya, bebas drag/resize
 // ─────────────────────────────────────────────────────────────
-import { useMemo, useCallback, useState, useEffect } from 'react'
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react'
 import RGL, { WidthProvider } from 'react-grid-layout'
 import type { Layout } from 'react-grid-layout'
 import { useStore } from '../../store/dashboardStore'
@@ -16,7 +16,7 @@ import NotesWidget   from '../widgets/NotesWidget'
 import type { Section, LinkItem } from '../../types'
 import { GRID_ROW_HEIGHT, SECTION_DEFAULT_W, SECTION_DEFAULT_H } from '../../types'
 import type { SharedSection } from '../../utils/supabaseClient'
-import { canEdit } from '../../utils/roles'
+import { canEdit, getInitials } from '../../utils/roles'
 
 // WidthProvider membuat RGL otomatis mengikuti lebar container
 const ReactGridLayout = WidthProvider(RGL)
@@ -59,10 +59,27 @@ export default function GridLayout({ onAddSection }: Props) {
     editMode, batchUpdateLayouts, searchQuery, toggleCollapse,
     addItem, updateItem, deleteItem, moveItem,
     deletePersonalSection, updatePersonalSection, toast,
-    addPersonalSectionAuto,
+    addPersonalSectionAuto, previewFilter,
   } = useStore()
   const { profile: session } = useAuthStore()
   const isMobile = useIsMobile()
+
+  // Handler untuk touch resize di mobile
+  const [mobileHeights, setMobileHeights] = useState<Record<string, number>>({})
+  const handleTouchResize = useCallback((id: string, deltaRows: number) => {
+    const section = personalSections.find(s => s.id === id)
+    if (!section) return
+    const baseH = section.layout.h
+    const newH  = Math.max(2, baseH + deltaRows)
+    setMobileHeights(prev => ({ ...prev, [id]: newH }))
+  }, [personalSections])
+
+  const commitTouchResize = useCallback((id: string) => {
+    const newH = mobileHeights[id]
+    if (!newH) return
+    batchUpdateLayouts([{ id, layout: { ...personalSections.find(s => s.id === id)!.layout, h: newH } }])
+    setMobileHeights(prev => { const n = { ...prev }; delete n[id]; return n })
+  }, [mobileHeights, personalSections, batchUpdateLayouts])
 
   // Cek apakah user boleh edit (admin/superadmin atau semua user untuk section pribadi)
   const isAdminLevel = session?.role === 'admin' || session?.role === 'superadmin'
@@ -109,7 +126,7 @@ export default function GridLayout({ onAddSection }: Props) {
     const OFFSET_Y = 0 // semua section dalam 1 grid, tidak ada offset
 
     // Hitung posisi Y personal section (setelah semua shared sections)
-    const sharedH = sharedRowsHeight  // tinggi total shared sections
+    const sharedH = sharedRowsHeight
     const layouts: Layout[] = personalSections.map(s => ({
       i:           s.id,
       x:           s.layout.x,
@@ -120,58 +137,9 @@ export default function GridLayout({ onAddSection }: Props) {
       minH:        s.collapsed ? 1 : 2,
       maxH:        s.collapsed ? 1 : undefined,
       isDraggable: editMode,
-      isResizable: editMode && !s.collapsed, // semua role bisa resize
+      isResizable: editMode && !s.collapsed,
       resizeHandles: ['se', 'e', 'w'] as unknown as ['se'],
     }))
-
-    // Ghost + section: w:2, tinggi sama dengan section referensi
-    // Jika ada personal section → di sebelah personal terakhir
-    // Jika tidak ada personal → di sebelah shared section terakhir
-    if (editMode) {
-      const GHOST_W = 2
-      if (personalSections.length > 0) {
-        // Setelah personal section terakhir
-        const last = [...personalSections].sort((a, b) =>
-          (b.layout.y * 100 + b.layout.x + b.layout.w) -
-          (a.layout.y * 100 + a.layout.x + a.layout.w)
-        )[0]
-        const afterX  = last.layout.x + last.layout.w
-        const sameRow = afterX + GHOST_W <= COLS
-        layouts.push({
-          i: GHOST_ADD_KEY,
-          x: sameRow ? afterX : 0,
-          y: OFFSET_Y + (sameRow ? last.layout.y : last.layout.y + last.layout.h),
-          w: GHOST_W, h: last.layout.h,
-          minW: GHOST_W, minH: 2, maxH: undefined,
-          isDraggable: false, isResizable: false,
-          resizeHandles: [] as unknown as ['se'],
-        })
-      } else if (sharedLayouts.length > 0) {
-        // Tidak ada personal → di sebelah shared terakhir (row pertama)
-        const lastShared = sharedLayouts.reduce((max, l) =>
-          (l.y * 100 + l.x + l.w > max.y * 100 + max.x + max.w) ? l : max, sharedLayouts[0])
-        const afterX  = lastShared.x + lastShared.w
-        const sameRow = afterX + GHOST_W <= COLS
-        layouts.push({
-          i: GHOST_ADD_KEY,
-          x: sameRow ? afterX : 0,
-          y: sameRow ? lastShared.y : lastShared.y + lastShared.h,
-          w: GHOST_W, h: lastShared.h,
-          minW: GHOST_W, minH: 2, maxH: undefined,
-          isDraggable: false, isResizable: false,
-          resizeHandles: [] as unknown as ['se'],
-        })
-      } else {
-        // Tidak ada section sama sekali
-        layouts.push({
-          i: GHOST_ADD_KEY,
-          x: 0, y: 0, w: 4, h: 3,
-          minW: 2, minH: 2, maxH: undefined,
-          isDraggable: false, isResizable: false,
-          resizeHandles: [] as unknown as ['se'],
-        })
-      }
-    }
 
     return layouts
   }, [personalSections, sharedRowsHeight, sharedLayouts, editMode])
@@ -287,8 +255,19 @@ export default function GridLayout({ onAddSection }: Props) {
           {/* Personal sections */}
           {personalSections.map(section => (
             <div key={section.id} className="mobile-section"
-              style={{ opacity: q && !visibleIds.has(section.id) ? 0.2 : 1, position: 'relative', paddingTop: 10 }}>
+              style={{ opacity: q && !visibleIds.has(section.id) ? 0.2 : 1, position: 'relative', paddingTop: 14 }}>
+              {/* Badge OWN + ⭐ untuk personal section */}
+              <SectionBadge personalSection={section} />
               {renderSection(section, false)}
+              {/* Touch resize handle — hanya saat edit mode */}
+              {editMode && (
+                <div onTouchEnd={() => commitTouchResize(section.id)}>
+                  <TouchResizeHandle
+                    sectionId={section.id}
+                    onResize={handleTouchResize}
+                  />
+                </div>
+              )}
             </div>
           ))}
           {/* Tombol tambah section di mobile saat edit mode */}
@@ -354,13 +333,6 @@ export default function GridLayout({ onAddSection }: Props) {
             </div>
           ))}
 
-          {/* Ghost + section untuk tambah section baru */}
-          {editMode && (
-            <div key={GHOST_ADD_KEY}>
-              {/* Klik ghost → langsung tambah section tanpa modal */}
-              <GhostAddSection onClick={() => addPersonalSectionAuto()} />
-            </div>
-          )}
         </ReactGridLayout>
       )}
 
@@ -378,6 +350,48 @@ export default function GridLayout({ onAddSection }: Props) {
         onClose={() => setItemModal({ open: false, sectionId: '', item: null })}
       />
     </>
+  )
+}
+
+// ── Touch Resize Handle — pojok kanan bawah section ─────────
+// Drag handle ini untuk resize section di mobile via touch
+function TouchResizeHandle({ sectionId, onResize }: {
+  sectionId: string
+  onResize:  (id: string, deltaH: number) => void
+}) {
+  const startY  = useRef(0)
+  const startH  = useRef(0)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation()
+    startY.current = e.touches[0].clientY
+    startH.current = 0
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.stopPropagation()
+    const deltaY   = e.touches[0].clientY - startY.current
+    const deltaRows = Math.round(deltaY / 70) // GRID_ROW_HEIGHT = 70
+    if (deltaRows !== startH.current) {
+      startH.current = deltaRows
+      onResize(sectionId, deltaRows)
+    }
+  }
+
+  return (
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      style={{
+        position: 'absolute', bottom: 4, right: 4,
+        width: 24, height: 24, borderRadius: 6, zIndex: 20,
+        background: 'var(--mint-bg2)', border: '1px solid var(--accent)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'se-resize', touchAction: 'none',
+        color: 'var(--accent)', fontSize: 12,
+        boxShadow: '0 2px 8px var(--accent-glow)',
+      }}
+    >⤡</div>
   )
 }
 
@@ -410,28 +424,35 @@ function GhostAddSection({ onClick }: { onClick: () => void }) {
 }
 
 // ── Badge section ─────────────────────────────────────────────
-// ADM REG = dari admin regional, ADM UNIT = dari admin unit, OWN = milik user
-function SectionBadge({ sharedSection, personalSection }: {
-  sharedSection?: import('../../utils/supabaseClient').SharedSection | null
+// Tampil untuk semua user — ADM REG/UNIT untuk shared, OWN untuk personal
+// Admin melihat badge tambahan: inisial pembuat + role + wilayah/unit
+function SectionBadge({ sharedSection, personalSection, isAdmin }: {
+  sharedSection?:  import('../../utils/supabaseClient').SharedSection | null
   personalSection?: Section | null
+  isAdmin?:        boolean
 }) {
+  const badgeBase: React.CSSProperties = {
+    fontSize: 8, fontWeight: 800, padding: '2px 7px', borderRadius: 10,
+    letterSpacing: '1px', textTransform: 'uppercase',
+    fontFamily: 'var(--mono)', lineHeight: 1.5, pointerEvents: 'none' as const,
+    border: '1px solid transparent',
+  }
+
   // Badge untuk shared section
   if (sharedSection) {
-    const SHARED_BADGE: Record<string, { label: string; bg: string; glow: string }> = {
-      region: { label: 'ADM REG',  bg: '#FF8C42', glow: 'rgba(255,140,66,0.5)' },
-      unit:   { label: 'ADM UNIT', bg: '#C77DFF', glow: 'rgba(199,125,255,0.5)' },
-    }
-    const b = SHARED_BADGE[sharedSection.visibility]
-    if (!b) return null
+    const isRegion = sharedSection.visibility === 'region'
+    const bg       = isRegion ? '#FF8C42' : '#C77DFF'
+    const glow     = isRegion ? 'rgba(255,140,66,0.4)' : 'rgba(199,125,255,0.4)'
+    const label    = isRegion ? 'ADM REG' : 'ADM UNIT'
+
     return (
-      <span style={{
+      <div style={{
         position: 'absolute', top: 0, left: 12, zIndex: 10,
-        fontSize: 8, fontWeight: 800, padding: '2px 8px', borderRadius: 10,
-        background: b.bg, color: '#0A0A0A', border: `1px solid ${b.bg}`,
-        letterSpacing: '1px', textTransform: 'uppercase',
-        fontFamily: 'var(--mono)', lineHeight: 1.5, pointerEvents: 'none',
-        boxShadow: `0 0 8px ${b.glow}, 0 1px 3px rgba(0,0,0,0.4)`,
-      }}>{b.label}</span>
+        display: 'flex', alignItems: 'center', gap: 3, pointerEvents: 'none',
+      }}>
+        <span style={{ ...badgeBase, background: bg, color: '#0A0A0A', borderColor: bg,
+          boxShadow: `0 0 8px ${glow}` }}>{label}</span>
+      </div>
     )
   }
 
@@ -440,21 +461,13 @@ function SectionBadge({ sharedSection, personalSection }: {
     return (
       <div style={{
         position: 'absolute', top: 0, left: 12, zIndex: 10,
-        display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'none',
+        display: 'flex', alignItems: 'center', gap: 3, pointerEvents: 'none',
       }}>
-        <span style={{
-          fontSize: 8, fontWeight: 800, padding: '2px 8px', borderRadius: 10,
-          background: '#4ADE80', color: '#0A0A0A', border: '1px solid #4ADE80',
-          letterSpacing: '1px', textTransform: 'uppercase',
-          fontFamily: 'var(--mono)', lineHeight: 1.5,
-          boxShadow: '0 0 8px rgba(74,222,128,0.5), 0 1px 3px rgba(0,0,0,0.4)',
-        }}>OWN</span>
-        {/* ⭐ favorite badge di samping OWN */}
+        <span style={{ ...badgeBase, background: '#4ADE80', color: '#0A0A0A',
+          borderColor: '#4ADE80', boxShadow: '0 0 8px rgba(74,222,128,0.4)' }}>OWN</span>
         {personalSection.isFavorite && (
-          <span style={{
-            fontSize: 10, lineHeight: 1,
-            filter: 'drop-shadow(0 0 4px rgba(255,215,0,0.8))',
-          }}>⭐</span>
+          <span style={{ fontSize: 10, lineHeight: 1,
+            filter: 'drop-shadow(0 0 4px rgba(255,215,0,0.8))' }}>⭐</span>
         )}
       </div>
     )
