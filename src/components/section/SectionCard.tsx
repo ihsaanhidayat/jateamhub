@@ -207,9 +207,7 @@ export default function SectionCard({ section, isShared, canEdit: canEditProp, o
                 onDragLeave={() => setItemDragOver(null)}
                 onEdit={() => onEditItem(section.id, item)}
                 onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
-                onToggleFavorite={!isShared && onToggleFavoriteItem
-                  ? (itemId) => onToggleFavoriteItem(section.id, itemId)
-                  : undefined}
+
               />
             ))}
             {/* Ghost + item — muncul saat edit mode, setelah icon terakhir */}
@@ -413,7 +411,7 @@ interface FolderItemProps {
   onDelete: () => void
 }
 
-function FolderItem({ item, searchQuery, editMode, dragOver, appearance, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete, onToggleFavorite }: FolderItemProps & { onToggleFavorite?: (itemId: string) => void }) {
+function FolderItem({ item, searchQuery, editMode, dragOver, appearance, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete }: FolderItemProps) {
   const [hovered, setHovered] = useState(false)
   const showLabel = appearance.labelMode === 'show' || (appearance.labelMode === 'hover' && hovered)
 
@@ -465,21 +463,10 @@ function FolderItem({ item, searchQuery, editMode, dragOver, appearance, onDragS
         </div>
       )}
 
-      {/* ⭐ badge favorit di pojok kiri atas — tampil saat item adalah favorit */}
-      {item.isFavorite && (
-        <span style={{
-          position: 'absolute', top: 3, left: 3, fontSize: 10, zIndex: 5,
-          filter: 'drop-shadow(0 0 3px rgba(255,215,0,0.8))',
-          pointerEvents: 'none', lineHeight: 1,
-        }}>⭐</span>
-      )}
+
       {editMode && (
         <div className="folder-action-group" onMouseDown={e => e.stopPropagation()}>
-          {onToggleFavorite && (
-            <button className="folder-edit-btn" onClick={e => { e.stopPropagation(); onToggleFavorite(item.id) }}
-              title={item.isFavorite ? 'Hapus favorit' : 'Favorit'}
-              style={{ color: item.isFavorite ? '#FFD700' : undefined }}>⭐</button>
-          )}
+
           <button className="folder-edit-btn" onClick={e => { e.stopPropagation(); onEdit() }} title="Edit">✏️</button>
           <button className="folder-delete-btn" onClick={e => { e.stopPropagation(); onDelete() }} title="Hapus">🗑</button>
         </div>
