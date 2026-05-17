@@ -26,14 +26,16 @@ export default function EditBar({ onAddSection }: Props) {
   }
 
   const btnStyle = (disabled: boolean) => ({
-    background: 'var(--bg3)',
+    height: 36,
+    background: 'var(--glass)',
     border: `1px solid ${disabled ? 'var(--border)' : 'var(--border2)'}`,
     borderRadius: 'var(--radius-sm)',
     color: disabled ? 'var(--silver3)' : 'var(--silver2)',
-    padding: '6px 11px', fontSize: 11, fontWeight: 600,
+    padding: '0 12px', fontSize: 'var(--text-xs)', fontWeight: 600,
     cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.45 : 1, transition: 'all .15s',
-    display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font)',
+    opacity: disabled ? 0.4 : 1,
+    transition: 'all 150ms var(--ease)',
+    display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font)',
   } as React.CSSProperties)
 
   const syncIndicator = () => {
@@ -56,12 +58,12 @@ export default function EditBar({ onAddSection }: Props) {
     <div className="edit-bar">
       <span className="edit-bar-label">Edit</span>
       <button style={btnStyle(!canUndo)} disabled={!canUndo} onClick={undo}
-        onMouseEnter={e => { if (canUndo) (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--mint)' }}
+        onMouseEnter={e => { if (canUndo) (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)' }}
         onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.borderColor = canUndo ? 'var(--border2)' : 'var(--border)'}>
         ↩ Undo
       </button>
       <button style={btnStyle(!canRedo)} disabled={!canRedo} onClick={redo}
-        onMouseEnter={e => { if (canRedo) (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--mint)' }}
+        onMouseEnter={e => { if (canRedo) (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)' }}
         onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.borderColor = canRedo ? 'var(--border2)' : 'var(--border)'}>
         ↪ Redo
       </button>

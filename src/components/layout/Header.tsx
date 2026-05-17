@@ -28,7 +28,6 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const hamburgerRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
-  const fileRef    = useRef<HTMLInputElement>(null)
 
   const isEditable   = canEdit(session as any)
   const showOptions  = canSeeOptions(session as any)
@@ -102,8 +101,6 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
 
   return (
     <>
-      <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
-
       <header className="header">
         {/* LEFT — Brand */}
         <div className="header-left">
@@ -318,12 +315,25 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                   }}>{badge.label}</span>
                 </div>
                 {/* Actions */}
-                <button onClick={() => { fileRef.current?.click(); setProfileDropdown(false) }}
-                  style={{ display: 'block', width: '100%', padding: '9px 14px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--silver2)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}
+                {/* Ganti foto — pakai label agar bisa tap di mobile */}
+                <label style={{
+                  display: 'block', width: '100%', padding: '9px 14px',
+                  textAlign: 'left', background: 'none', border: 'none',
+                  color: 'var(--silver2)', fontSize: 12, cursor: 'pointer',
+                  fontFamily: 'var(--font)', boxSizing: 'border-box',
+                }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--mint-bg)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                   📷 Ganti Foto
-                </button>
+                  <input
+                    type="file" accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      setProfileDropdown(false)
+                      handleAvatarUpload(e)
+                    }}
+                  />
+                </label>
                 {(session?.role === 'admin' || session?.role === 'superadmin') && (
                   <button onClick={() => { onOpenAdvanced(); setProfileDropdown(false) }}
                     style={{ display: 'block', width: '100%', padding: '9px 14px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--silver2)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}
