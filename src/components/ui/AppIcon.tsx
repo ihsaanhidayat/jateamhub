@@ -75,8 +75,8 @@ export default function AppIcon({ item, iconSize, faviconEnabled, className }: P
 
   // 4. Fallback: generic link icon SVG
   return (
-    <div style={{ ...wrapStyle, background: 'var(--mint-bg)', border: '1px solid rgba(0,255,194,0.15)', borderRadius: 6 }} className={className}>
-      <svg width={sizes.img * 0.65} height={sizes.img * 0.65} viewBox="0 0 24 24" fill="none" stroke="var(--mint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <div style={{ ...wrapStyle, background: 'var(--mint-bg)', border: '1px solid var(--border2)', borderRadius: 10 }} className={className}>
+      <svg width={sizes.img * 0.6} height={sizes.img * 0.6} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
       </svg>

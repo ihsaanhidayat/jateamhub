@@ -31,58 +31,61 @@ export default function ConfirmDialog({
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9000,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-      padding: 20,
+      background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)',
+      padding: 'var(--sp-4)',
+      animation: 'fadeIn 150ms var(--ease)',
     }} onClick={onCancel}>
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: 'rgba(14,14,14,0.98)',
-          border: `1px solid ${danger ? 'rgba(224,85,85,0.3)' : 'rgba(0,255,194,0.2)'}`,
-          borderRadius: 10, padding: '24px 28px',
-          width: '100%', maxWidth: 360,
-          boxShadow: `0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px ${danger ? 'rgba(224,85,85,0.08)' : 'rgba(0,255,194,0.04)'}`,
-          animation: 'scaleIn 0.18s ease',
+          background: 'var(--bg3)',
+          border: `1px solid ${danger ? 'rgba(239,68,68,0.25)' : 'var(--border2)'}`,
+          borderRadius: 'var(--radius-xl)',
+          padding: 'var(--sp-6)',
+          width: '100%', maxWidth: 380,
+          boxShadow: '0 16px 48px rgba(0,0,0,0.12)',
+          animation: 'scaleIn 200ms var(--ease)',
         }}
       >
         {title && (
           <div style={{
-            fontSize: 14, fontWeight: 700, color: danger ? 'var(--red)' : 'var(--mint)',
-            marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 15, fontWeight: 700,
+            color: danger ? 'var(--red)' : 'var(--accent)',
+            marginBottom: 'var(--sp-2)',
+            display: 'flex', alignItems: 'center', gap: 'var(--sp-2)',
           }}>
             {danger ? '⚠️' : 'ℹ️'} {title}
           </div>
         )}
-        <p style={{ fontSize: 13, color: 'var(--silver2)', lineHeight: 1.6, margin: 0 }}>
+        <p style={{
+          fontSize: 'var(--text-sm)', color: 'var(--silver2)',
+          lineHeight: 1.65, margin: 0,
+        }}>
           {message}
         </p>
-        <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 'var(--sp-2)', marginTop: 'var(--sp-5)', justifyContent: 'flex-end' }}>
           <button
             onClick={onCancel}
             style={{
-              padding: '8px 16px', fontSize: 12, fontWeight: 600,
-              background: 'var(--bg3)', border: '1px solid var(--border2)',
-              borderRadius: 6, color: 'var(--silver3)', cursor: 'pointer',
-              fontFamily: 'var(--font)', transition: 'all .15s',
+              height: 40, padding: '0 var(--sp-4)',
+              fontSize: 'var(--text-sm)', fontWeight: 600,
+              background: 'transparent', border: '1px solid var(--border2)',
+              borderRadius: 'var(--radius-sm)', color: 'var(--silver3)',
+              cursor: 'pointer', fontFamily: 'var(--font)',
+              transition: 'all 150ms var(--ease)',
             }}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--silver3)')}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border2)')}
           >{cancelLabel}</button>
           <button
             onClick={onConfirm}
             style={{
-              padding: '8px 16px', fontSize: 12, fontWeight: 700,
-              background: danger ? 'rgba(224,85,85,0.12)' : 'var(--mint-bg2)',
-              border: `1px solid ${danger ? 'var(--red)' : 'var(--mint)'}`,
-              borderRadius: 6,
-              color: danger ? 'var(--red)' : 'var(--mint)',
-              cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = danger ? 'rgba(224,85,85,0.2)' : 'rgba(0,255,194,0.2)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = danger ? 'rgba(224,85,85,0.12)' : 'var(--mint-bg2)'
+              height: 40, padding: '0 var(--sp-4)',
+              fontSize: 'var(--text-sm)', fontWeight: 700,
+              background: danger ? 'rgba(239,68,68,0.1)' : 'var(--mint-bg2)',
+              border: `1px solid ${danger ? 'var(--red)' : 'var(--accent)'}`,
+              borderRadius: 'var(--radius-sm)',
+              color: danger ? 'var(--red)' : 'var(--accent)',
+              cursor: 'pointer', fontFamily: 'var(--font)',
+              transition: 'all 150ms var(--ease)',
             }}
           >{confirmLabel}</button>
         </div>

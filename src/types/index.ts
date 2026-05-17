@@ -58,43 +58,74 @@ export function hasPermission(role: Role, permission: Permission): boolean {
 }
 
 // ── Theme ─────────────────────────────────────
-// ThemeBase: pilihan tema user (Pearl/Ivory/Sage/Obsidian)
-export type ThemeBase = 'pearl' | 'ivory' | 'sage' | 'obsidian'
-// ThemeId mencakup semua format: base, light/dark variants, dan legacy
+export type ThemeBase = 'aurora' | 'sand' | 'slate' | 'obsidian'
 export type ThemeId =
   | ThemeBase
-  | 'pearl-light' | 'pearl-dark'
-  | 'ivory-light' | 'ivory-dark'
-  | 'sage-light'  | 'sage-dark'
+  | 'aurora-light' | 'aurora-dark'
+  | 'sand-light'   | 'sand-dark'
+  | 'slate-light'  | 'slate-dark'
   | 'dark-mint' | 'dark-soft' | 'enterprise'  // legacy compat
 
 export interface ThemeConfig {
   id:          ThemeBase
   name:        string
-  accent:      string   // warna aksen — sama untuk light dan dark
-  bgLight:     string   // background versi terang
-  bgDark:      string   // background versi gelap
-  standalone?: boolean  // true = selalu gelap, tidak punya versi terang
+  accent:      string
+  bgLight:     string
+  bgDark:      string
+  font:        string   // font otomatis per tema
+  standalone?: boolean  // true = selalu gelap, tidak ada versi terang
+}
+
+// Import font di runtime saat tema dipilih
+const loadFont = (name: string) => {
+  const fontMap: Record<string, string> = {
+    'Inter':         'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
+    'Lora':          'https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap',
+    'IBM Plex Sans': 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap',
+    'Space Grotesk': 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap',
+  }
+  if (!fontMap[name]) return
+  const existing = document.querySelector(`link[href*="${name.replace(' ', '+')}"]`)
+  if (existing) return
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'; link.href = fontMap[name]
+  document.head.appendChild(link)
 }
 
 export const THEMES: ThemeConfig[] = [
-  { id: 'pearl',    name: 'Pearl',    accent: '#0EA5E9', bgLight: '#F8FAFC', bgDark: '#0A1628' },
-  { id: 'ivory',    name: 'Ivory',    accent: '#6366F1', bgLight: '#FAFAF9', bgDark: '#0E0E1A' },
-  { id: 'sage',     name: 'Sage',     accent: '#059669', bgLight: '#F0FDF4', bgDark: '#041A0E' },
-  { id: 'obsidian', name: 'Obsidian', accent: '#6EE7B7', bgLight: '#0E0E0E', bgDark: '#0E0E0E', standalone: true },
+  {
+    id: 'aurora', name: 'Aurora',
+    accent: '#8B5CF6', bgLight: '#F5F3FF', bgDark: '#0D0A1E',
+    font: 'Inter',
+  },
+  {
+    id: 'sand', name: 'Sand',
+    accent: '#B45309', bgLight: '#FDFAF5', bgDark: '#1A1208',
+    font: 'Lora',
+  },
+  {
+    id: 'slate', name: 'Slate',
+    accent: '#0F766E', bgLight: '#F4F7F8', bgDark: '#0A1215',
+    font: 'IBM Plex Sans',
+  },
+  {
+    id: 'obsidian', name: 'Obsidian',
+    accent: '#6EE7B7', bgLight: '#0E0E0E', bgDark: '#0E0E0E',
+    font: 'Space Grotesk',
+    standalone: true,
+  },
 ]
 
-// Helper: terapkan tema ke DOM berdasarkan base + darkMode
-export const applyTheme = (base: ThemeBase, isDark: boolean) => {
+// Terapkan tema ke DOM: set data-theme, font, warna
+export const applyThemeToElement = (base: ThemeBase, isDark: boolean) => {
   const theme = THEMES.find(t => t.id === base) ?? THEMES[0]
   const isActuallyDark = base === 'obsidian' || isDark
-  const bg     = isActuallyDark ? theme.bgDark  : theme.bgLight
-  const accent = theme.accent
-  const root   = document.documentElement
-  root.setAttribute('data-theme', `${base}${isActuallyDark ? '-dark' : '-light'}`)
-  root.style.setProperty('--bg-base',    bg)
-  root.style.setProperty('--accent-base', accent)
-  root.style.setProperty('--is-dark',    isActuallyDark ? '1' : '0')
+  const themeId = base === 'obsidian' ? 'obsidian' : `${base}-${isActuallyDark ? 'dark' : 'light'}`
+  const root = document.documentElement
+  root.setAttribute('data-theme', themeId)
+  // Set font otomatis
+  loadFont(theme.font)
+  root.style.setProperty('--font', `'${theme.font}', ${theme.font === 'Lora' ? 'serif' : 'sans-serif'}`)
 }
 
 // ── Section ───────────────────────────────────
@@ -161,12 +192,12 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   itemDisplayMode: 'folderGrid',
   iconSize:        'large',
   labelMode:       'show',
-  folderGridCols:  5,
+  folderGridCols:  4,
   tooltipEnabled:  true,
   faviconEnabled:  true,
   colorMode:       'light',
-  theme:           'pearl-light' as ThemeId,  // default: Pearl Light
-  themeBase:       'pearl',
+  theme:           'aurora-light' as ThemeId,
+  themeBase:       'aurora',
   isDarkMode:      false,
 }
 
@@ -176,10 +207,10 @@ export const defaultDisplayOptions: DisplayOptions = { showDesc: true, showTags:
 
 // ── Icon size map ─────────────────────────────
 export const ICON_SIZE_MAP: Record<string, { wrapper: number; img: number }> = {
-  small:  { wrapper: 24, img: 16 },
-  medium: { wrapper: 30, img: 20 },
-  large:  { wrapper: 44, img: 32 },
-  xl:     { wrapper: 56, img: 42 },
+  small:  { wrapper: 28, img: 18 },
+  medium: { wrapper: 36, img: 24 },
+  large:  { wrapper: 48, img: 34 },  // ideal touch target
+  xl:     { wrapper: 60, img: 44 },
 }
 
 // ── Pages ─────────────────────────────────────

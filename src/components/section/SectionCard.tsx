@@ -291,20 +291,19 @@ function GhostAddItem({ onClick }: { onClick: () => void }) {
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       onTouchStart={() => setHov(true)}
-      onTouchEnd={() => { setHov(false); onClick() }}
+      onTouchEnd={e => { e.preventDefault(); setHov(false); onClick() }}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: 4, cursor: 'pointer',
-        borderRadius: 8, minHeight: 70,
+        borderRadius: 'var(--radius-sm)',
+        minHeight: 'var(--touch-ideal, 48px)',
         border: `1.5px dashed ${hov ? 'var(--accent)' : 'var(--border2)'}`,
         background: hov ? 'var(--mint-bg)' : 'transparent',
-        transition: 'all .15s',
+        transition: 'all 150ms var(--ease)',
         color: hov ? 'var(--accent)' : 'var(--silver3)',
-        // Di mobile selalu visible (tidak perlu hover)
-        opacity: 1,
       }}>
-      <span style={{ fontSize: 22, fontWeight: 300, lineHeight: 1 }}>＋</span>
-      <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.5px' }}>Tambah</span>
+      <span style={{ fontSize: 20, lineHeight: 1 }}>＋</span>
+      <span style={{ fontSize: 10, fontWeight: 600 }}>Tambah</span>
     </div>
   )
 }
