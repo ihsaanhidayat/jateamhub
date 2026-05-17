@@ -21,10 +21,10 @@ import {
 import type { SharedSection } from '../utils/supabaseClient'
 
 // ── Konstanta ─────────────────────────────────────────────────
-const CONFIG_VERSION  = '5.0'   // versi format config
-const MAX_HISTORY     = 20      // maksimal langkah undo
-const DATA_KEY        = 'jateamhub-personal' // key localStorage section pribadi
-const APPEARANCE_KEY  = 'jateamhub-appearance' // key localStorage preferensi tampilan
+const CONFIG_VERSION = '5.0'   // versi format config
+const MAX_HISTORY = 20      // maksimal langkah undo
+const DATA_KEY = 'jateamhub-personal' // key localStorage section pribadi
+const APPEARANCE_KEY = 'jateamhub-appearance' // key localStorage preferensi tampilan
 
 // ── Helper: simpan/baca preferensi tampilan dari localStorage ──
 const loadLocalAppearance = (): Partial<AppearanceSettings> => {
@@ -40,12 +40,12 @@ const saveLocalAppearance = (a: AppearanceSettings) =>
 const getDevicePreset = (): Partial<AppearanceSettings> => {
   const w = window.innerWidth
   if (w < 480) return { itemDisplayMode: 'folderGrid', iconSize: 'medium', folderGridCols: 2 }
-  if (w < 768) return { itemDisplayMode: 'folderGrid', iconSize: 'large',  folderGridCols: 3 }
+  if (w < 768) return { itemDisplayMode: 'folderGrid', iconSize: 'large', folderGridCols: 3 }
   return {} // desktop — pakai preferensi tersimpan
 }
 const DEVICE_PREF_KEY = 'jateamhub-device-pref'
-const hasDevicePref   = () => !!localStorage.getItem(DEVICE_PREF_KEY)
-const setDevicePref   = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
+const hasDevicePref = () => !!localStorage.getItem(DEVICE_PREF_KEY)
+const setDevicePref = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
 
 // ── Helper: generate ID unik untuk section/item ───────────────
 const uid = () => Math.random().toString(36).slice(2, 10)
@@ -73,78 +73,78 @@ const loadPersonalFromLocal = (): Section[] => {
 
 // ── Helper: simpan section pribadi ke localStorage ────────────
 const persistPersonal = (sections: Section[]) => {
-  try { localStorage.setItem(DATA_KEY, JSON.stringify(sections)) } catch {}
+  try { localStorage.setItem(DATA_KEY, JSON.stringify(sections)) } catch { }
 }
 
 // ── Debounce timer untuk sync ke DB ──────────────────────────
-let personalSyncTimer:  ReturnType<typeof setTimeout> | null = null
+let personalSyncTimer: ReturnType<typeof setTimeout> | null = null
 let appearanceSyncTimer: ReturnType<typeof setTimeout> | null = null
 
 // ── Tipe interface store ──────────────────────────────────────
 interface DashboardStore {
   // -- State --
   personalSections: Section[]        // section pribadi user
-  sharedSections:   SharedSection[]  // section dari admin (read-only)
-  appearance:       AppearanceSettings
-  displayOptions:   DisplayOptions
-  presets:          Preset[]
-  editMode:         boolean
-  searchQuery:      string
-  previewFilter:    { role: string; region: string; unit: string } // filter preview admin
-  currentUserId:    string | null
-  currentUserRole:  string
-  currentRegion:    string
-  currentUnit:      string
-  globalTheme:      ThemeId
-  history:          Section[][]   // stack undo
-  future:           Section[][]   // stack redo
-  canUndo:          boolean
-  canRedo:          boolean
-  isDirty:          boolean
-  isSyncing:        boolean
-  syncStatus:       'saved' | 'saving' | 'error' | 'idle'
+  sharedSections: SharedSection[]  // section dari admin (read-only)
+  appearance: AppearanceSettings
+  displayOptions: DisplayOptions
+  presets: Preset[]
+  editMode: boolean
+  searchQuery: string
+  previewFilter: { role: string; region: string; unit: string } // filter preview admin
+  currentUserId: string | null
+  currentUserRole: string
+  currentRegion: string
+  currentUnit: string
+  globalTheme: ThemeId
+  history: Section[][]   // stack undo
+  future: Section[][]   // stack redo
+  canUndo: boolean
+  canRedo: boolean
+  isDirty: boolean
+  isSyncing: boolean
+  syncStatus: 'saved' | 'saving' | 'error' | 'idle'
 
   // -- Init & Load --
-  initUser:    (userId: string, role: string, region: string, unit: string) => Promise<void>
+  initUser: (userId: string, role: string, region: string, unit: string) => Promise<void>
   setCurrentUserId: (id: string | null) => void
 
   // -- Section Pribadi --
   addPersonalSectionAuto: () => void
-  addPersonalSection:    (data: Partial<Section>) => void
+  addPersonalSection: (data: Partial<Section>) => void
   updatePersonalSection: (id: string, updates: Partial<Section>) => void
   deletePersonalSection: (id: string) => void
-  toggleCollapse:        (id: string) => void
-  batchUpdateLayouts:    (layouts: Array<{ id: string; layout: any }>) => void
+  toggleCollapse: (id: string) => void
+  batchUpdateLayouts: (layouts: Array<{ id: string; layout: any }>) => void
 
   // -- Items (dalam section pribadi) --
-  addItem:    (sectionId: string, data: Omit<LinkItem, 'id'>) => void
+  addItem: (sectionId: string, data: Omit<LinkItem, 'id'>) => void
   updateItem: (sectionId: string, itemId: string, data: Omit<LinkItem, 'id'>) => void
   deleteItem: (sectionId: string, itemId: string) => void
-  moveItem:   (srcId: string, itemId: string, tgtId: string) => void
+  moveItem: (srcId: string, itemId: string, tgtId: string, tgtItemId?: string) => void
 
   // -- Shared Sections (admin only) --
-  loadSharedSections:    () => Promise<void>
-  addSharedSection:      (data: Omit<SharedSection, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
+  loadSharedSections: () => Promise<void>
+  addSharedSection: (data: Omit<SharedSection, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateSharedSectionFn: (id: string, updates: Partial<SharedSection>) => Promise<void>
   deleteSharedSectionFn: (id: string) => Promise<void>
 
   // -- Favorites --
   toggleFavoriteSection: (id: string) => void
-  toggleFavoriteItem:    (sectionId: string, itemId: string) => void
+  toggleFavoriteItem: (sectionId: string, itemId: string) => void
 
   // -- UI State --
-  toggleEditMode:    () => void
-  setSearch:         (q: string) => void
-  setPreviewFilter:  (filter: { role: string; region: string; unit: string }) => void
+  toggleEditMode: () => void
+  setSearch: (q: string) => void
+  setPreviewFilter: (filter: { role: string; region: string; unit: string }) => void
 
   // -- Tampilan / Appearance --
-  setAppearance:     (o: Partial<AppearanceSettings>) => void
+  setAppearance: (o: Partial<AppearanceSettings>) => void
   setDisplayOptions: (o: Partial<DisplayOptions>) => void
-  setGlobalTheme:    (theme: ThemeId) => void
+  setGlobalTheme: (theme: ThemeId) => void
 
   // -- Presets --
-  savePreset:   (name: string) => void
-  applyPreset:  (id: string) => void
+  savePreset: (name: string) => void
+  applyPreset: (id: string) => void
   deletePreset: (id: string) => void
 
   // -- Undo/Redo --
@@ -155,8 +155,8 @@ interface DashboardStore {
   syncPersonalToDb: () => Promise<void>
 
   // -- Toast --
-  toast:       (msg: string, type?: 'success' | 'error' | 'warn') => void
-  toasts:      Array<{ id: string; msg: string; type: 'success' | 'error' | 'warn' }>
+  toast: (msg: string, type?: 'success' | 'error' | 'warn') => void
+  toasts: Array<{ id: string; msg: string; type: 'success' | 'error' | 'warn' }>
   removeToast: (id: string) => void
 }
 
@@ -164,26 +164,26 @@ interface DashboardStore {
 export const useStore = create<DashboardStore>((set, get) => ({
   // -- Nilai awal state --
   personalSections: loadPersonalFromLocal(),
-  sharedSections:   [],
-  appearance:       { ...DEFAULT_APPEARANCE, ...loadLocalAppearance() },
-  displayOptions:   { ...defaultDisplayOptions },
-  presets:          [],
-  editMode:         false,
-  searchQuery:      '',
-  previewFilter:    { role: '', region: '', unit: '' },
-  currentUserId:    null,
-  currentUserRole:  'user',
-  currentRegion:    'global',
-  currentUnit:      'general',
-  globalTheme:      'pearl-light' as any,
-  history:          [],
-  future:           [],
-  canUndo:          false,
-  canRedo:          false,
-  isDirty:          false,
-  isSyncing:        false,
-  syncStatus:       'idle',
-  toasts:           [],
+  sharedSections: [],
+  appearance: { ...DEFAULT_APPEARANCE, ...loadLocalAppearance() },
+  displayOptions: { ...defaultDisplayOptions },
+  presets: [],
+  editMode: false,
+  searchQuery: '',
+  previewFilter: { role: '', region: '', unit: '' },
+  currentUserId: null,
+  currentUserRole: 'user',
+  currentRegion: 'global',
+  currentUnit: 'general',
+  globalTheme: 'pearl-light' as any,
+  history: [],
+  future: [],
+  canUndo: false,
+  canRedo: false,
+  isDirty: false,
+  isSyncing: false,
+  syncStatus: 'idle',
+  toasts: [],
 
   // ── Toast: tampilkan notifikasi ───────────────────────────
   toast: (msg, type = 'success') => {
@@ -318,9 +318,9 @@ export const useStore = create<DashboardStore>((set, get) => ({
   // ── Tambah section langsung tanpa modal (poin 5) ─────────
   addPersonalSectionAuto: () => {
     const current = get().personalSections
-    const maxY    = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
+    const maxY = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
     const lastRow = current.filter(s => s.layout.y + s.layout.h >= maxY)
-    const maxX    = lastRow.reduce((m, s) => Math.max(m, s.layout.x + s.layout.w), 0)
+    const maxX = lastRow.reduce((m, s) => Math.max(m, s.layout.x + s.layout.w), 0)
     const sameRow = maxX + 4 <= 12
     const newSection: Section = {
       id: 's' + uid(), title: 'Section Baru', icon: '📁', subtitle: '',
@@ -334,23 +334,23 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   // ── Tambah section pribadi baru ───────────────────────────
   addPersonalSection: (data) => {
-    ;(get() as any).pushHistory()
+    ; (get() as any).pushHistory()
     const current = get().personalSections
     // Hitung posisi Y setelah section terakhir
     const maxY = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
     const newSection: Section = {
-      id:          's' + uid(),
-      title:       data.title       ?? 'Section Baru',
-      icon:        data.icon        ?? '📁',
-      subtitle:    data.subtitle    ?? '',
-      items:       [],
-      layout:      { x: 0, y: maxY, w: data.layout?.w ?? SECTION_DEFAULT_W, h: data.layout?.h ?? SECTION_DEFAULT_H },
-      visibility:  'all',   // section pribadi selalu 'all' (hanya milik user ini)
+      id: 's' + uid(),
+      title: data.title ?? 'Section Baru',
+      icon: data.icon ?? '📁',
+      subtitle: data.subtitle ?? '',
+      items: [],
+      layout: { x: 0, y: maxY, w: data.layout?.w ?? SECTION_DEFAULT_W, h: data.layout?.h ?? SECTION_DEFAULT_H },
+      visibility: 'all',   // section pribadi selalu 'all' (hanya milik user ini)
       targetUnits: [],
-      pageId:      'beranda',
+      pageId: 'beranda',
       accentColor: data.accentColor,
-      type:        data.type        ?? 'section',
-      widgetType:  data.widgetType,
+      type: data.type ?? 'section',
+      widgetType: data.widgetType,
     }
     const next = [...current, newSection]
     persistPersonal(next)
@@ -370,7 +370,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   // ── Hapus section pribadi ─────────────────────────────────
   deletePersonalSection: (id) => {
-    ;(get() as any).pushHistory()
+    ; (get() as any).pushHistory()
     const next = get().personalSections.filter(s => s.id !== id)
     persistPersonal(next)
     set({ personalSections: next })
@@ -457,13 +457,35 @@ export const useStore = create<DashboardStore>((set, get) => ({
   },
 
   // ── Pindahkan item antar section ──────────────────────────
-  moveItem: (srcId, itemId, tgtId) => {
+  moveItem: (srcId, itemId, tgtId, tgtItemId?) => {
     const sections = get().personalSections
-    const item = sections.find(s => s.id === srcId)?.items.find(i => i.id === itemId)
+    const srcSection = sections.find(s => s.id === srcId)
+    const item = srcSection?.items.find(i => i.id === itemId)
     if (!item) return
+
     const next = sections.map(s => {
+      // Drag dalam section yang sama → reorder
+      if (s.id === srcId && s.id === tgtId) {
+        const items = s.items.filter(i => i.id !== itemId)
+        if (tgtItemId) {
+          const tgtIdx = items.findIndex(i => i.id === tgtItemId)
+          if (tgtIdx >= 0) {
+            items.splice(tgtIdx, 0, item)
+            return { ...s, items }
+          }
+        }
+        return { ...s, items: [...items, item] }
+      }
+      // Drag ke section lain
       if (s.id === srcId) return { ...s, items: s.items.filter(i => i.id !== itemId) }
-      if (s.id === tgtId) return { ...s, items: [...s.items, item] }
+      if (s.id === tgtId) {
+        if (tgtItemId) {
+          const items = [...s.items]
+          const tgtIdx = items.findIndex(i => i.id === tgtItemId)
+          if (tgtIdx >= 0) { items.splice(tgtIdx, 0, item); return { ...s, items } }
+        }
+        return { ...s, items: [...s.items, item] }
+      }
       return s
     })
     persistPersonal(next)
@@ -498,9 +520,9 @@ export const useStore = create<DashboardStore>((set, get) => ({
       s.id === id ? { ...s, isFavorite: !s.isFavorite } : s
     )
     // Re-assign layout: favorit dulu (x:0), sisanya setelahnya
-    const favs  = toggled.filter(s => s.isFavorite)
-    const rest  = toggled.filter(s => !s.isFavorite)
-    const COLS  = 12
+    const favs = toggled.filter(s => s.isFavorite)
+    const rest = toggled.filter(s => !s.isFavorite)
+    const COLS = 12
     let x = 0, y = 0, rowH = 0
     const reLayout = (list: typeof toggled) => list.map(s => {
       if (x + s.layout.w > COLS) { y += rowH; x = 0; rowH = 0 }
@@ -589,24 +611,28 @@ export const useStore = create<DashboardStore>((set, get) => ({
   undo: () => {
     const { history, personalSections, future } = get()
     if (!history.length) return
-    const prev       = history[history.length - 1]
+    const prev = history[history.length - 1]
     const newHistory = history.slice(0, -1)
-    const newFuture  = [structuredClone(personalSections), ...future].slice(0, MAX_HISTORY)
+    const newFuture = [structuredClone(personalSections), ...future].slice(0, MAX_HISTORY)
     persistPersonal(prev)
-    set({ personalSections: prev, history: newHistory, future: newFuture,
-          canUndo: newHistory.length > 0, canRedo: true })
+    set({
+      personalSections: prev, history: newHistory, future: newFuture,
+      canUndo: newHistory.length > 0, canRedo: true
+    })
   },
 
   // ── Redo: maju ke state berikutnya ───────────────────────
   redo: () => {
     const { history, personalSections, future } = get()
     if (!future.length) return
-    const next       = future[0]
-    const newFuture  = future.slice(1)
+    const next = future[0]
+    const newFuture = future.slice(1)
     const newHistory = [...history, structuredClone(personalSections)].slice(-MAX_HISTORY)
     persistPersonal(next)
-    set({ personalSections: next, history: newHistory, future: newFuture,
-          canUndo: true, canRedo: newFuture.length > 0 })
+    set({
+      personalSections: next, history: newHistory, future: newFuture,
+      canUndo: true, canRedo: newFuture.length > 0
+    })
   },
 }))
 
@@ -614,18 +640,18 @@ export const useStore = create<DashboardStore>((set, get) => ({
 export function applyThemeToDOM(theme: string) {
   // Map tema lama ke tema baru
   const legacyMap: Record<string, string> = {
-    'dark-mint':  'obsidian',
-    'dark-soft':  'aurora-dark',
+    'dark-mint': 'obsidian',
+    'dark-soft': 'aurora-dark',
     'enterprise': 'slate-dark',
-    'pearl':      'aurora-light',
-    'ivory':      'aurora-light',
-    'sage':       'slate-light',
-    'pearl-light':'aurora-light',
+    'pearl': 'aurora-light',
+    'ivory': 'aurora-light',
+    'sage': 'slate-light',
+    'pearl-light': 'aurora-light',
     'pearl-dark': 'aurora-dark',
-    'ivory-light':'slate-light',
+    'ivory-light': 'slate-light',
     'ivory-dark': 'slate-dark',
     'sage-light': 'slate-light',
-    'sage-dark':  'slate-dark',
+    'sage-dark': 'slate-dark',
   }
   const resolvedTheme = legacyMap[theme] ?? theme
 
@@ -635,12 +661,12 @@ export function applyThemeToDOM(theme: string) {
   // Font per tema
   const fontMap: Record<string, string> = {
     'aurora-light': "'Inter', sans-serif",
-    'aurora-dark':  "'Inter', sans-serif",
-    'sand-light':   "'Lora', serif",
-    'sand-dark':    "'Lora', serif",
-    'slate-light':  "'IBM Plex Sans', sans-serif",
-    'slate-dark':   "'IBM Plex Sans', sans-serif",
-    'obsidian':     "'Space Grotesk', sans-serif",
+    'aurora-dark': "'Inter', sans-serif",
+    'sand-light': "'Lora', serif",
+    'sand-dark': "'Lora', serif",
+    'slate-light': "'IBM Plex Sans', sans-serif",
+    'slate-dark': "'IBM Plex Sans', sans-serif",
+    'obsidian': "'Space Grotesk', sans-serif",
   }
   const font = fontMap[resolvedTheme]
   if (font) document.documentElement.style.setProperty('--font', font)

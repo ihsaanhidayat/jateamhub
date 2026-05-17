@@ -199,6 +199,21 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             </div>
           )}
 
+          {/* Edit mode badge — indicator visual saat edit mode aktif */}
+          {editMode && (
+            <div className="desktop-only" style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '4px 10px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--mint-bg2)', border: '1px solid var(--accent)',
+              fontSize: 10, fontWeight: 700, color: 'var(--accent)',
+              fontFamily: 'var(--mono)', letterSpacing: '0.5px',
+              animation: 'fadeIn 200ms var(--ease)',
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', animation: 'editPulse 2s ease-in-out infinite' }} />
+              EDIT
+            </div>
+          )}
+
           {/* Filter */}
           <div className="search-wrap desktop-only" style={{ marginRight: 10 }}>
             <input className="search-input" placeholder="Filter..." value={searchQuery} onChange={e => setSearch(e.target.value)} />

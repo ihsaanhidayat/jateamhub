@@ -8,25 +8,25 @@ import AppIcon from '../ui/AppIcon'
 import { sanitizeUrl } from '../../utils/security'
 
 interface Props {
-  section: Section
-  isShared?: boolean
-  canEdit?: boolean
-  isFocused?: boolean           // section sedang dalam focus edit
-  onFocus?: (id: string) => void  // callback saat header diklik
-  onEditSection: (s: Section) => void
-  onEditItem: (sectionId: string, item: LinkItem) => void
-  onAddItem: (sectionId: string) => void
-  onDeleteSection: (id: string) => void
-  onToggleFavorite?: (sectionId: string) => void
-  onToggleFavoriteItem?: (sectionId: string, itemId: string) => void
-  onSave?: () => void        // callback setelah simpan
-  onCancel?: () => void        // callback batal
+  section:              Section
+  isShared?:            boolean
+  canEdit?:             boolean
+  isFocused?:           boolean           // section sedang dalam focus edit
+  onFocus?:             (id: string) => void  // callback saat header diklik
+  onEditSection:        (s: Section) => void
+  onEditItem:           (sectionId: string, item: LinkItem) => void
+  onAddItem:            (sectionId: string) => void
+  onDeleteSection:      (id: string) => void
+  onToggleFavorite?:    (sectionId: string) => void
+  onToggleFavoriteItem?:(sectionId: string, itemId: string) => void
+  onSave?:              () => void        // callback setelah simpan
+  onCancel?:            () => void        // callback batal
 }
 
 const DENSITY: Record<string, { body: string; gap: string; headerPad: string }> = {
-  compact: { body: '4px', gap: '2px', headerPad: '7px 12px 7px 15px' },
-  comfortable: { body: '6px', gap: '4px', headerPad: '9px 12px 9px 15px' },
-  spacious: { body: '12px', gap: '8px', headerPad: '12px 14px 12px 17px' },
+  compact:     { body: '4px',  gap: '2px',  headerPad: '7px 12px 7px 15px'  },
+  comfortable: { body: '6px',  gap: '4px',  headerPad: '9px 12px 9px 15px'  },
+  spacious:    { body: '12px', gap: '8px',  headerPad: '12px 14px 12px 17px' },
 }
 
 export default function SectionCard({
@@ -44,7 +44,7 @@ export default function SectionCard({
     open: boolean; type: 'section' | 'item' | 'unfavorite'; itemId?: string; msg: string
   }>({ open: false, type: 'section', msg: '' })
 
-  const accent = section.accentColor || 'var(--accent)'
+  const accent  = section.accentColor || 'var(--accent)'
   const density = DENSITY[(appearance as any).sectionDensity ?? 'compact'] || DENSITY.compact
   const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'
 
@@ -65,7 +65,8 @@ export default function SectionCard({
     if (!raw.startsWith('item:')) return
     const [, srcItemId, srcSectionId] = raw.split(':')
     if (srcItemId === tgtItemId) return
-    moveItem(srcSectionId, srcItemId, section.id)
+    // Pass tgtItemId agar item diinsert di posisi yang benar
+    moveItem(srcSectionId, srcItemId, section.id, tgtItemId)
   }
   const onListDrop = (e: React.DragEvent) => {
     e.preventDefault(); setItemDragOver(null)
@@ -78,10 +79,10 @@ export default function SectionCard({
   const q = searchQuery.toLowerCase()
   const filteredItems = q
     ? section.items.filter(i =>
-      i.title.toLowerCase().includes(q) ||
-      (i.desc && i.desc.toLowerCase().includes(q)) ||
-      i.tags.some(t => t.toLowerCase().includes(q))
-    )
+        i.title.toLowerCase().includes(q) ||
+        (i.desc && i.desc.toLowerCase().includes(q)) ||
+        i.tags.some(t => t.toLowerCase().includes(q))
+      )
     : section.items
 
   // Apakah section ini benar-benar editable
@@ -109,236 +110,224 @@ export default function SectionCard({
 
   return (
     <>
+    <div
+      className={`section-card${isFocused ? ' is-focused' : ''}`}
+      style={{
+        '--section-accent': accent,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        // Focus highlight
+        ...(isFocused ? {
+          border: `1.5px solid ${accent === 'var(--accent)' ? 'var(--accent)' : accent}`,
+          boxShadow: `0 0 0 3px var(--mint-bg2), var(--shadow)`,
+        } : {}),
+        transition: 'border 200ms var(--ease), box-shadow 200ms var(--ease)',
+      } as React.CSSProperties}
+    >
+      {/* ── Header ─────────────────────────────────────── */}
       <div
-        className="section-card"
+        className="section-header"
         style={{
-          '--section-accent': accent,
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          // Focus highlight
-          ...(isFocused ? {
-            border: `1.5px solid ${accent === 'var(--accent)' ? 'var(--accent)' : accent}`,
-            boxShadow: `0 0 0 3px var(--mint-bg2), var(--shadow)`,
-          } : {}),
-          transition: 'border 200ms var(--ease), box-shadow 200ms var(--ease)',
-        } as React.CSSProperties}
+          padding: density.headerPad,
+          cursor: canFocus ? 'pointer' : 'default',
+          alignItems: section.subtitle ? 'flex-start' : 'center',
+          // Header highlight saat focused
+          ...(isFocused ? { background: 'var(--mint-bg)' } : {}),
+        }}
+        onClick={handleHeaderClick}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
-        {/* ── Header ─────────────────────────────────────── */}
-        <div
-          className="section-header"
-          style={{
-            padding: density.headerPad,
-            cursor: canFocus ? 'pointer' : 'default',
-            alignItems: section.subtitle ? 'flex-start' : 'center',
-            // Header highlight saat focused
-            ...(isFocused ? { background: 'var(--mint-bg)' } : {}),
-          }}
-          onClick={handleHeaderClick}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          <span className="section-icon" style={{ marginTop: section.subtitle ? 1 : 0 }}>
-            {section.icon || '📁'}
-          </span>
+        <span className="section-icon" style={{ marginTop: section.subtitle ? 1 : 0 }}>
+          {section.icon || '📁'}
+        </span>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="section-title">{section.title}</div>
-            {section.subtitle && (
-              <div style={{
-                fontSize: 10, color: 'var(--silver3)', fontWeight: 400,
-                letterSpacing: '.2px', marginTop: 1,
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {section.subtitle}
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
-            {/* Focus tools — muncul saat section focused */}
-            {isFocused && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                {/* Favorite */}
-                {!isShared && onToggleFavorite && (
-                  <button
-                    className="sec-action-btn-lg"
-                    onMouseDown={e => e.stopPropagation()}
-                    onClick={e => {
-                      e.stopPropagation()
-                      if (section.isFavorite) {
-                        setConfirmDel({
-                          open: true, type: 'unfavorite',
-                          msg: `Lepas "${section.title}" dari Favorit?`
-                        })
-                      } else {
-                        onToggleFavorite(section.id)
-                      }
-                    }}
-                    title={section.isFavorite ? 'Lepas favorit' : 'Tandai favorit'}
-                    style={{ color: section.isFavorite ? '#FFD700' : undefined }}
-                  >⭐</button>
-                )}
-                {/* Tambah link */}
-                <button
-                  className="sec-action-btn-lg"
-                  onMouseDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); onAddItem(section.id) }}
-                  title="Tambah Link"
-                  style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
-                >＋</button>
-                {/* Edit section (buka modal) */}
-                <button
-                  className="sec-action-btn-lg"
-                  onMouseDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); onEditSection(section) }}
-                  title="Edit Section"
-                >⚙️</button>
-                {/* Hapus section */}
-                <button
-                  className="sec-action-btn-lg danger"
-                  onMouseDown={e => e.stopPropagation()}
-                  onClick={e => {
-                    e.stopPropagation()
-                    setConfirmDel({
-                      open: true, type: 'section',
-                      msg: `Hapus section "${section.title}" beserta semua item di dalamnya?`
-                    })
-                  }}
-                  title="Hapus Section"
-                >🗑</button>
-              </div>
-            )}
-
-            {/* Collapse button — selalu ada */}
-            <button
-              className={`sec-collapse-btn${section.collapsed ? '' : ' open'}`}
-              onMouseDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); toggleCollapse(section.id) }}
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* ── Body ─────────────────────────────────────────── */}
-        <div className={`section-body${section.collapsed ? ' collapsed' : ''}`}>
-          {isFolderGrid ? (
-            <div
-              className="folder-grid"
-              style={{ '--folder-cols': appearance.folderGridCols } as React.CSSProperties}
-              onDragOver={e => e.preventDefault()}
-              onDrop={e => {
-                e.preventDefault()
-                const raw = e.dataTransfer.getData('text/plain')
-                if (!raw.startsWith('item:')) return
-                const [, srcItemId, srcSectionId] = raw.split(':')
-                moveItem(srcSectionId, srcItemId, section.id)
-              }}
-            >
-              {filteredItems.map(item => (
-                <FolderItem
-                  key={item.id}
-                  item={item}
-                  searchQuery={q}
-                  editMode={!!isFocused && isAdmin && editMode}
-                  dragOver={itemDragOver === item.id}
-                  appearance={appearance}
-                  onDragStart={onItemDragStart}
-                  onDragOver={onItemDragOver}
-                  onDrop={onItemDrop}
-                  onDragLeave={() => setItemDragOver(null)}
-                  onEdit={() => onEditItem(section.id, item)}
-                  onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
-                />
-              ))}
-              {/* Ghost add item — saat section focused */}
-              {isFocused && isAdmin && editMode && (
-                <GhostAddItem onClick={() => onAddItem(section.id)} />
-              )}
-            </div>
-          ) : (
-            <div
-              style={{ padding: density.body, display: 'flex', flexDirection: 'column', gap: density.gap }}
-              onDragOver={e => e.preventDefault()}
-              onDrop={onListDrop}
-            >
-              {filteredItems.map(item => (
-                <ListItem
-                  key={item.id}
-                  item={item}
-                  searchQuery={q}
-                  editMode={!!isFocused && isAdmin && editMode}
-                  appearance={appearance}
-                  showDesc={displayOptions.showDesc}
-                  showTags={displayOptions.showTags}
-                  onEdit={() => onEditItem(section.id, item)}
-                  onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
-                />
-              ))}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="section-title">{section.title}</div>
+          {section.subtitle && (
+            <div style={{
+              fontSize: 10, color: 'var(--silver3)', fontWeight: 400,
+              letterSpacing: '.2px', marginTop: 1,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {section.subtitle}
             </div>
           )}
         </div>
 
-        {/* ── Footer: Simpan + Batal — hanya saat focused ─── */}
-        {isFocused && isAdmin && (
-          <div style={{
-            display: 'flex', gap: 8, padding: '10px 12px',
-            borderTop: '1px solid var(--border)',
-            background: 'var(--mint-bg)',
-            flexShrink: 0,
-          }}>
-            <button
-              onMouseDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); onCancel?.() }}
-              style={{
-                flex: 1, height: 36, background: 'none',
-                border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)',
-                color: 'var(--silver3)', fontSize: 12, fontWeight: 600,
-                cursor: 'pointer', fontFamily: 'var(--font)',
-              }}>Batal</button>
-            <button
-              onMouseDown={e => e.stopPropagation()}
-              onClick={async e => {
-                e.stopPropagation()
-                // Tunggu sync selesai dulu
-                await syncPersonalToDb()
-                onSave?.()
-              }}
-              disabled={isSyncing}
-              style={{
-                flex: 2, height: 36,
-                background: 'var(--accent)', border: 'none',
-                borderRadius: 'var(--radius-sm)',
-                color: 'white', fontSize: 12, fontWeight: 700,
-                cursor: isSyncing ? 'wait' : 'pointer', fontFamily: 'var(--font)',
-                opacity: isSyncing ? 0.7 : 1,
-              }}>{isSyncing ? '⏳ Menyimpan...' : '✓ Simpan'}</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+          {/* Focus tools — muncul saat section focused */}
+          {isFocused && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {/* Favorite */}
+              {!isShared && onToggleFavorite && (
+                <button
+                  className="sec-action-btn-lg"
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => {
+                    e.stopPropagation()
+                    if (section.isFavorite) {
+                      setConfirmDel({ open: true, type: 'unfavorite',
+                        msg: `Lepas "${section.title}" dari Favorit?` })
+                    } else {
+                      onToggleFavorite(section.id)
+                    }
+                  }}
+                  title={section.isFavorite ? 'Lepas favorit' : 'Tandai favorit'}
+                  style={{ color: section.isFavorite ? '#FFD700' : undefined }}
+                >⭐</button>
+              )}
+              {/* Edit section (buka modal) */}
+              <button
+                className="sec-action-btn-lg"
+                onMouseDown={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); onEditSection(section) }}
+                title="Edit Section"
+              >⚙️</button>
+              {/* Hapus section */}
+              <button
+                className="sec-action-btn-lg danger"
+                onMouseDown={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation()
+                  setConfirmDel({ open: true, type: 'section',
+                    msg: `Hapus section "${section.title}" beserta semua item di dalamnya?` })
+                }}
+                title="Hapus Section"
+              >🗑</button>
+            </div>
+          )}
+
+          {/* Collapse button — selalu ada */}
+          <button
+            className={`sec-collapse-btn${section.collapsed ? '' : ' open'}`}
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); toggleCollapse(section.id) }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Body ─────────────────────────────────────────── */}
+      <div className={`section-body${section.collapsed ? ' collapsed' : ''}`}>
+        {isFolderGrid ? (
+          <div
+            className="folder-grid"
+            style={{ '--folder-cols': appearance.folderGridCols } as React.CSSProperties}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => {
+              e.preventDefault()
+              const raw = e.dataTransfer.getData('text/plain')
+              if (!raw.startsWith('item:')) return
+              const [, srcItemId, srcSectionId] = raw.split(':')
+              moveItem(srcSectionId, srcItemId, section.id)
+            }}
+          >
+            {filteredItems.map(item => (
+              <FolderItem
+                key={item.id}
+                item={item}
+                searchQuery={q}
+                editMode={!!isFocused && isAdmin && editMode}
+                dragOver={itemDragOver === item.id}
+                appearance={appearance}
+                onDragStart={onItemDragStart}
+                onDragOver={onItemDragOver}
+                onDrop={onItemDrop}
+                onDragLeave={() => setItemDragOver(null)}
+                onEdit={() => onEditItem(section.id, item)}
+                onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
+              />
+            ))}
+            {/* Ghost add item — saat section focused */}
+            {isFocused && isAdmin && editMode && (
+              <GhostAddItem onClick={() => onAddItem(section.id)} />
+            )}
+          </div>
+        ) : (
+          <div
+            style={{ padding: density.body, display: 'flex', flexDirection: 'column', gap: density.gap }}
+            onDragOver={e => e.preventDefault()}
+            onDrop={onListDrop}
+          >
+            {filteredItems.map(item => (
+              <ListItem
+                key={item.id}
+                item={item}
+                searchQuery={q}
+                editMode={!!isFocused && isAdmin && editMode}
+                appearance={appearance}
+                showDesc={displayOptions.showDesc}
+                showTags={displayOptions.showTags}
+                onEdit={() => onEditItem(section.id, item)}
+                onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
+              />
+            ))}
           </div>
         )}
       </div>
 
-      {/* Confirm dialog */}
-      <ConfirmDialog
-        open={confirmDel.open}
-        title={confirmDel.type === 'section' ? 'Hapus Section' : confirmDel.type === 'unfavorite' ? 'Lepas Favorit' : 'Hapus Link'}
-        message={confirmDel.msg}
-        danger={confirmDel.type !== 'unfavorite'}
-        onConfirm={() => {
-          if (confirmDel.type === 'unfavorite') {
-            onToggleFavorite?.(section.id)
-          } else if (confirmDel.type === 'section') {
-            onDeleteSection(section.id)
-          } else if (confirmDel.type === 'item' && confirmDel.itemId) {
-            deleteItem(section.id, confirmDel.itemId)
-            toast('Link dihapus.', 'success')
-          }
-          setConfirmDel({ open: false, type: 'section', msg: '' })
-        }}
-        onCancel={() => setConfirmDel({ open: false, type: 'section', msg: '' })}
-      />
+      {/* ── Footer: Simpan + Batal — hanya saat focused ─── */}
+      {isFocused && isAdmin && (
+        <div style={{
+          display: 'flex', gap: 8, padding: '10px 12px',
+          borderTop: '1px solid var(--border)',
+          background: 'var(--mint-bg)',
+          flexShrink: 0,
+        }}>
+          <button
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onCancel?.() }}
+            style={{
+              flex: 1, height: 36, background: 'none',
+              border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)',
+              color: 'var(--silver3)', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'var(--font)',
+            }}>Batal</button>
+          <button
+            onMouseDown={e => e.stopPropagation()}
+            onClick={async e => {
+              e.stopPropagation()
+              // Tunggu sync selesai dulu
+              await syncPersonalToDb()
+              onSave?.()
+            }}
+            disabled={isSyncing}
+            style={{
+              flex: 2, height: 36,
+              background: 'var(--accent)', border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              color: 'white', fontSize: 12, fontWeight: 700,
+              cursor: isSyncing ? 'wait' : 'pointer', fontFamily: 'var(--font)',
+              opacity: isSyncing ? 0.7 : 1,
+            }}>{isSyncing ? '⏳ Menyimpan...' : '✓ Simpan'}</button>
+        </div>
+      )}
+    </div>
+
+    {/* Confirm dialog */}
+    <ConfirmDialog
+      open={confirmDel.open}
+      title={confirmDel.type === 'section' ? 'Hapus Section' : confirmDel.type === 'unfavorite' ? 'Lepas Favorit' : 'Hapus Link'}
+      message={confirmDel.msg}
+      danger={confirmDel.type !== 'unfavorite'}
+      onConfirm={() => {
+        if (confirmDel.type === 'unfavorite') {
+          onToggleFavorite?.(section.id)
+        } else if (confirmDel.type === 'section') {
+          onDeleteSection(section.id)
+        } else if (confirmDel.type === 'item' && confirmDel.itemId) {
+          deleteItem(section.id, confirmDel.itemId)
+          toast('Link dihapus.', 'success')
+        }
+        setConfirmDel({ open: false, type: 'section', msg: '' })
+      }}
+      onCancel={() => setConfirmDel({ open: false, type: 'section', msg: '' })}
+    />
     </>
   )
 }
@@ -371,17 +360,17 @@ function GhostAddItem({ onClick }: { onClick: () => void }) {
 
 // ── Folder Item ───────────────────────────────────────────
 interface FolderItemProps {
-  item: LinkItem
+  item:        LinkItem
   searchQuery: string
-  editMode: boolean
-  dragOver: boolean
-  appearance: AppearanceSettings
+  editMode:    boolean
+  dragOver:    boolean
+  appearance:  AppearanceSettings
   onDragStart: (e: React.DragEvent, item: LinkItem) => void
-  onDragOver: (e: React.DragEvent, id: string) => void
-  onDrop: (e: React.DragEvent, id: string) => void
+  onDragOver:  (e: React.DragEvent, id: string) => void
+  onDrop:      (e: React.DragEvent, id: string) => void
   onDragLeave: () => void
-  onEdit: () => void
-  onDelete: () => void
+  onEdit:      () => void
+  onDelete:    () => void
 }
 
 function FolderItem({ item, searchQuery, editMode, dragOver, appearance, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete }: FolderItemProps) {
@@ -447,14 +436,14 @@ function FolderItem({ item, searchQuery, editMode, dragOver, appearance, onDragS
 
 // ── List Item ─────────────────────────────────────────────
 interface ListItemProps {
-  item: LinkItem
+  item:        LinkItem
   searchQuery: string
-  editMode: boolean
-  appearance: AppearanceSettings
-  showDesc: boolean
-  showTags: boolean
-  onEdit: () => void
-  onDelete: () => void
+  editMode:    boolean
+  appearance:  AppearanceSettings
+  showDesc:    boolean
+  showTags:    boolean
+  onEdit:      () => void
+  onDelete:    () => void
 }
 
 function ListItem({ item, searchQuery, editMode, appearance, showDesc, showTags, onEdit, onDelete }: ListItemProps) {

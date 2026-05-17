@@ -279,6 +279,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  overflow-y: hidden; /* prevent double scroll — main handles scroll */
   transition: background-color var(--dur-slow) var(--ease),
               color var(--dur-slow) var(--ease);
 }
@@ -301,8 +302,8 @@ button { cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--sp-6);
-  height: 60px;
+  padding: env(safe-area-inset-top) var(--sp-6) 0;
+  min-height: 60px;
   background: var(--header-bg);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
@@ -467,13 +468,13 @@ button { cursor: pointer; }
   flex: 1; display: flex; flex-direction: column;
   overflow-x: hidden; overflow-y: auto; min-height: 0;
   max-width: var(--max-w); width: 100%; margin: 0 auto;
-  align-self: center; box-sizing: border-box;
+  align-self: stretch; box-sizing: border-box;
 }
 .main.edit-active { padding-bottom: 60px; }
 
 .rgl-grid {
   width: 100%; min-height: 200px;
-  padding: var(--sp-6) var(--sp-6);
+  padding: var(--sp-6); /* 24px semua sisi */
   box-sizing: border-box;
 }
 
@@ -544,21 +545,28 @@ button { cursor: pointer; }
 
 /* Section action buttons — min 44px touch */
 .sec-action-btn-lg {
-  width: 32px; height: 32px;
+  width: 40px; height: 40px;
   background: var(--mint-bg);
   border: 1px solid var(--border2);
   border-radius: var(--radius-sm);
-  color: var(--silver3); font-size: 13px;
+  color: var(--silver3); font-size: 14px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   transition: all var(--dur-fast) var(--ease);
   flex-shrink: 0;
+  /* Touch target expanded via pseudo */
+  position: relative;
+}
+.sec-action-btn-lg::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
 }
 .sec-action-btn-lg:hover { border-color: var(--accent); color: var(--accent); background: var(--mint-bg2); }
 .sec-action-btn-lg.danger:hover { border-color: var(--red); color: var(--red); background: rgba(239,68,68,0.08); }
 
 .sec-collapse-btn {
-  width: 32px; height: 32px;
+  width: 40px; height: 40px;
   background: none; border: none;
   color: var(--silver3);
   display: flex; align-items: center; justify-content: center;
@@ -620,7 +628,7 @@ button { cursor: pointer; }
   word-break: break-word; max-width: 100%;
 }
 
-/* Action group — tampil saat hover/edit */
+/* Action group — tampil saat hover atau edit mode */
 .folder-action-group {
   position: absolute; top: var(--sp-1); right: var(--sp-1);
   display: flex; gap: 2px;
@@ -628,16 +636,22 @@ button { cursor: pointer; }
   transition: opacity var(--dur-fast) var(--ease);
 }
 .folder-item:hover .folder-action-group,
-.folder-item:focus-within .folder-action-group { opacity: 1; }
+.folder-item:focus-within .folder-action-group,
+.folder-item .folder-action-group[style*="opacity: 1"] { opacity: 1; }
 
 .folder-edit-btn, .folder-delete-btn {
-  width: 24px; height: 24px;
+  width: 28px; height: 28px;
   background: var(--bg3);
   border: 1px solid var(--border2);
   border-radius: 6px; color: var(--silver3);
   font-size: 11px; cursor: pointer;
   transition: all var(--dur-fast) var(--ease);
   display: flex; align-items: center; justify-content: center; padding: 0;
+  position: relative;
+}
+.folder-edit-btn::after, .folder-delete-btn::after {
+  content: ''; position: absolute;
+  inset: -8px; /* expand touch area to ~44px */
 }
 .folder-edit-btn:hover   { color: var(--accent); border-color: var(--accent); background: var(--mint-bg); }
 .folder-delete-btn:hover { color: var(--red);    border-color: var(--red);    background: rgba(239,68,68,0.08); }
@@ -679,11 +693,15 @@ button { cursor: pointer; }
 }
 .item-card:hover .item-action-group { opacity: 1; }
 .item-edit-btn, .item-delete-btn {
-  width: 28px; height: 28px;
+  width: 32px; height: 32px;
   background: var(--bg3); border: 1px solid var(--border2);
   border-radius: var(--radius-sm); color: var(--silver3);
   font-size: 12px; cursor: pointer; transition: all var(--dur-fast);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 0;
+  position: relative;
+}
+.item-edit-btn::after, .item-delete-btn::after {
+  content: ''; position: absolute; inset: -6px;
 }
 .item-edit-btn:hover   { color: var(--accent); border-color: var(--accent); background: var(--mint-bg); }
 .item-delete-btn:hover { color: var(--red);    border-color: var(--red);    background: rgba(239,68,68,0.08); }
@@ -751,7 +769,7 @@ button { cursor: pointer; }
   color: var(--accent); font-family: var(--mono);
 }
 .close-btn {
-  width: 32px; height: 32px;
+  width: 44px; height: 44px;
   background: none; border: none; color: var(--silver3);
   font-size: 20px; cursor: pointer; line-height: 1;
   display: flex; align-items: center; justify-content: center;
@@ -968,9 +986,9 @@ button { cursor: pointer; }
    MOBILE GRID
 ══════════════════════════════════════════════════════════════ */
 .mobile-grid {
-  display: flex; flex-direction: column; gap: var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-4); /* 16px */
   padding: var(--sp-4) var(--sp-4);
-  padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--sp-6) + env(safe-area-inset-bottom)); /* 24px + safe */
   overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
 .mobile-section { width: 100%; position: relative; padding-top: 14px; }
@@ -1021,6 +1039,42 @@ button { cursor: pointer; }
 .modal { animation: scaleIn var(--dur-base) var(--ease) both; }
 .edit-bar { animation: slideInUp var(--dur-base) var(--ease) both; }
 .options-panel { animation: slideInRight var(--dur-base) var(--ease) both; }
+
+
+/* ── Edit Mode Indicator ────────────────────────────────────── */
+/* Subtle top border saat edit mode aktif */
+body.edit-mode-active .header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent 60%);
+  z-index: 1;
+  animation: editPulse 2s ease-in-out infinite;
+}
+@keyframes editPulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+
+/* Section focused — glow ring */
+.section-card.is-focused {
+  box-shadow: 0 0 0 2px var(--accent), 0 4px 24px rgba(0,0,0,0.12) !important;
+}
+
+/* Edit mode overlay hint — muncul sekali saat pertama masuk edit mode */
+.edit-mode-hint {
+  position: fixed; bottom: calc(72px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: var(--radius-lg); padding: 8px 16px;
+  font-size: 11px; color: var(--silver3); white-space: nowrap;
+  z-index: 200; pointer-events: none;
+  animation: slideInUp var(--dur-base) var(--ease) both,
+             fadeOut 0.5s var(--ease) 3s forwards;
+  box-shadow: var(--shadow);
+}
+@keyframes fadeOut { to { opacity: 0; } }
 
 /* ══════════════════════════════════════════════════════════════
    RESPONSIVE — Mobile First

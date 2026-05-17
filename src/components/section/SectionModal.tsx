@@ -163,19 +163,6 @@ export default function SectionModal({ open, section, onClose }: Props) {
         </div>
       )}
 
-      {/* Lebar section dalam kolom grid (1-12) */}
-      <div className="field">
-        <label>Lebar (kolom grid: {colW}/12)</label>
-        <input
-          type="range" min={2} max={12} value={colW}
-          onChange={e => setColW(Number(e.target.value))}
-          style={{ width: '100%', accentColor: 'var(--accent)' }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--silver3)', marginTop: 2 }}>
-          <span>Sempit</span><span>Penuh</span>
-        </div>
-      </div>
-
       {/* Warna aksen border section */}
       <div className="field">
         <label>Warna Aksen</label>

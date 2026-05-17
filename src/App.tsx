@@ -4,16 +4,16 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from './store/authStore'
 import { useStore, applyThemeToDOM } from './store/dashboardStore'
-import LoginPage           from './components/layout/LoginPage'
-import RegisterPage        from './components/layout/RegisterPage'
+import LoginPage from './components/layout/LoginPage'
+import RegisterPage from './components/layout/RegisterPage'
 import SuperadminDashboard from './components/layout/SuperadminDashboard'
-import Header       from './components/layout/Header'
+import Header from './components/layout/Header'
 import OptionsPanel from './components/layout/OptionsPanel'
-import EditBar      from './components/layout/EditBar'
-import GridLayout   from './components/layout/GridLayout'
-import ProfilePage  from './components/layout/ProfilePage'
-import PanduanFAB   from './components/layout/PanduanFAB'
-import CoffeeModal  from './components/ui/CoffeeModal'
+import EditBar from './components/layout/EditBar'
+import GridLayout from './components/layout/GridLayout'
+import ProfilePage from './components/layout/ProfilePage'
+import PanduanFAB from './components/layout/PanduanFAB'
+import CoffeeModal from './components/ui/CoffeeModal'
 import SectionModal from './components/section/SectionModal'
 import AddSectionModal from './components/layout/AddSectionModal'
 import ToastContainer from './components/ui/Toast'
@@ -30,11 +30,11 @@ export default function App() {
   } = useStore()
 
   // State UI lokal
-  const [optionsOpen,    setOptionsOpen]    = useState(false)
-  const [showRegister,   setShowRegister]   = useState(false)
-  const [profileOpen,    setProfileOpen]    = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const [showRegister, setShowRegister] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [addSectionOpen, setAddSectionOpen] = useState(false)
-  const [coffeeOpen,     setCoffeeOpen]     = useState(false)
+  const [coffeeOpen, setCoffeeOpen] = useState(false)
 
   // Inisialisasi auth saat app pertama kali dibuka
   useEffect(() => { init() }, [])
@@ -61,7 +61,7 @@ export default function App() {
         profile.id,
         profile.role,
         (profile as any).region_scope ?? 'global',
-        (profile as any).unit_scope   ?? 'general',
+        (profile as any).unit_scope ?? 'general',
       )
       // Inject fungsi toast ke authStore agar bisa tampilkan notifikasi
       useAuthStore.getState().setToastFn(toast)
@@ -80,6 +80,16 @@ export default function App() {
 
   // Terapkan theme ke DOM setiap kali theme berubah
   useEffect(() => { applyThemeToDOM(globalTheme) }, [globalTheme])
+
+  // Edit mode — tambah class ke body untuk CSS indicator
+  useEffect(() => {
+    if (editMode) {
+      document.body.classList.add('edit-mode-active')
+    } else {
+      document.body.classList.remove('edit-mode-active')
+    }
+    return () => document.body.classList.remove('edit-mode-active')
+  }, [editMode])
 
   // Tampilkan loading spinner saat init auth belum selesai
   if (!initialized) return (
@@ -128,6 +138,41 @@ export default function App() {
 
       {/* Edit bar — muncul saat edit mode aktif */}
       {editMode && <EditBar onAddSection={() => setAddSectionOpen(true)} />}
+
+      {/* Edit mode topbar — slim bar di bawah header saat edit aktif */}
+      {editMode && (
+        <div style={{
+          height: 36, flexShrink: 0,
+          background: 'var(--mint-bg2)',
+          borderBottom: '1px solid var(--accent)',
+          display: 'flex', alignItems: 'center',
+          padding: '0 var(--sp-5)', gap: 'var(--sp-3)',
+          animation: 'slideInUp 200ms var(--ease)',
+        }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: 'var(--accent)', flexShrink: 0,
+            animation: 'editPulse 2s ease-in-out infinite',
+          }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--mono)', letterSpacing: '0.8px' }}>
+            EDIT MODE
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--silver3)', flex: 1 }}>
+            Klik section untuk mulai edit
+          </span>
+          <button
+            onClick={() => useStore.getState().toggleEditMode()}
+            style={{
+              height: 24, padding: '0 10px',
+              background: 'none', border: '1px solid var(--border2)',
+              borderRadius: 'var(--radius-sm)', color: 'var(--silver3)',
+              fontSize: 10, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'var(--font)', letterSpacing: '0.5px',
+            }}>
+            ✕ SELESAI
+          </button>
+        </div>
+      )}
 
       {/* Modal tambah section/widget — muncul saat klik ＋ di header */}
       <AddSectionModal
