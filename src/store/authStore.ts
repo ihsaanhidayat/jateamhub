@@ -14,33 +14,33 @@ import type { Role } from '../types'
 import { canManageUser, canCreateUser, canAssignRole, getRegion, getUnit } from '../utils/roles'
 
 interface AuthState {
-  profile:     Profile | null   // profil user yang sedang login
-  loading:     boolean           // sedang proses login/init
+  profile: Profile | null   // profil user yang sedang login
+  loading: boolean           // sedang proses login/init
   initialized: boolean           // inisialisasi auth sudah selesai
-  users:       Profile[]         // daftar user untuk management
+  users: Profile[]         // daftar user untuk management
 
   // Fungsi inject toast dari dashboard store
   _toast: ((msg: string, type?: 'success' | 'error' | 'warn') => void) | null
   setToastFn: (fn: (msg: string, type?: 'success' | 'error' | 'warn') => void) => void
 
   // Auth actions
-  init:    () => Promise<void>
-  login:   (username: string, password: string) => Promise<string | null>
-  logout:  () => Promise<void>
+  init: () => Promise<void>
+  login: (username: string, password: string) => Promise<string | null>
+  logout: () => Promise<void>
 
   // User management actions
-  loadUsers:   () => Promise<void>
-  addUser:     (username: string, password: string, role: Role, unitId: string, regionScope?: string, unitScope?: string) => Promise<string | null>
-  updateUser:  (userId: string, role: Role, unitId: string, newPassword?: string, emoji?: string, regionScope?: string, unitScope?: string) => Promise<string | null>
-  removeUser:  (userId: string) => Promise<string | null>
+  loadUsers: () => Promise<void>
+  addUser: (username: string, password: string, role: Role, unitId: string, regionScope?: string, unitScope?: string) => Promise<string | null>
+  updateUser: (userId: string, role: Role, unitId: string, newPassword?: string, emoji?: string, regionScope?: string, unitScope?: string) => Promise<string | null>
+  removeUser: (userId: string) => Promise<string | null>
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  profile:     null,
-  loading:     false,
+  profile: null,
+  loading: false,
   initialized: false,
-  users:       [],
-  _toast:      null,
+  users: [],
+  _toast: null,
 
   // Simpan referensi fungsi toast dari dashboard store
   setToastFn: (fn) => set({ _toast: fn }),
@@ -48,21 +48,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // ── Inisialisasi: cek sesi aktif saat app dibuka ──────────
   init: async () => {
     set({ loading: true })
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.user) {
-      // Ada sesi aktif — ambil profil dari DB
-      const profile = await getProfile(session.user.id)
-      set({ profile, loading: false, initialized: true })
-    } else {
-      // Tidak ada sesi
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      if (error || !session?.user) {
+        // Sesi tidak valid atau tidak ada — bersihkan storage
+        if (error) {
+          localStorage.removeItem('jateamhub-personal')
+          await supabase.auth.signOut()
+        }
+        set({ profile: null, loading: false, initialized: true })
+      } else {
+        const profile = await getProfile(session.user.id)
+        set({ profile, loading: false, initialized: true })
+      }
+    } catch {
+      // Fallback — token corrupt atau network error
       set({ profile: null, loading: false, initialized: true })
     }
-    // Dengarkan perubahan status auth (login/logout dari tab lain)
-    supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        const profile = await getProfile(session.user.id)
-        set({ profile })
-      } else {
+
+    // Dengarkan perubahan status auth
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+        if (session?.user) {
+          const profile = await getProfile(session.user.id)
+          set({ profile })
+        }
+      } else if (event === 'SIGNED_OUT') {
         set({ profile: null })
       }
     })
@@ -94,14 +105,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // Superadmin dan admin global → load semua user
     if (me.role === 'superadmin' ||
-       (me.role === 'admin' && (me.region_scope ?? 'global') === 'global')) {
+      (me.role === 'admin' && (me.region_scope ?? 'global') === 'global')) {
       set({ users: await getAllProfiles() })
     } else {
       // Admin wilayah/unit → hanya load user dalam scope-nya
-      set({ users: await getProfilesByScope(
-        me.region_scope ?? 'global',
-        me.unit_scope   ?? 'general'
-      )})
+      set({
+        users: await getProfilesByScope(
+          me.region_scope ?? 'global',
+          me.unit_scope ?? 'general'
+        )
+      })
     }
   },
 
@@ -111,8 +124,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!me) return 'Tidak ada sesi.'
 
     // Cek apakah boleh membuat user dengan role ini
-    if (!canCreateUser(me as any, role))  return 'Tidak ada akses membuat user dengan role ini.'
-    if (!canAssignRole(me as any, role))  return 'Tidak bisa assign role ini.'
+    if (!canCreateUser(me as any, role)) return 'Tidak ada akses membuat user dengan role ini.'
+    if (!canAssignRole(me as any, role)) return 'Tidak bisa assign role ini.'
 
     const { error } = await createUser(username, password, role, unitId, regionScope, unitScope)
     if (error) return error.message
@@ -123,7 +136,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // ── Update user — validasi permission dan scope ───────────
   updateUser: async (userId, role, unitId, newPassword, emoji, regionScope, unitScope) => {
-    const me     = get().profile
+    const me = get().profile
     if (!me) return 'Tidak ada sesi.'
     const target = get().users.find(u => u.id === userId)
     if (!target) return 'User tidak ditemukan.'
@@ -144,8 +157,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Update data profil
     const updates: Partial<Profile> = {
       role,
-      unit_id:      unitId,
-      unit_scope:   unitScope   ?? target.unit_scope   ?? 'general',
+      unit_id: unitId,
+      unit_scope: unitScope ?? target.unit_scope ?? 'general',
       region_scope: regionScope ?? target.region_scope ?? 'global',
     }
     if (emoji !== undefined) updates.emoji = emoji
