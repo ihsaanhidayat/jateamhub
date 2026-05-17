@@ -12,7 +12,7 @@ function MatrixRain() {
     if (!ctx) return
 
     const resize = () => {
-      canvas.width  = window.innerWidth
+      canvas.width = window.innerWidth
       canvas.height = window.innerHeight
     }
     resize()
@@ -73,12 +73,12 @@ function MatrixRain() {
 
 export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
   const { login } = useAuthStore()
-  const [showPw,   setShowPw]   = useState(false)
+  const [showPw, setShowPw] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [err,      setErr]      = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const [shake,    setShake]    = useState(false)
+  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [shake, setShake] = useState(false)
 
   // Terapkan tema dari localStorage saat login page muncul
   useEffect(() => {
@@ -89,13 +89,12 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
         if (app?.theme) {
           document.documentElement.setAttribute('data-theme', app.theme)
           const fontMap: Record<string, string> = {
-            'aurora-light': "'Inter', sans-serif",
-            'aurora-dark':  "'Inter', sans-serif",
-            'sand-light':   "'Lora', serif",
-            'sand-dark':    "'Lora', serif",
-            'slate-light':  "'IBM Plex Sans', sans-serif",
-            'slate-dark':   "'IBM Plex Sans', sans-serif",
-            'obsidian':     "'Space Grotesk', sans-serif",
+            'ivory-light': "'Inter', sans-serif",
+            'obsidian': "'Space Grotesk', sans-serif",
+            'sand-light': "'Lora', serif",
+            'sand-dark': "'Lora', serif",
+            'slate-light': "'IBM Plex Sans', sans-serif",
+            'slate-dark': "'IBM Plex Sans', sans-serif",
           }
           const font = fontMap[app.theme]
           if (font) document.documentElement.style.setProperty('--font', font)
@@ -185,6 +184,7 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
             letterSpacing: '-1px', fontFamily: 'var(--font)',
             textShadow: '0 0 20px rgba(0,255,194,0.8), 0 0 40px rgba(0,255,194,0.4), 0 0 80px rgba(0,255,194,0.2)',
           }}>JateamHub</h1>
+          <h3>Selamat datang, Jagoan</h3>
           <div style={{
             width: 50, height: 2, background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
             margin: '8px auto 0',

@@ -90,67 +90,45 @@ export default function OptionsPanel({ open, onClose }: Props) {
         <div className="options-label">Tema</div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
           {THEMES.map(t => {
-            const currentBase = (appearance.themeBase ?? 'aurora') as string
+            const currentBase = (appearance.themeBase ?? 'ivory') as string
             const isActive    = currentBase === t.id
-            const isDark      = appearance.isDarkMode ?? false
             return (
               <button key={t.id} onClick={() => {
-                // Obsidian: standalone dark, jangan ubah isDarkMode state
-                const newIsDark = t.standalone ? false : isDark  // reset toggle state
-                const themeId   = t.standalone ? 'obsidian' : `${t.id}-${isDark ? 'dark' : 'light'}`
-                setAppearance({
-                  themeBase: t.id as any,
-                  theme:     themeId as any,
-                  isDarkMode: t.standalone ? false : isDark,  // Obsidian tidak pakai isDarkMode
-                })
+                const themeId = t.standalone ? 'obsidian' : 'ivory-light'
+                setAppearance({ themeBase: t.id as any, theme: themeId as any, isDarkMode: false })
                 applyThemeToDOM(themeId)
-              }} title={t.name} style={{
-                flex: 1, padding: '8px 4px',
+              }} style={{
+                flex: 1, padding: '12px 10px',
                 borderRadius: 'var(--radius-sm)',
-                background: isActive ? 'var(--mint-bg2)' : 'var(--bg3)',
-                border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--border2)'}`,
-                cursor: 'pointer', transition: 'all .15s',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                background: isActive ? 'var(--mint-bg2)' : 'var(--bg2)',
+                border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
+                cursor: 'pointer', transition: 'all 150ms var(--ease)',
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
+                textAlign: 'left',
               }}>
-                {/* Swatch light | dark */}
-                <div style={{ display: 'flex', borderRadius: 4, overflow: 'hidden', width: 34, height: 16, border: '1px solid rgba(0,0,0,0.08)' }}>
-                  <div style={{ flex: 1, background: t.standalone ? '#1a1a1a' : t.bgLight }} />
-                  <div style={{ flex: 1, background: t.bgDark }} />
+                {/* Preview swatch */}
+                <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                  <div style={{
+                    width: 24, height: 16, borderRadius: 4,
+                    background: t.standalone ? '#0C0C0C' : '#FAFAF8',
+                    border: '1px solid var(--border2)',
+                  }} />
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.accent, flexShrink: 0 }} />
                 </div>
-                <span style={{ fontSize: 9, fontWeight: 700, color: isActive ? 'var(--accent)' : 'var(--silver2)', letterSpacing: '.3px' }}>
-                  {t.name}
-                </span>
-                {/* Font preview */}
-                <span style={{ fontSize: 8, color: 'var(--silver3)', fontFamily: (t as any).font, opacity: 0.7 }}>Aa</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: isActive ? 'var(--accent)' : 'var(--silver)', fontFamily: t.font }}>
+                    {t.name}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--silver3)', marginTop: 2, lineHeight: 1.4 }}>
+                    {t.description}
+                  </div>
+                </div>
+                {isActive && <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.5px' }}>✓ AKTIF</span>}
               </button>
             )
           })}
         </div>
 
-        {/* Toggle dark mode — HANYA untuk Aurora/Sand/Slate, TIDAK untuk Obsidian */}
-        {(appearance.themeBase ?? 'aurora') !== 'obsidian' && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--silver2)', fontWeight: 500 }}>🌙 Dark Mode</span>
-            <div onClick={() => {
-              const base    = (appearance.themeBase ?? 'aurora') as string
-              const isDark  = !(appearance.isDarkMode ?? false)
-              const themeId = `${base}-${isDark ? 'dark' : 'light'}`
-              setAppearance({ isDarkMode: isDark, theme: themeId as any })
-              applyThemeToDOM(themeId)
-            }} style={{
-              width: 40, height: 22, borderRadius: 11, cursor: 'pointer',
-              background: (appearance.isDarkMode ?? false) ? 'var(--accent)' : 'var(--border2)',
-              position: 'relative', transition: 'background 0.25s', flexShrink: 0,
-            }}>
-              <div style={{
-                width: 16, height: 16, borderRadius: '50%', background: 'white',
-                position: 'absolute', top: 3,
-                left: (appearance.isDarkMode ?? false) ? 21 : 3,
-                transition: 'left 0.25s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-              }} />
-            </div>
-          </div>
-        )}
         <div className="options-divider" />
 
         {/* Appearance */}

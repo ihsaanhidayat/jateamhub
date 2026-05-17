@@ -207,7 +207,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
       applyThemeToDOM(localApp.theme as string)
       set({ appearance: { ...DEFAULT_APPEARANCE, ...localApp } })
     } else {
-      applyThemeToDOM('aurora-light')
+      applyThemeToDOM('ivory-light')
     }
 
     // Load section pribadi dari DB
@@ -636,38 +636,18 @@ export const useStore = create<DashboardStore>((set, get) => ({
   },
 }))
 
-// ── Terapkan theme ke DOM — set data-theme + font per tema ────
+// ── Terapkan theme ke DOM ─────────────────────────────────────
+// 2 tema: ivory-light (default) dan obsidian (dark)
 export function applyThemeToDOM(theme: string) {
-  // Map tema lama ke tema baru
-  const legacyMap: Record<string, string> = {
-    'dark-mint': 'obsidian',
-    'dark-soft': 'aurora-dark',
-    'enterprise': 'slate-dark',
-    'pearl': 'aurora-light',
-    'ivory': 'aurora-light',
-    'sage': 'slate-light',
-    'pearl-light': 'aurora-light',
-    'pearl-dark': 'aurora-dark',
-    'ivory-light': 'slate-light',
-    'ivory-dark': 'slate-dark',
-    'sage-light': 'slate-light',
-    'sage-dark': 'slate-dark',
-  }
-  const resolvedTheme = legacyMap[theme] ?? theme
+  // Semua tema gelap → obsidian, semua yang lain → ivory-light
+  const darkThemes = ['obsidian', 'dark-mint', 'dark-soft', 'enterprise',
+    'aurora-dark', 'sand-dark', 'slate-dark', 'pearl-dark', 'ivory-dark', 'sage-dark']
+  const resolvedTheme = darkThemes.includes(theme) ? 'obsidian' : 'ivory-light'
 
-  // Terapkan data-theme
   document.documentElement.setAttribute('data-theme', resolvedTheme)
 
-  // Font per tema
-  const fontMap: Record<string, string> = {
-    'aurora-light': "'Inter', sans-serif",
-    'aurora-dark': "'Inter', sans-serif",
-    'sand-light': "'Lora', serif",
-    'sand-dark': "'Lora', serif",
-    'slate-light': "'IBM Plex Sans', sans-serif",
-    'slate-dark': "'IBM Plex Sans', sans-serif",
-    'obsidian': "'Space Grotesk', sans-serif",
-  }
-  const font = fontMap[resolvedTheme]
-  if (font) document.documentElement.style.setProperty('--font', font)
+  const font = resolvedTheme === 'obsidian'
+    ? "'Space Grotesk', sans-serif"
+    : "'Plus Jakarta Sans', sans-serif"
+  document.documentElement.style.setProperty('--font', font)
 }
