@@ -1,0 +1,10 @@
+{
+  "name": "JateamHub",
+  "short_name": "JateamHub",
+  "description": "Portal dashboard internal tim",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0A0A",
+  "theme_color": "#6EE7B7",
+  "orientation": "any"
+}

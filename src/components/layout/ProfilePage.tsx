@@ -19,7 +19,7 @@ export default function ProfilePage({ onClose }: Props) {
   const isAdminLevel = profile?.role === 'admin' || isSuperAdmin
   const canManage    = isAdminLevel
 
-  const [tab, setTab] = useState<'users' | 'settings'>(canManage ? 'users' : 'settings')
+  // tab state di-handle oleh tabState di bawah
 
   // Users state
   const [search,      setSearch]      = useState('')
@@ -117,9 +117,14 @@ export default function ProfilePage({ onClose }: Props) {
   }
 
   const TABS = [
+    { id: 'profile', label: '👤 Profil Saya' },
     ...(canManage ? [{ id: 'users', label: `👥 User Management (${users.length})` }] : []),
     ...(isSuperAdmin ? [{ id: 'settings', label: '⚙️ Settings' }] : []),
   ] as const
+
+  const [tabState, setTabState] = useState<'profile' | 'users' | 'settings'>(
+    'profile'
+  )
 
   const inputStyle: React.CSSProperties = {
     width: '100%', background: 'var(--bg3)', border: '1px solid var(--border2)',
@@ -164,26 +169,103 @@ export default function ProfilePage({ onClose }: Props) {
         </div>
 
         {/* Tabs */}
-        {TABS.length > 0 && (
-          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-            {TABS.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id as any)} style={{
-                flex: 1, padding: '10px', fontSize: 11, fontWeight: 600,
-                background: tab === t.id ? 'rgba(0,255,194,0.06)' : 'none',
-                border: 'none', borderBottom: `2px solid ${tab === t.id ? 'var(--mint)' : 'transparent'}`,
-                color: tab === t.id ? 'var(--mint)' : 'var(--silver3)',
-                cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
-                textTransform: 'uppercase', letterSpacing: '.8px',
-              }}>{t.label}</button>
-            ))}
-          </div>
-        )}
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTabState(t.id as any)} style={{
+              flex: 1, padding: '10px', fontSize: 11, fontWeight: 600,
+              background: tabState === t.id ? 'rgba(0,255,194,0.06)' : 'none',
+              border: 'none', borderBottom: `2px solid ${tabState === t.id ? 'var(--mint)' : 'transparent'}`,
+              color: tabState === t.id ? 'var(--mint)' : 'var(--silver3)',
+              cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+              textTransform: 'uppercase', letterSpacing: '.8px',
+            }}>{t.label}</button>
+          ))}
+        </div>
 
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
 
+          {/* ── PROFILE TAB — view info + ganti foto ── */}
+          {tabState === 'profile' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Avatar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <div style={{
+                    width: 72, height: 72, borderRadius: '50%',
+                    background: 'var(--mint-bg)', border: '2px solid var(--accent)',
+                    overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 24, color: 'var(--accent)',
+                  }}>
+                    {profile?.avatar_url
+                      ? <img src={profile.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : ((profile?.full_name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') ?? profile?.username?.slice(0,2) ?? '?').toUpperCase())
+                    }
+                  </div>
+                  {/* Pencil icon untuk ganti foto */}
+                  <label htmlFor="profile-avatar-upload" style={{
+                    position: 'absolute', bottom: 0, right: 0,
+                    width: 24, height: 24, borderRadius: '50%',
+                    background: 'var(--accent)', color: 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', fontSize: 12,
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  }}>✏️</label>
+                  <input id="profile-avatar-upload" type="file" accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      e.target.value = ''
+                      const reader = new FileReader()
+                      reader.onload = ev => {
+                        const dataUrl = ev.target?.result as string
+                        if (dataUrl) {
+                          // Trigger crop modal via custom event
+                          window.dispatchEvent(new CustomEvent('avatar-upload', { detail: dataUrl }))
+                          onClose()
+                        }
+                      }
+                      reader.readAsDataURL(file)
+                    }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--silver)' }}>
+                    {profile?.full_name || profile?.username}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--silver3)', marginTop: 3 }}>
+                    @{profile?.username}
+                  </div>
+                </div>
+              </div>
+
+              {/* Info fields */}
+              {[
+                { label: 'Nama Lengkap', value: profile?.full_name || '—' },
+                { label: 'Username',     value: profile?.username  || '—' },
+                { label: 'Role',         value: profile?.role      || '—' },
+                { label: 'Wilayah',      value: (profile as any)?.region_scope || '—' },
+                { label: 'Unit',         value: (profile as any)?.unit_scope   || '—' },
+              ].map(f => (
+                <div key={f.label} style={{
+                  padding: '10px 14px', background: 'var(--bg2)',
+                  border: '1px solid var(--border)', borderRadius: 8,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <span style={{ fontSize: 11, color: 'var(--silver3)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '1px' }}>{f.label}</span>
+                  <span style={{ fontSize: 13, color: 'var(--silver)', fontWeight: 500 }}>{f.value}</span>
+                </div>
+              ))}
+
+              <div style={{ padding: '10px 14px', background: 'var(--mint-bg)', border: '1px solid var(--border2)', borderRadius: 8, fontSize: 11, color: 'var(--silver3)', lineHeight: 1.6 }}>
+                Untuk mengubah informasi profil, hubungi Admin.
+              </div>
+            </div>
+          )}
+
           {/* ── USERS TAB ── */}
-          {tab === 'users' && canManage && (
+          {tabState === 'users' && canManage && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {/* Filters */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -375,7 +457,7 @@ export default function ProfilePage({ onClose }: Props) {
           )}
 
           {/* ── SETTINGS TAB ── */}
-          {tab === 'settings' && isSuperAdmin && (
+          {tabState === 'settings' && isSuperAdmin && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: 11, color: 'var(--silver3)', marginBottom: 4 }}>Pengaturan global — hanya superadmin</div>
               {[

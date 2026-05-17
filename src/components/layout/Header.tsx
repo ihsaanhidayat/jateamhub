@@ -8,11 +8,12 @@ import AvatarCropModal from '../ui/AvatarCropModal'
 
 interface Props {
   onToggleOptions: () => void
-  optionsOpen: boolean
-  onOpenAdvanced: () => void
+  optionsOpen:     boolean
+  onOpenAdvanced:  () => void
+  onAddSection:    () => void
 }
 
-export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }: Props) {
+export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection }: Props) {
   const {
     editMode, toggleEditMode,
     searchQuery, setSearch,
@@ -46,7 +47,18 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
       if (hamburgerRef.current  && !hamburgerRef.current.contains(e.target as Node))  setHamburgerOpen(false)
     }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+
+    // Listener untuk crop modal yang dipanggil dari ProfilePage
+    const avatarHandler = (e: Event) => {
+      const dataUrl = (e as CustomEvent).detail as string
+      if (dataUrl) setCropDataUrl(dataUrl)
+    }
+    window.addEventListener('avatar-upload', avatarHandler)
+
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      window.removeEventListener('avatar-upload', avatarHandler)
+    }
   }, [])
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,8 +212,8 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced }:
           {editMode && (
             <button
               className="icon-btn desktop-only"
-              onClick={() => useStore.getState().addPersonalSectionAuto()}
-              title="Tambah Section"
+              onClick={onAddSection}
+              title="Tambah Section / Widget"
               style={{ marginRight: 4, fontWeight: 700, fontSize: 16 }}
             >＋</button>
           )}

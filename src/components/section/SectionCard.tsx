@@ -35,7 +35,7 @@ export default function SectionCard({ section, isShared, canEdit: canEditProp, o
   // isShared = true berarti dari admin, tidak boleh diedit siapapun
   const isAdmin = isShared ? false : true
   const [headerHovered, setHeaderHovered] = useState(false)
-  const [confirmDel, setConfirmDel] = useState<{ open: boolean; type: 'section' | 'item'; itemId?: string; msg: string }>({ open: false, type: 'section', msg: '' })
+  const [confirmDel, setConfirmDel] = useState<{ open: boolean; type: 'section' | 'item' | 'unfavorite'; itemId?: string; msg: string }>({ open: false, type: 'section', msg: '' })
   const accent   = section.accentColor || 'var(--mint)'
   const density  = DENSITY[(appearance as any).sectionDensity ?? 'compact'] || DENSITY.compact
   const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'
@@ -124,13 +124,25 @@ export default function SectionCard({ section, isShared, canEdit: canEditProp, o
           {/* Focus edit mode — tombol muncul saat hover header */}
           {isAdmin && editMode && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {/* Tombol favorite section — hanya untuk OWN, sebelah tombol edit */}
+              {/* Tombol favorite section — hanya untuk OWN section */}
               {!isShared && onToggleFavorite && (
                 <button
                   className="sec-action-btn-lg"
                   onMouseDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); onToggleFavorite(section.id) }}
-                  title={section.isFavorite ? 'Hapus dari favorit' : 'Tandai favorit'}
+                  onClick={e => {
+                    e.stopPropagation()
+                    if (section.isFavorite) {
+                      // Warning saat melepas favorite
+                      setConfirmDel({
+                        open: true,
+                        type: 'unfavorite',
+                        msg: `Lepas "${section.title}" dari Favorit? Section tidak akan lagi tampil di urutan pertama.`,
+                      })
+                    } else {
+                      onToggleFavorite(section.id)
+                    }
+                  }}
+                  title={section.isFavorite ? 'Lepas dari favorit' : 'Tandai sebagai favorit'}
                   style={{ color: section.isFavorite ? '#FFD700' : undefined }}
                 >⭐</button>
               )}
@@ -256,8 +268,10 @@ export default function SectionCard({ section, isShared, canEdit: canEditProp, o
         confirmLabel="Ya, Hapus"
         danger
         onConfirm={() => {
-          if (confirmDel.type === 'section') {
-            onDeleteSection(section.id)  // panggil handler dari parent GridLayout
+          if (confirmDel.type === 'unfavorite') {
+            onToggleFavorite?.(section.id)  // lepas favorite
+          } else if (confirmDel.type === 'section') {
+            onDeleteSection(section.id)
           } else if (confirmDel.itemId) {
             deleteItem(section.id, confirmDel.itemId)
             toast('Item dihapus.', 'success')
@@ -278,16 +292,21 @@ function GhostAddItem({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
+      onTouchStart={() => setHov(true)}
+      onTouchEnd={() => { setHov(false); onClick() }}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: 4, cursor: 'pointer',
         borderRadius: 8, minHeight: 70,
-        border: `1.5px dashed ${hov ? 'var(--mint)' : 'rgba(0,255,194,0.2)'}`,
-        background: hov ? 'rgba(0,255,194,0.06)' : 'transparent',
+        border: `1.5px dashed ${hov ? 'var(--accent)' : 'var(--border2)'}`,
+        background: hov ? 'var(--mint-bg)' : 'transparent',
         transition: 'all .15s',
-        color: hov ? 'var(--mint)' : 'rgba(0,255,194,0.3)',
+        color: hov ? 'var(--accent)' : 'var(--silver3)',
+        // Di mobile selalu visible (tidak perlu hover)
+        opacity: 1,
       }}>
-      <span style={{ fontSize: 20, fontWeight: 300, lineHeight: 1 }}>＋</span>
+      <span style={{ fontSize: 22, fontWeight: 300, lineHeight: 1 }}>＋</span>
+      <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.5px' }}>Tambah</span>
     </div>
   )
 }

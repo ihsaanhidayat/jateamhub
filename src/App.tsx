@@ -15,6 +15,7 @@ import ProfilePage  from './components/layout/ProfilePage'
 import PanduanFAB   from './components/layout/PanduanFAB'
 import CoffeeModal  from './components/ui/CoffeeModal'
 import SectionModal from './components/section/SectionModal'
+import AddSectionModal from './components/layout/AddSectionModal'
 import ToastContainer from './components/ui/Toast'
 
 import 'react-grid-layout/css/styles.css'
@@ -114,6 +115,7 @@ export default function App() {
         onToggleOptions={() => setOptionsOpen(v => !v)}
         optionsOpen={optionsOpen}
         onOpenAdvanced={() => setProfileOpen(true)}
+        onAddSection={() => setAddSectionOpen(true)}
       />
 
       {/* Options panel — tersedia untuk semua user */}
@@ -127,14 +129,11 @@ export default function App() {
       {/* Edit bar — muncul saat edit mode aktif */}
       {editMode && <EditBar onAddSection={() => setAddSectionOpen(true)} />}
 
-      {/* Modal tambah section pribadi */}
-      {addSectionOpen && (
-        <SectionModal
-          open={addSectionOpen}
-          section={null}
-          onClose={() => setAddSectionOpen(false)}
-        />
-      )}
+      {/* Modal tambah section/widget — muncul saat klik ＋ di header */}
+      <AddSectionModal
+        open={addSectionOpen}
+        onClose={() => setAddSectionOpen(false)}
+      />
 
       {/* Modal profile advanced (users + settings) */}
       {profileOpen && <ProfilePage onClose={() => setProfileOpen(false)} />}
