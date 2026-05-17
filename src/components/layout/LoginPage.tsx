@@ -80,6 +80,30 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
   const [loading, setLoading] = useState(false)
   const [shake, setShake] = useState(false)
 
+  // Terapkan tema dari localStorage saat login page muncul
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('jateamhub-appearance')
+      if (saved) {
+        const app = JSON.parse(saved)
+        if (app?.theme) {
+          document.documentElement.setAttribute('data-theme', app.theme)
+          const fontMap: Record<string, string> = {
+            'aurora-light': "'Inter', sans-serif",
+            'aurora-dark': "'Inter', sans-serif",
+            'sand-light': "'Lora', serif",
+            'sand-dark': "'Lora', serif",
+            'slate-light': "'IBM Plex Sans', sans-serif",
+            'slate-dark': "'IBM Plex Sans', sans-serif",
+            'obsidian': "'Space Grotesk', sans-serif",
+          }
+          const font = fontMap[app.theme]
+          if (font) document.documentElement.style.setProperty('--font', font)
+        }
+      }
+    } catch { /* ignore */ }
+  }, [])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!username.trim() || !password) {
@@ -161,7 +185,7 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
             letterSpacing: '-1px', fontFamily: 'var(--font)',
             textShadow: '0 0 20px rgba(0,255,194,0.8), 0 0 40px rgba(0,255,194,0.4), 0 0 80px rgba(0,255,194,0.2)',
           }}>JateamHub</h1>
-          <h3>Sugeng Rawuh, Jagoan</h3>
+          <h3>Selamat Datang, Jagoan</h3>
           <div style={{
             width: 50, height: 2, background: 'linear-gradient(90deg, transparent, #00FFC2, transparent)',
             margin: '8px auto 0',

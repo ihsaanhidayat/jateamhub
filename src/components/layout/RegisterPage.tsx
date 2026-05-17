@@ -176,7 +176,7 @@ export default function RegisterPage({ onBack }: Props) {
               <select value={unit} onChange={e => setUnit(e.target.value)}
                 style={{ ...inputStyle, appearance: 'auto', color: unit ? '#F1F5F9' : '#64748B' }}>
                 <option value="" disabled>Pilih unit</option>
-                {UNITS.filter(u => u.value !== 'general').map(u => (
+                {UNITS.map(u => (
                   <option key={u.value} value={u.value} style={{ background: '#1E1E1E' }}>{u.label}</option>
                 ))}
               </select>

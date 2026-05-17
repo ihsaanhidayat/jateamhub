@@ -13,38 +13,37 @@ interface Props {
 
 export default function ItemModal({ open, sectionId, item, onClose }: Props) {
   const { addItem, updateItem, deleteItem, toast, appearance } = useStore()
-  const [title, setTitle]         = useState('')
-  const [url, setUrl]             = useState('')
-  const [desc, setDesc]           = useState('')
-  const [icon, setIcon]           = useState('')
-  const [iconUrl, setIconUrl]     = useState('')
-  const useFavicon = true  // selalu true
-  const [tags, setTags]           = useState('')
-  const newTab = true      // selalu buka tab baru
+  const [title,   setTitle]   = useState('')
+  const [url,     setUrl]     = useState('https://')
+  const [desc,    setDesc]    = useState('')
+  const [iconUrl, setIconUrl] = useState('')
+
+  // useFavicon dan newTab selalu true — tidak ditampilkan di UI
+  const useFavicon = true
+  const newTab     = true
 
   useEffect(() => {
     if (open) {
       setTitle(item?.title ?? '')
-      setUrl(item?.url ?? '')
+      // Edit: tampilkan URL asli; Tambah baru: default https://
+      setUrl(item?.url ?? 'https://')
       setDesc(item?.desc ?? '')
-      setIcon(item?.icon ?? '')
       setIconUrl(item?.iconUrl ?? '')
-      // useFavicon always true
-      setTags(item?.tags.join(',') ?? '')
-      // newTab always true
     }
   }, [open, item])
 
   const handleSave = () => {
-    if (!title.trim() || !url.trim()) { toast('Title dan URL wajib diisi.', 'error'); return }
+    if (!title.trim()) { toast('Nama link wajib diisi.', 'error'); return }
+    if (!url.trim() || url === 'https://') { toast('URL wajib diisi.', 'error'); return }
     const data: Omit<LinkItem, 'id'> = {
-      title: title.trim(), url: url.trim(),
-      desc: desc.trim(),
-      icon: icon.trim(),
-      iconUrl: iconUrl.trim() || undefined,
+      title:    title.trim(),
+      url:      url.trim(),
+      desc:     desc.trim(),
+      icon:     '',
+      iconUrl:  iconUrl.trim() || undefined,
       useFavicon,
       newTab,
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+      tags:     [],
     }
     if (item) { updateItem(sectionId, item.id, data); toast('Link diperbarui.', 'success') }
     else       { addItem(sectionId, data);             toast('Link ditambahkan.', 'success') }
@@ -52,17 +51,15 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
   }
 
   const handleDelete = () => {
-    if (!item) return
-    if (!confirm('Hapus link ini?')) return
+    if (!item || !confirm('Hapus link ini?')) return
     deleteItem(sectionId, item.id)
     toast('Link dihapus.', 'success')
     onClose()
   }
 
-  // preview item
   const previewItem: LinkItem = {
     id: 'preview', title: title || 'Preview', url: url || '#',
-    icon, desc: '', iconUrl: iconUrl || undefined, useFavicon, tags: [], newTab,
+    icon: '', desc: '', iconUrl: iconUrl || undefined, useFavicon, tags: [], newTab,
   }
 
   return (
@@ -71,58 +68,52 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
       title={item ? 'Edit Link' : 'Tambah Link'}
       onClose={onClose}
       footer={
-        <>
-          {item && <button className="btn-delete" onClick={handleDelete}>🗑 Hapus</button>}
+        <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 8 }}>
+          {/* Preview di pojok kiri bawah */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+            <AppIcon item={previewItem} iconSize="medium" faviconEnabled={true} />
+            <span style={{ fontSize: 12, color: 'var(--silver2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {title || 'Preview'}
+            </span>
+          </div>
+          {/* Tombol di kanan */}
+          {item && <button className="btn-cancel" onClick={handleDelete} style={{ color: 'var(--red)', borderColor: 'rgba(239,68,68,0.3)' }}>🗑</button>}
           <button className="btn-cancel" onClick={onClose}>Batal</button>
           <button className="btn-save" onClick={handleSave}>Simpan</button>
-        </>
+        </div>
       }
     >
       <div className="field">
-        <label>Title</label>
-        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Email Korporat" autoFocus />
+        <label>Nama Link</label>
+        <input value={title} onChange={e => setTitle(e.target.value)}
+          placeholder="Contoh: Email Korporat" autoFocus />
       </div>
+
       <div className="field">
         <label>URL</label>
-        <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." />
+        <input
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          onFocus={e => { if (e.target.value === 'https://') e.target.select() }}
+          placeholder="https://contoh.com"
+          type="url"
+        />
       </div>
+
       <div className="field">
         <label>Deskripsi (opsional)</label>
-        <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Keterangan singkat" />
+        <input value={desc} onChange={e => setDesc(e.target.value)}
+          placeholder="Keterangan singkat" />
       </div>
 
-      {/* Icon section */}
-      <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '12px', marginBottom: 14 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--silver3)', marginBottom: 10 }}>Icon</div>
-
-        <div className="field-row">
-          <div className="field">
-            <label>Emoji / Teks</label>
-            <input value={icon} onChange={e => setIcon(e.target.value)} placeholder="🔧 atau teks" />
-          </div>
-          <div className="field">
-            <label>Custom Icon URL</label>
-            <input value={iconUrl} onChange={e => setIconUrl(e.target.value)} placeholder="https://..." />
-          </div>
-        </div>
-
-
-
-        {/* Icon preview */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 11, color: 'var(--silver3)' }}>Preview:</span>
-          <AppIcon item={previewItem} iconSize={appearance.iconSize} faviconEnabled={appearance.faviconEnabled} />
-          <span style={{ fontSize: 12, color: 'var(--silver2)' }}>{title || 'Nama Link'}</span>
-        </div>
+      <div className="field">
+        <label>Custom Icon URL (opsional)</label>
+        <input value={iconUrl} onChange={e => setIconUrl(e.target.value)}
+          placeholder="https://domain.com/icon.png"
+          onFocus={e => { if (!e.target.value) setIconUrl('https://') }}
+          onBlur={e  => { if (e.target.value === 'https://') setIconUrl('') }}
+        />
       </div>
-
-      <div className="field-row">
-        <div className="field">
-          <label>Tags (opsional)</label>
-          <input value={tags} onChange={e => setTags(e.target.value)} placeholder="tag1,tag2" />
-        </div>
-      </div>
-
     </Modal>
   )
 }
