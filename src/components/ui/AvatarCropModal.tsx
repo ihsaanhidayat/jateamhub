@@ -7,23 +7,23 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 
 interface Props {
   imageDataUrl: string   // data URL dari FileReader
-  onConfirm:   (blob: Blob) => void
-  onCancel:    () => void
+  onConfirm: (blob: Blob) => void
+  onCancel: () => void
 }
 
 export default function AvatarCropModal({ imageDataUrl, onConfirm, onCancel }: Props) {
-  const canvasRef   = useRef<HTMLCanvasElement>(null)
-  const previewRef  = useRef<HTMLCanvasElement>(null)
-  const imgRef      = useRef<HTMLImageElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const previewRef = useRef<HTMLCanvasElement>(null)
+  const imgRef = useRef<HTMLImageElement | null>(null)
 
   // State crop
-  const [scale,     setScale]     = useState(1)
-  const [offsetX,   setOffsetX]   = useState(0)
-  const [offsetY,   setOffsetY]   = useState(0)
-  const [dragging,  setDragging]  = useState(false)
-  const [startPos,  setStartPos]  = useState({ x: 0, y: 0 })
+  const [scale, setScale] = useState(1)
+  const [offsetX, setOffsetX] = useState(0)
+  const [offsetY, setOffsetY] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 })
   const [imgLoaded, setImgLoaded] = useState(false)
-  const [saving,    setSaving]    = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const CROP_SIZE = 280  // ukuran canvas crop
 
@@ -44,17 +44,17 @@ export default function AvatarCropModal({ imageDataUrl, onConfirm, onCancel }: P
   // Render ke canvas setiap state berubah
   const draw = useCallback(() => {
     const canvas = canvasRef.current
-    const img    = imgRef.current
+    const img = imgRef.current
     if (!canvas || !img || !imgLoaded) return
     const ctx = canvas.getContext('2d')!
-    const cx  = CROP_SIZE / 2
-    const cy  = CROP_SIZE / 2
-    const r   = CROP_SIZE / 2 - 4
+    const cx = CROP_SIZE / 2
+    const cy = CROP_SIZE / 2
+    const r = CROP_SIZE / 2 - 4
 
     ctx.clearRect(0, 0, CROP_SIZE, CROP_SIZE)
 
     // 1. Gambar semua image (full canvas, tanpa clip) sebagai layer bawah
-    const w = img.width  * scale
+    const w = img.width * scale
     const h = img.height * scale
     const dx = (CROP_SIZE - w) / 2 + offsetX
     const dy = (CROP_SIZE - h) / 2 + offsetY
@@ -74,7 +74,7 @@ export default function AvatarCropModal({ imageDataUrl, onConfirm, onCancel }: P
     // 3. Border lingkaran
     ctx.save()
     ctx.strokeStyle = 'rgba(255,255,255,0.85)'
-    ctx.lineWidth   = 2
+    ctx.lineWidth = 2
     ctx.beginPath()
     ctx.arc(cx, cy, r, 0, Math.PI * 2)
     ctx.stroke()
@@ -126,9 +126,9 @@ export default function AvatarCropModal({ imageDataUrl, onConfirm, onCancel }: P
   // Konfirmasi — export langsung dari image asli (bukan canvas display yang ada overlay)
   const handleConfirm = async () => {
     setSaving(true)
-    const img    = imgRef.current!
+    const img = imgRef.current!
     const output = document.createElement('canvas')
-    output.width  = 400; output.height = 400
+    output.width = 400; output.height = 400
     const ctx = output.getContext('2d')!
 
     // Clip lingkaran dulu
@@ -137,12 +137,12 @@ export default function AvatarCropModal({ imageDataUrl, onConfirm, onCancel }: P
     ctx.clip()
 
     // Gambar image asli dengan scale + offset yang sama seperti di preview
-    const w = img.width  * scale
+    const w = img.width * scale
     const h = img.height * scale
     // Hitung posisi di output canvas (scale dari CROP_SIZE ke 400)
     const ratio = 400 / CROP_SIZE
-    const dx    = ((CROP_SIZE - w) / 2 + offsetX) * ratio
-    const dy    = ((CROP_SIZE - h) / 2 + offsetY) * ratio
+    const dx = ((CROP_SIZE - w) / 2 + offsetX) * ratio
+    const dy = ((CROP_SIZE - h) / 2 + offsetY) * ratio
     ctx.drawImage(img, dx, dy, w * ratio, h * ratio)
 
     output.toBlob(blob => {
