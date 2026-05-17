@@ -265,7 +265,7 @@ export default function SuperadminDashboard() {
                   />
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => setRejectId(null)} style={{ flex: 1, padding: '9px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12 }}>Batal</button>
-                    <button onClick={handleReject} style={{ flex: 2, padding: '9px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700 }}>Tolak Pendaftaran</button>
+                    <button onClick={handleReject} style={{ flex: 2, padding: '9px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700 }}>Tolak Pendaftaran</button>
                   </div>
                 </div>
               </div>

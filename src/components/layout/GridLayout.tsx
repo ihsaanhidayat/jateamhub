@@ -11,6 +11,7 @@ import { useAuthStore } from '../../store/authStore'
 import SectionCard   from '../section/SectionCard'
 import SectionModal  from '../section/SectionModal'
 import ItemModal     from '../item/ItemModal'
+import ConfirmDialog from '../ui/ConfirmDialog'
 import ClockWidget   from '../widgets/ClockWidget'
 import NotesWidget   from '../widgets/NotesWidget'
 import type { Section, LinkItem } from '../../types'
@@ -87,6 +88,55 @@ export default function GridLayout({ onAddSection }: Props) {
   // State untuk modal tambah/edit section dan item
   const [sectionModal, setSectionModal] = useState<{ open: boolean; section: Section | null }>({ open: false, section: null })
   const [itemModal,    setItemModal]    = useState<{ open: boolean; sectionId: string; item: LinkItem | null }>({ open: false, sectionId: '', item: null })
+
+  // Focus edit state — section mana yang sedang dalam mode edit
+  const [focusedId,  setFocusedId]  = useState<string | null>(null)
+  const [snapshots,  setSnapshots]  = useState<Record<string, Section>>({})  // snapshot sebelum edit
+  const [confirmSwitch, setConfirmSwitch] = useState<{ open: boolean; nextId: string | null }>({ open: false, nextId: null })
+
+  // Keluar dari edit mode → reset focus
+  const prevEditMode = useRef(editMode)
+  if (prevEditMode.current !== editMode) {
+    prevEditMode.current = editMode
+    if (!editMode && focusedId) setFocusedId(null)
+  }
+
+  // Handle klik focus section
+  const handleFocus = (id: string) => {
+    if (!editMode) return
+    if (id === focusedId) return
+    const current = personalSections.find(s => s.id === focusedId)
+    const snapshot = snapshots[id ?? '']
+    const hasChanges = focusedId && current && snapshot &&
+      JSON.stringify(current) !== JSON.stringify(snapshot)
+
+    if (hasChanges) {
+      setConfirmSwitch({ open: true, nextId: id })
+    } else {
+      focusSection(id)
+    }
+  }
+
+  const focusSection = (id: string) => {
+    // Simpan snapshot section yang akan di-focus
+    const section = personalSections.find(s => s.id === id)
+    if (section) setSnapshots(prev => ({ ...prev, [id]: structuredClone(section) }))
+    setFocusedId(id)
+  }
+
+  const handleSave = () => {
+    toast('✓ Tersimpan', 'success')
+    setFocusedId(null)
+  }
+
+  const handleCancel = () => {
+    // Rollback section ke snapshot
+    if (focusedId && snapshots[focusedId]) {
+      const snap = snapshots[focusedId]
+      useStore.getState().updatePersonalSection(focusedId, snap)
+    }
+    setFocusedId(null)
+  }
 
   // Filter query pencarian
   const q = searchQuery.toLowerCase()
@@ -183,14 +233,18 @@ export default function GridLayout({ onAddSection }: Props) {
     return (
       <SectionCard
         section={section}
-        isShared={isShared}            // shared = read-only, tidak bisa edit
+        isShared={isShared}
         canEdit={!isShared && editMode}
+        isFocused={!isShared && focusedId === section.id}
+        onFocus={handleFocus}
         onEditSection={s  => setSectionModal({ open: true, section: s })}
         onEditItem={(sId, item) => setItemModal({ open: true, sectionId: sId, item })}
         onAddItem={sId  => setItemModal({ open: true, sectionId: sId, item: null })}
-        onDeleteSection={id => { deletePersonalSection(id); toast('Section dihapus.', 'success') }}
+        onDeleteSection={id => { deletePersonalSection(id); toast('Section dihapus.', 'success'); setFocusedId(null) }}
         onToggleFavorite={id => useStore.getState().toggleFavoriteSection(id)}
         onToggleFavoriteItem={(sId, iId) => useStore.getState().toggleFavoriteItem(sId, iId)}
+        onSave={handleSave}
+        onCancel={handleCancel}
       />
     )
   }
@@ -270,10 +324,10 @@ export default function GridLayout({ onAddSection }: Props) {
               )}
             </div>
           ))}
-          {/* Tombol tambah section di mobile saat edit mode */}
+          {/* Tombol tambah section di mobile — buka modal pilihan Section/Widget */}
           {editMode && (
-            <button className="mobile-add-section" onClick={() => addPersonalSectionAuto()}>
-              ＋ Tambah Section
+            <button className="mobile-add-section" onClick={onAddSection}>
+              ＋ Tambah Section / Widget
             </button>
           )}
         </div>
@@ -349,6 +403,22 @@ export default function GridLayout({ onAddSection }: Props) {
         item={itemModal.item}
         onClose={() => setItemModal({ open: false, sectionId: '', item: null })}
       />
+      {/* Konfirmasi pindah section saat ada perubahan */}
+      <ConfirmDialog
+        open={confirmSwitch.open}
+        title="Ada Perubahan Belum Disimpan"
+        message="Section ini memiliki perubahan yang belum disimpan. Simpan sekarang sebelum pindah?"
+        confirmLabel="Simpan & Pindah"
+        cancelLabel="Batal (tetap di sini)"
+        danger={false}
+        onConfirm={async () => {
+          await useStore.getState().syncPersonalToDb()
+          toast('✓ Tersimpan', 'success')
+          setConfirmSwitch({ open: false, nextId: null })
+          if (confirmSwitch.nextId) focusSection(confirmSwitch.nextId)
+        }}
+        onCancel={() => setConfirmSwitch({ open: false, nextId: null })}
+      />
     </>
   )
 }
@@ -406,16 +476,16 @@ function GhostAddSection({ onClick }: { onClick: () => void }) {
       style={{
         width: '100%', height: '100%',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: `1.5px dashed ${hov ? 'var(--mint)' : 'rgba(0,255,194,0.2)'}`,
+        border: `1.5px dashed ${hov ? 'var(--accent)' : 'var(--accent-glow)'}`,
         borderRadius: 'var(--radius)',
-        background: hov ? 'rgba(0,255,194,0.06)' : 'rgba(0,255,194,0.01)',
+        background: hov ? 'var(--mint-bg)' : 'var(--mint-bg)',
         cursor: 'pointer', transition: 'all .2s',
-        color: hov ? 'var(--mint)' : 'rgba(0,255,194,0.3)',
+        color: hov ? 'var(--accent)' : 'var(--accent-glow)',
       }}
     >
       <div style={{
         width: 28, height: 28, borderRadius: '50%',
-        border: `1.5px dashed ${hov ? 'var(--mint)' : 'rgba(0,255,194,0.25)'}`,
+        border: `1.5px dashed ${hov ? 'var(--accent)' : 'var(--mint-bg2)'}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 18, transition: 'all .2s',
       }}>＋</div>
@@ -482,7 +552,7 @@ function WidgetWrapper({ section, editMode, onEdit }: {
   const { toggleCollapse } = useStore()
   return (
     <div className="section-card" style={{
-      '--section-accent': section.accentColor || 'var(--mint)',
+      '--section-accent': section.accentColor || 'var(--accent)',
       height: '100%', display: 'flex', flexDirection: 'column',
     } as React.CSSProperties}>
       <div className="section-header" style={{ cursor: editMode ? 'grab' : 'default' }}>

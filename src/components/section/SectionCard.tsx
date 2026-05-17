@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
@@ -8,39 +8,47 @@ import AppIcon from '../ui/AppIcon'
 import { sanitizeUrl } from '../../utils/security'
 
 interface Props {
-  section:              Section
-  isShared?:            boolean
-  canEdit?:             boolean
-  onEditSection:        (s: Section) => void
-  onEditItem:           (sectionId: string, item: LinkItem) => void
-  onAddItem:            (sectionId: string) => void
-  onDeleteSection:      (id: string) => void
-  onToggleFavorite?:    (sectionId: string) => void        // toggle favorite section
-  onToggleFavoriteItem?:(sectionId: string, itemId: string) => void // toggle favorite item
+  section: Section
+  isShared?: boolean
+  canEdit?: boolean
+  isFocused?: boolean           // section sedang dalam focus edit
+  onFocus?: (id: string) => void  // callback saat header diklik
+  onEditSection: (s: Section) => void
+  onEditItem: (sectionId: string, item: LinkItem) => void
+  onAddItem: (sectionId: string) => void
+  onDeleteSection: (id: string) => void
+  onToggleFavorite?: (sectionId: string) => void
+  onToggleFavoriteItem?: (sectionId: string, itemId: string) => void
+  onSave?: () => void        // callback setelah simpan
+  onCancel?: () => void        // callback batal
 }
 
 const DENSITY: Record<string, { body: string; gap: string; headerPad: string }> = {
-  compact:     { body: '4px',  gap: '2px',  headerPad: '7px 12px 7px 15px'  },
-  comfortable: { body: '6px',  gap: '4px',  headerPad: '9px 12px 9px 15px'  },
-  spacious:    { body: '12px', gap: '8px',  headerPad: '12px 14px 12px 17px' },
+  compact: { body: '4px', gap: '2px', headerPad: '7px 12px 7px 15px' },
+  comfortable: { body: '6px', gap: '4px', headerPad: '9px 12px 9px 15px' },
+  spacious: { body: '12px', gap: '8px', headerPad: '12px 14px 12px 17px' },
 }
 
-export default function SectionCard({ section, isShared, canEdit: canEditProp, onEditSection, onEditItem, onAddItem, onDeleteSection, onToggleFavorite, onToggleFavoriteItem }: Props) {
-  const { editMode, searchQuery, moveItem, toggleCollapse, appearance, displayOptions, deleteItem, toast } = useStore()
+export default function SectionCard({
+  section, isShared, canEdit: canEditProp,
+  isFocused, onFocus,
+  onEditSection, onEditItem, onAddItem, onDeleteSection,
+  onToggleFavorite, onToggleFavoriteItem,
+  onSave, onCancel,
+}: Props) {
+  const { editMode, searchQuery, moveItem, toggleCollapse, appearance, displayOptions, deleteItem, toast, syncPersonalToDb, isSyncing } = useStore()
   const { profile: session } = useAuthStore()
-  // Semua user bisa edit section pribadi mereka sendiri
-  // Shared section tetap read-only
-  // isAdmin = bisa edit section ini
-  // isShared = false berarti section pribadi, semua user boleh edit
-  // isShared = true berarti dari admin, tidak boleh diedit siapapun
   const isAdmin = isShared ? false : true
-  const [headerHovered, setHeaderHovered] = useState(false)
-  const [confirmDel, setConfirmDel] = useState<{ open: boolean; type: 'section' | 'item' | 'unfavorite'; itemId?: string; msg: string }>({ open: false, type: 'section', msg: '' })
-  const accent   = section.accentColor || 'var(--mint)'
-  const density  = DENSITY[(appearance as any).sectionDensity ?? 'compact'] || DENSITY.compact
+
+  const [confirmDel, setConfirmDel] = useState<{
+    open: boolean; type: 'section' | 'item' | 'unfavorite'; itemId?: string; msg: string
+  }>({ open: false, type: 'section', msg: '' })
+
+  const accent = section.accentColor || 'var(--accent)'
+  const density = DENSITY[(appearance as any).sectionDensity ?? 'compact'] || DENSITY.compact
   const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'
 
-  // item drag state (native HTML DnD — tidak konflik dengan RGL)
+  // item drag state
   const [itemDragOver, setItemDragOver] = useState<string | null>(null)
 
   const onItemDragStart = (e: React.DragEvent, item: LinkItem) => {
@@ -70,209 +78,262 @@ export default function SectionCard({ section, isShared, canEdit: canEditProp, o
   const q = searchQuery.toLowerCase()
   const filteredItems = q
     ? section.items.filter(i =>
-        i.title.toLowerCase().includes(q) ||
-        (i.desc && i.desc.toLowerCase().includes(q)) ||
-        i.tags.some(t => t.toLowerCase().includes(q))
-      )
+      i.title.toLowerCase().includes(q) ||
+      (i.desc && i.desc.toLowerCase().includes(q)) ||
+      i.tags.some(t => t.toLowerCase().includes(q))
+    )
     : section.items
+
+  // Apakah section ini benar-benar editable
+  const canFocus = isAdmin && editMode && !isShared
+
+  // Handle klik header — masuk focus edit
+  const handleHeaderClick = (e: React.MouseEvent) => {
+    if (!canFocus) return
+    // Jangan trigger jika klik tombol
+    if ((e.target as HTMLElement).closest('button')) return
+    onFocus?.(section.id)
+  }
+
+  // Long press untuk drag di mobile
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleTouchStart = () => {
+    if (!editMode) return
+    longPressTimer.current = setTimeout(() => {
+      navigator.vibrate?.(50)
+    }, 500)
+  }
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+  }
 
   return (
     <>
-    <div
-      className="section-card"
-      style={{
-        '--section-accent': accent,
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-      } as React.CSSProperties}
-    >
-
-      {/* ── Header ─────────────────────────────────────── */}
-      {/* section-header jadi drag handle untuk RGL (via draggableHandle) */}
       <div
-        className="section-header"
+        className="section-card"
         style={{
-          padding: density.headerPad,
-          cursor: isAdmin && editMode ? 'grab' : 'default',
-          alignItems: section.subtitle ? 'flex-start' : 'center',
-        }}
-        onMouseEnter={() => setHeaderHovered(true)}
-        onMouseLeave={() => setHeaderHovered(false)}
+          '--section-accent': accent,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          // Focus highlight
+          ...(isFocused ? {
+            border: `1.5px solid ${accent === 'var(--accent)' ? 'var(--accent)' : accent}`,
+            boxShadow: `0 0 0 3px var(--mint-bg2), var(--shadow)`,
+          } : {}),
+          transition: 'border 200ms var(--ease), box-shadow 200ms var(--ease)',
+        } as React.CSSProperties}
       >
-        <span className="section-icon" style={{ marginTop: section.subtitle ? 1 : 0 }}>{section.icon || '📁'}</span>
+        {/* ── Header ─────────────────────────────────────── */}
+        <div
+          className="section-header"
+          style={{
+            padding: density.headerPad,
+            cursor: canFocus ? 'pointer' : 'default',
+            alignItems: section.subtitle ? 'flex-start' : 'center',
+            // Header highlight saat focused
+            ...(isFocused ? { background: 'var(--mint-bg)' } : {}),
+          }}
+          onClick={handleHeaderClick}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <span className="section-icon" style={{ marginTop: section.subtitle ? 1 : 0 }}>
+            {section.icon || '📁'}
+          </span>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="section-title">{section.title}</div>
-          {section.subtitle && (
-            <div style={{
-              fontSize: 10,
-              color: 'var(--silver3)',
-              fontWeight: 400,
-              letterSpacing: '.2px',
-              marginTop: 1,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}>
-              {section.subtitle}
-            </div>
-          )}
-        </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="section-title">{section.title}</div>
+            {section.subtitle && (
+              <div style={{
+                fontSize: 10, color: 'var(--silver3)', fontWeight: 400,
+                letterSpacing: '.2px', marginTop: 1,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {section.subtitle}
+              </div>
+            )}
+          </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
-          {/* Focus edit mode — tombol muncul saat hover header */}
-          {isAdmin && editMode && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {/* Tombol favorite section — hanya untuk OWN section */}
-              {!isShared && onToggleFavorite && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+            {/* Focus tools — muncul saat section focused */}
+            {isFocused && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {/* Favorite */}
+                {!isShared && onToggleFavorite && (
+                  <button
+                    className="sec-action-btn-lg"
+                    onMouseDown={e => e.stopPropagation()}
+                    onClick={e => {
+                      e.stopPropagation()
+                      if (section.isFavorite) {
+                        setConfirmDel({
+                          open: true, type: 'unfavorite',
+                          msg: `Lepas "${section.title}" dari Favorit?`
+                        })
+                      } else {
+                        onToggleFavorite(section.id)
+                      }
+                    }}
+                    title={section.isFavorite ? 'Lepas favorit' : 'Tandai favorit'}
+                    style={{ color: section.isFavorite ? '#FFD700' : undefined }}
+                  >⭐</button>
+                )}
+                {/* Tambah link */}
                 <button
                   className="sec-action-btn-lg"
                   onMouseDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); onAddItem(section.id) }}
+                  title="Tambah Link"
+                  style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                >＋</button>
+                {/* Edit section (buka modal) */}
+                <button
+                  className="sec-action-btn-lg"
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); onEditSection(section) }}
+                  title="Edit Section"
+                >⚙️</button>
+                {/* Hapus section */}
+                <button
+                  className="sec-action-btn-lg danger"
+                  onMouseDown={e => e.stopPropagation()}
                   onClick={e => {
                     e.stopPropagation()
-                    if (section.isFavorite) {
-                      // Warning saat melepas favorite
-                      setConfirmDel({
-                        open: true,
-                        type: 'unfavorite',
-                        msg: `Lepas "${section.title}" dari Favorit? Section tidak akan lagi tampil di urutan pertama.`,
-                      })
-                    } else {
-                      onToggleFavorite(section.id)
-                    }
+                    setConfirmDel({
+                      open: true, type: 'section',
+                      msg: `Hapus section "${section.title}" beserta semua item di dalamnya?`
+                    })
                   }}
-                  title={section.isFavorite ? 'Lepas dari favorit' : 'Tandai sebagai favorit'}
-                  style={{ color: section.isFavorite ? '#FFD700' : undefined }}
-                >⭐</button>
+                  title="Hapus Section"
+                >🗑</button>
+              </div>
+            )}
+
+            {/* Collapse button — selalu ada */}
+            <button
+              className={`sec-collapse-btn${section.collapsed ? '' : ' open'}`}
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); toggleCollapse(section.id) }}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* ── Body ─────────────────────────────────────────── */}
+        <div className={`section-body${section.collapsed ? ' collapsed' : ''}`}>
+          {isFolderGrid ? (
+            <div
+              className="folder-grid"
+              style={{ '--folder-cols': appearance.folderGridCols } as React.CSSProperties}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => {
+                e.preventDefault()
+                const raw = e.dataTransfer.getData('text/plain')
+                if (!raw.startsWith('item:')) return
+                const [, srcItemId, srcSectionId] = raw.split(':')
+                moveItem(srcSectionId, srcItemId, section.id)
+              }}
+            >
+              {filteredItems.map(item => (
+                <FolderItem
+                  key={item.id}
+                  item={item}
+                  searchQuery={q}
+                  editMode={!!isFocused && isAdmin && editMode}
+                  dragOver={itemDragOver === item.id}
+                  appearance={appearance}
+                  onDragStart={onItemDragStart}
+                  onDragOver={onItemDragOver}
+                  onDrop={onItemDrop}
+                  onDragLeave={() => setItemDragOver(null)}
+                  onEdit={() => onEditItem(section.id, item)}
+                  onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
+                />
+              ))}
+              {/* Ghost add item — saat section focused */}
+              {isFocused && isAdmin && editMode && (
+                <GhostAddItem onClick={() => onAddItem(section.id)} />
               )}
-              <button
-                className="sec-action-btn-lg"
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); onEditSection(section) }}
-                title="Edit section"
-              >✏️</button>
-              <button
-                className="sec-action-btn-lg danger"
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => {
-                  e.stopPropagation()
-                  setConfirmDel({ open: true, type: 'section', msg: `Hapus section "${section.title}" beserta semua item di dalamnya?` })
-                  // panggil onDeleteSection dari parent saat konfirmasi
-                }}
-                title="Hapus section"
-              >🗑</button>
+            </div>
+          ) : (
+            <div
+              style={{ padding: density.body, display: 'flex', flexDirection: 'column', gap: density.gap }}
+              onDragOver={e => e.preventDefault()}
+              onDrop={onListDrop}
+            >
+              {filteredItems.map(item => (
+                <ListItem
+                  key={item.id}
+                  item={item}
+                  searchQuery={q}
+                  editMode={!!isFocused && isAdmin && editMode}
+                  appearance={appearance}
+                  showDesc={displayOptions.showDesc}
+                  showTags={displayOptions.showTags}
+                  onEdit={() => onEditItem(section.id, item)}
+                  onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
+                />
+              ))}
             </div>
           )}
-          <button
-            className={`sec-collapse-btn${section.collapsed ? '' : ' open'}`}
-            onMouseDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); toggleCollapse(section.id) }}
-            title={section.collapsed ? 'Expand' : 'Collapse'}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M3 5L7 9L11 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
         </div>
-      </div>
 
-      {/* ── Body ───────────────────────────────────────── */}
-      <div
-        className={`section-body${section.collapsed ? ' collapsed' : ''}`}
-        style={{ flex: 1, overflow: 'auto' }}
-      >
-        {isFolderGrid ? (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${appearance.folderGridCols}, 1fr)`,
-              gap: density.gap === '2px' ? '8px' : density.gap === '4px' ? '12px' : '16px',
-              padding: density.body === '4px' ? '8px' : density.body === '6px' ? '10px' : '14px',
-            }}
-            onDragOver={e => e.preventDefault()}
-            onDrop={onListDrop}
-          >
-            {filteredItems.map(item => (
-              <FolderItem
-                key={item.id}
-                item={item}
-                searchQuery={q}
-                editMode={isAdmin && editMode}
-                dragOver={itemDragOver === item.id}
-                appearance={appearance}
-                onDragStart={onItemDragStart}
-                onDragOver={onItemDragOver}
-                onDrop={onItemDrop}
-                onDragLeave={() => setItemDragOver(null)}
-                onEdit={() => onEditItem(section.id, item)}
-                onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
-
-              />
-            ))}
-            {/* Ghost + item — muncul saat edit mode, setelah icon terakhir */}
-            {isAdmin && editMode && (
-              <GhostAddItem onClick={() => onAddItem(section.id)} />
-            )}
-          </div>
-        ) : (
-          <div
-            style={{ padding: density.body, display: 'flex', flexDirection: 'column', gap: density.gap }}
-            onDragOver={e => e.preventDefault()}
-            onDrop={onListDrop}
-          >
-            {filteredItems.map(item => (
-              <ListItem
-                key={item.id}
-                item={item}
-                searchQuery={q}
-                editMode={isAdmin && editMode}
-                dragOver={itemDragOver === item.id}
-                appearance={appearance}
-                showDesc={displayOptions.showDesc}
-                showTags={displayOptions.showTags}
-                onDragStart={onItemDragStart}
-                onDragOver={onItemDragOver}
-                onDrop={onItemDrop}
-                onDragLeave={() => setItemDragOver(null)}
-                onEdit={() => onEditItem(section.id, item)}
-                onDelete={() => setConfirmDel({ open: true, type: 'item', itemId: item.id, msg: `Hapus "${item.title}"?` })}
-              />
-            ))}
-          </div>
-        )}
-
-        {q && filteredItems.length === 0 && (
-          <div style={{ padding: '12px', fontSize: 11, color: 'var(--silver3)', textAlign: 'center' }}>
-            Tidak ada hasil
+        {/* ── Footer: Simpan + Batal — hanya saat focused ─── */}
+        {isFocused && isAdmin && (
+          <div style={{
+            display: 'flex', gap: 8, padding: '10px 12px',
+            borderTop: '1px solid var(--border)',
+            background: 'var(--mint-bg)',
+            flexShrink: 0,
+          }}>
+            <button
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); onCancel?.() }}
+              style={{
+                flex: 1, height: 36, background: 'none',
+                border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)',
+                color: 'var(--silver3)', fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'var(--font)',
+              }}>Batal</button>
+            <button
+              onMouseDown={e => e.stopPropagation()}
+              onClick={async e => {
+                e.stopPropagation()
+                // Tunggu sync selesai dulu
+                await syncPersonalToDb()
+                onSave?.()
+              }}
+              disabled={isSyncing}
+              style={{
+                flex: 2, height: 36,
+                background: 'var(--accent)', border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                color: 'white', fontSize: 12, fontWeight: 700,
+                cursor: isSyncing ? 'wait' : 'pointer', fontFamily: 'var(--font)',
+                opacity: isSyncing ? 0.7 : 1,
+              }}>{isSyncing ? '⏳ Menyimpan...' : '✓ Simpan'}</button>
           </div>
         )}
       </div>
 
-      {/* ── Resize hint — hanya di edit mode ───────────── */}
-      {isAdmin && editMode && (
-        <div className="rgl-resize-hint" title="Drag untuk resize">
-          <svg width="10" height="10" viewBox="0 0 10 10">
-            <path d="M2 9L9 2M5 9L9 5M8 9L9 8" stroke="var(--mint)" strokeWidth="1.2" strokeLinecap="round"/>
-          </svg>
-        </div>
-      )}
-    </div>
-
+      {/* Confirm dialog */}
       <ConfirmDialog
         open={confirmDel.open}
-        title={confirmDel.type === 'section' ? 'Hapus Section' : 'Hapus Item'}
+        title={confirmDel.type === 'section' ? 'Hapus Section' : confirmDel.type === 'unfavorite' ? 'Lepas Favorit' : 'Hapus Link'}
         message={confirmDel.msg}
-        confirmLabel="Ya, Hapus"
-        danger
+        danger={confirmDel.type !== 'unfavorite'}
         onConfirm={() => {
           if (confirmDel.type === 'unfavorite') {
-            onToggleFavorite?.(section.id)  // lepas favorite
+            onToggleFavorite?.(section.id)
           } else if (confirmDel.type === 'section') {
             onDeleteSection(section.id)
-          } else if (confirmDel.itemId) {
+          } else if (confirmDel.type === 'item' && confirmDel.itemId) {
             deleteItem(section.id, confirmDel.itemId)
-            toast('Item dihapus.', 'success')
+            toast('Link dihapus.', 'success')
           }
           setConfirmDel({ open: false, type: 'section', msg: '' })
         }}
@@ -308,94 +369,7 @@ function GhostAddItem({ onClick }: { onClick: () => void }) {
   )
 }
 
-// ── helper ────────────────────────────────────────────────
-function handleItemClick(item: LinkItem, editMode: boolean) {
-  if (editMode) return
-  const url = sanitizeUrl(item.url)
-  if (!url || url === '#') return
-  if (item.newTab) window.open(url, '_blank', 'noopener noreferrer')
-  else window.location.href = url
-}
-
-// ── LIST ITEM ─────────────────────────────────────────────
-interface ListItemProps {
-  item: LinkItem
-  searchQuery: string
-  editMode: boolean
-  dragOver: boolean
-  appearance: AppearanceSettings
-  showDesc: boolean
-  showTags: boolean
-  onDragStart: (e: React.DragEvent, item: LinkItem) => void
-  onDragOver:  (e: React.DragEvent, id: string) => void
-  onDrop:      (e: React.DragEvent, id: string) => void
-  onDragLeave: () => void
-  onEdit:   () => void
-  onDelete: () => void
-}
-
-function ListItem({ item, searchQuery, editMode, dragOver, appearance, showDesc, showTags, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete }: ListItemProps) {
-  const [hovered, setHovered] = useState(false)
-  const isCompact  = appearance.itemDisplayMode === 'list'
-  const isTextOnly = false  // removed: textOnly mode deprecated
-  const isIconOnly = false  // removed: iconOnly mode deprecated
-  const showLabel  = appearance.labelMode === 'show' || (appearance.labelMode === 'hover' && hovered)
-  const showTooltip = appearance.tooltipEnabled && hovered && (
-    isIconOnly || appearance.labelMode === 'hide' || (appearance.labelMode === 'hover' && item.desc)
-  )
-
-  return (
-    <div
-      className={`item-card${dragOver ? ' drag-over-item' : ''}`}
-      style={{ padding: isCompact ? '3px 8px' : '6px 8px', position: 'relative' }}
-      draggable={editMode}
-      onDragStart={e => onDragStart(e, item)}
-      onDragOver={e => onDragOver(e, item.id)}
-      onDrop={e => onDrop(e, item.id)}
-      onDragLeave={onDragLeave}
-      onClick={() => handleItemClick(item, editMode)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      aria-label={item.title}
-    >
-      {!isTextOnly && (
-        <AppIcon item={item} iconSize={isCompact ? 'small' : appearance.iconSize} faviconEnabled={appearance.faviconEnabled} />
-      )}
-
-      {!isIconOnly && showLabel && (
-        <div className="item-text">
-          <div className="item-title" dangerouslySetInnerHTML={{ __html: highlight(item.title, searchQuery) }} />
-          {showDesc && item.desc && !isCompact && <div className="item-desc">{item.desc}</div>}
-          {showTags && item.tags.length > 0 && (
-            <div className="item-tags">
-              {item.tags.map(t => <span key={t} className="item-tag">{t}</span>)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {isIconOnly && !showLabel && (
-        <div className="item-text" style={{ opacity: 0 }} aria-hidden />
-      )}
-
-      {showTooltip && (
-        <div className="item-tooltip-popup">
-          <div style={{ fontWeight: 600, marginBottom: item.desc ? 2 : 0 }}>{item.title}</div>
-          {item.desc && <div style={{ opacity: .7, fontSize: 11 }}>{item.desc}</div>}
-        </div>
-      )}
-
-      {editMode && (
-        <div className="item-action-group" onMouseDown={e => e.stopPropagation()}>
-          <button className="item-edit-btn" onClick={e => { e.stopPropagation(); onEdit() }} title="Edit">✏️</button>
-          <button className="item-delete-btn" onClick={e => { e.stopPropagation(); onDelete() }} title="Hapus">🗑</button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── FOLDER ITEM ───────────────────────────────────────────
+// ── Folder Item ───────────────────────────────────────────
 interface FolderItemProps {
   item: LinkItem
   searchQuery: string
@@ -403,30 +377,31 @@ interface FolderItemProps {
   dragOver: boolean
   appearance: AppearanceSettings
   onDragStart: (e: React.DragEvent, item: LinkItem) => void
-  onDragOver:  (e: React.DragEvent, id: string) => void
-  onDrop:      (e: React.DragEvent, id: string) => void
+  onDragOver: (e: React.DragEvent, id: string) => void
+  onDrop: (e: React.DragEvent, id: string) => void
   onDragLeave: () => void
-  onEdit:   () => void
+  onEdit: () => void
   onDelete: () => void
 }
 
 function FolderItem({ item, searchQuery, editMode, dragOver, appearance, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete }: FolderItemProps) {
   const [hovered, setHovered] = useState(false)
-  const showLabel = appearance.labelMode === 'show' || (appearance.labelMode === 'hover' && hovered)
+
+  const handleItemClick = (item: LinkItem, editMode: boolean) => {
+    if (editMode) return
+    const url = sanitizeUrl(item.url)
+    if (url) window.open(url, item.newTab ? '_blank' : '_self', 'noopener,noreferrer')
+  }
+
+  const showLabel = appearance.labelMode !== 'hide' || editMode
 
   return (
     <div
+      className={`folder-item${dragOver ? ' drag-over' : ''}`}
       style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'flex-start', gap: 5,
-        padding: '10px 4px 8px',
-        borderRadius: 'var(--radius-sm)',
-        border: `1px solid ${dragOver ? 'var(--mint)' : hovered ? 'rgba(0,255,194,0.22)' : 'transparent'}`,
-        background: hovered ? 'rgba(0,255,194,0.06)' : dragOver ? 'var(--mint-bg)' : 'transparent',
-        boxShadow: hovered ? '0 0 8px rgba(0,255,194,0.07)' : 'none',
-        cursor: editMode ? 'default' : (item.url && item.url !== '#' ? 'pointer' : 'default'),
-        transition: 'all .15s',
-        position: 'relative', minHeight: 64,
+        opacity: dragOver ? 0.5 : 1,
+        outline: hovered && !editMode ? '2px solid var(--border2)' : 'none',
+        outlineOffset: '-2px',
         userSelect: 'none',
       }}
       draggable={editMode}
@@ -455,19 +430,63 @@ function FolderItem({ item, searchQuery, editMode, dragOver, appearance, onDragS
         />
       )}
 
-      {appearance.tooltipEnabled && appearance.labelMode === 'hide' && hovered && (
-        <div className="item-tooltip-popup" style={{ bottom: 'calc(100% + 4px)', left: '50%', transform: 'translateX(-50%)' }}>
-          {item.title}
-          {item.desc && <div style={{ opacity: .7, fontSize: 10, marginTop: 2 }}>{item.desc}</div>}
-        </div>
-      )}
-
-
+      {/* Action buttons — selalu visible saat editMode (section focused) */}
       {editMode && (
-        <div className="folder-action-group" onMouseDown={e => e.stopPropagation()}>
-
+        <div
+          className="folder-action-group"
+          onMouseDown={e => e.stopPropagation()}
+          style={{ opacity: 1 }}
+        >
           <button className="folder-edit-btn" onClick={e => { e.stopPropagation(); onEdit() }} title="Edit">✏️</button>
           <button className="folder-delete-btn" onClick={e => { e.stopPropagation(); onDelete() }} title="Hapus">🗑</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── List Item ─────────────────────────────────────────────
+interface ListItemProps {
+  item: LinkItem
+  searchQuery: string
+  editMode: boolean
+  appearance: AppearanceSettings
+  showDesc: boolean
+  showTags: boolean
+  onEdit: () => void
+  onDelete: () => void
+}
+
+function ListItem({ item, searchQuery, editMode, appearance, showDesc, showTags, onEdit, onDelete }: ListItemProps) {
+  const handleClick = () => {
+    if (editMode) return
+    const url = sanitizeUrl(item.url)
+    if (url) window.open(url, item.newTab ? '_blank' : '_self', 'noopener,noreferrer')
+  }
+
+  return (
+    <div className="item-card" onClick={handleClick}>
+      <AppIcon item={item} iconSize="small" faviconEnabled={appearance.faviconEnabled} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="item-title"
+          dangerouslySetInnerHTML={{ __html: highlight(item.title, searchQuery) }} />
+        {showDesc && item.desc && <div className="item-desc">{item.desc}</div>}
+        {showTags && item.tags?.length > 0 && (
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 3 }}>
+            {item.tags.map(t => (
+              <span key={t} style={{
+                fontSize: 9, padding: '1px 5px', borderRadius: 3,
+                background: 'var(--mint-bg)', color: 'var(--accent)',
+                fontFamily: 'var(--mono)', fontWeight: 700,
+              }}>{t}</span>
+            ))}
+          </div>
+        )}
+      </div>
+      {editMode && (
+        <div className="item-action-group" style={{ opacity: 1 }} onMouseDown={e => e.stopPropagation()}>
+          <button className="item-edit-btn" onClick={e => { e.stopPropagation(); onEdit() }}>✏️</button>
+          <button className="item-delete-btn" onClick={e => { e.stopPropagation(); onDelete() }}>🗑</button>
         </div>
       )}
     </div>

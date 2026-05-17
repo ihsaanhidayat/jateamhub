@@ -18,7 +18,7 @@ interface Props {
 
 // Pilihan accent color untuk section
 const ACCENT_COLORS = [
-  '#00FFC2', '#00BFFF', '#FF6B6B', '#FFD93D',
+  'var(--accent)', '#00BFFF', '#FF6B6B', '#FFD93D',
   '#C77DFF', '#FF8C42', '#A78BFA', '#34D399',
 ]
 
@@ -136,8 +136,8 @@ export default function SectionModal({ open, section, onClose }: Props) {
               <button key={t} onClick={() => setType(t)} style={{
                 flex: 1, padding: '8px', fontSize: 12, fontWeight: 600,
                 background: type === t ? 'var(--mint-bg2)' : 'var(--bg3)',
-                border: `1px solid ${type === t ? 'var(--mint)' : 'var(--border2)'}`,
-                borderRadius: 6, color: type === t ? 'var(--mint)' : 'var(--silver3)',
+                border: `1px solid ${type === t ? 'var(--accent)' : 'var(--border2)'}`,
+                borderRadius: 6, color: type === t ? 'var(--accent)' : 'var(--silver3)',
                 cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
               }}>{t === 'section' ? '📁 Section' : '🧩 Widget'}</button>
             ))}
@@ -154,8 +154,8 @@ export default function SectionModal({ open, section, onClose }: Props) {
               <button key={w} onClick={() => setWidgetType(w)} style={{
                 flex: 1, padding: '8px', fontSize: 12, fontWeight: 600,
                 background: widgetType === w ? 'var(--mint-bg2)' : 'var(--bg3)',
-                border: `1px solid ${widgetType === w ? 'var(--mint)' : 'var(--border2)'}`,
-                borderRadius: 6, color: widgetType === w ? 'var(--mint)' : 'var(--silver3)',
+                border: `1px solid ${widgetType === w ? 'var(--accent)' : 'var(--border2)'}`,
+                borderRadius: 6, color: widgetType === w ? 'var(--accent)' : 'var(--silver3)',
                 cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
               }}>{w === 'clock' ? '🕐 Jam' : '📝 Catatan'}</button>
             ))}
@@ -169,7 +169,7 @@ export default function SectionModal({ open, section, onClose }: Props) {
         <input
           type="range" min={2} max={12} value={colW}
           onChange={e => setColW(Number(e.target.value))}
-          style={{ width: '100%', accentColor: 'var(--mint)' }}
+          style={{ width: '100%', accentColor: 'var(--accent)' }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--silver3)', marginTop: 2 }}>
           <span>Sempit</span><span>Penuh</span>
@@ -191,7 +191,7 @@ export default function SectionModal({ open, section, onClose }: Props) {
           {/* Tombol hapus warna aksen */}
           <div onClick={() => setAccent('')} style={{
             width: 28, height: 28, borderRadius: 6,
-            background: 'var(--bg3)', border: `1px solid ${!accent ? 'var(--mint)' : 'var(--border2)'}`,
+            background: 'var(--bg3)', border: `1px solid ${!accent ? 'var(--accent)' : 'var(--border2)'}`,
             cursor: 'pointer', display: 'flex', alignItems: 'center',
             justifyContent: 'center', fontSize: 12, color: 'var(--silver3)',
           }}>✕</div>

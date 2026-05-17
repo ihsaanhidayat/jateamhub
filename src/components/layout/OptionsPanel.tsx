@@ -36,9 +36,9 @@ function ChipGroup<T extends string>({ options, value, onChange }: {
         <button key={o.key} onClick={() => onChange(o.key)} style={{
           padding: '4px 9px', fontSize: 11, fontWeight: 600,
           background: value === o.key ? 'var(--mint-bg2)' : 'var(--bg3)',
-          border: `1px solid ${value === o.key ? 'var(--mint)' : 'var(--border2)'}`,
+          border: `1px solid ${value === o.key ? 'var(--accent)' : 'var(--border2)'}`,
           borderRadius: 'var(--radius-sm)',
-          color: value === o.key ? 'var(--mint)' : 'var(--silver3)',
+          color: value === o.key ? 'var(--accent)' : 'var(--silver3)',
           cursor: 'pointer', transition: 'all .12s',
           display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font)',
         }}>
@@ -108,7 +108,7 @@ export default function OptionsPanel({ open, onClose }: Props) {
                 flex: 1, padding: '8px 4px',
                 borderRadius: 'var(--radius-sm)',
                 background: isActive ? 'var(--mint-bg2)' : 'var(--bg3)',
-                border: `1.5px solid ${isActive ? 'var(--mint)' : 'var(--border2)'}`,
+                border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--border2)'}`,
                 cursor: 'pointer', transition: 'all .15s',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
               }}>
@@ -117,7 +117,7 @@ export default function OptionsPanel({ open, onClose }: Props) {
                   <div style={{ flex: 1, background: t.standalone ? '#1a1a1a' : t.bgLight }} />
                   <div style={{ flex: 1, background: t.bgDark }} />
                 </div>
-                <span style={{ fontSize: 9, fontWeight: 700, color: isActive ? 'var(--mint)' : 'var(--silver2)', letterSpacing: '.3px' }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: isActive ? 'var(--accent)' : 'var(--silver2)', letterSpacing: '.3px' }}>
                   {t.name}
                 </span>
                 {/* Font preview */}
@@ -139,7 +139,7 @@ export default function OptionsPanel({ open, onClose }: Props) {
               applyThemeToDOM(themeId)
             }} style={{
               width: 40, height: 22, borderRadius: 11, cursor: 'pointer',
-              background: (appearance.isDarkMode ?? false) ? 'var(--mint)' : 'var(--border2)',
+              background: (appearance.isDarkMode ?? false) ? 'var(--accent)' : 'var(--border2)',
               position: 'relative', transition: 'background 0.25s', flexShrink: 0,
             }}>
               <div style={{
@@ -169,9 +169,9 @@ export default function OptionsPanel({ open, onClose }: Props) {
                   <button key={cols} onClick={() => setAppearance({ folderGridCols: cols })} style={{
                     flex: 1, padding: '6px 4px', fontSize: 12, fontWeight: 700,
                     background: active ? 'var(--mint-bg2)' : 'var(--bg3)',
-                    border: `1px solid ${active ? 'var(--mint)' : 'var(--border2)'}`,
+                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border2)'}`,
                     borderRadius: 'var(--radius-sm)',
-                    color: active ? 'var(--mint)' : 'var(--silver3)',
+                    color: active ? 'var(--accent)' : 'var(--silver3)',
                     cursor: 'pointer', transition: 'all .12s', fontFamily: 'var(--mono)',
                   }}>{label}</button>
                 )
@@ -188,7 +188,7 @@ export default function OptionsPanel({ open, onClose }: Props) {
               const sizes: IconSize[] = ['small','medium','large','xl']
               setAppearance({ iconSize: sizes[Number(e.target.value)] })
             }}
-            style={{ width: '100%', accentColor: 'var(--mint)', cursor: 'pointer' }} />
+            style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--silver3)', fontFamily: 'var(--mono)', marginTop: 2 }}>
             <span>S</span><span>M</span><span>L</span><span>XL</span>
           </div>

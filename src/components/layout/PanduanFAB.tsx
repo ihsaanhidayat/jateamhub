@@ -37,10 +37,10 @@ export default function PanduanFAB() {
             <div style={{
               padding: '18px 20px', borderBottom: '1px solid var(--border)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'rgba(0,255,194,0.03)', flexShrink: 0,
+              background: 'var(--mint-bg)', flexShrink: 0,
             }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--mint)', textShadow: '0 0 12px rgba(0,255,194,0.3)' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', textShadow: '0 0 12px var(--accent-glow)' }}>
                   📖 Panduan JateamHub
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--silver3)', marginTop: 2 }}>
@@ -64,7 +64,7 @@ export default function PanduanFAB() {
                     animation: `fadeSlideUp 0.3s ease ${i * 0.03}s both`,
                     transition: 'border-color .2s',
                   }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(0,255,194,0.12)')}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--mint-bg)')}
                     onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)')}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -78,10 +78,10 @@ export default function PanduanFAB() {
 
               <div style={{
                 marginTop: 16, padding: '14px 16px',
-                background: 'rgba(0,255,194,0.04)', border: '1px solid rgba(0,255,194,0.12)',
+                background: 'var(--mint-bg)', border: '1px solid var(--mint-bg)',
                 borderRadius: 8, fontSize: 11, color: 'var(--silver3)', lineHeight: 1.6,
               }}>
-                <span style={{ color: 'var(--mint)', fontWeight: 700 }}>💡 Admin:</span>{' '}
+                <span style={{ color: 'var(--accent)', fontWeight: 700 }}>💡 Admin:</span>{' '}
                 Kamu bisa menambahkan panduan sendiri di halaman Beranda dengan membuat section khusus panduan.
               </div>
             </div>

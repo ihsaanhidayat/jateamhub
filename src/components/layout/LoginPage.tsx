@@ -12,7 +12,7 @@ function MatrixRain() {
     if (!ctx) return
 
     const resize = () => {
-      canvas.width = window.innerWidth
+      canvas.width  = window.innerWidth
       canvas.height = window.innerHeight
     }
     resize()
@@ -73,12 +73,12 @@ function MatrixRain() {
 
 export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
   const { login } = useAuthStore()
-  const [showPw, setShowPw] = useState(false)
+  const [showPw,   setShowPw]   = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [err, setErr] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [shake, setShake] = useState(false)
+  const [err,      setErr]      = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [shake,    setShake]    = useState(false)
 
   // Terapkan tema dari localStorage saat login page muncul
   useEffect(() => {
@@ -90,12 +90,12 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
           document.documentElement.setAttribute('data-theme', app.theme)
           const fontMap: Record<string, string> = {
             'aurora-light': "'Inter', sans-serif",
-            'aurora-dark': "'Inter', sans-serif",
-            'sand-light': "'Lora', serif",
-            'sand-dark': "'Lora', serif",
-            'slate-light': "'IBM Plex Sans', sans-serif",
-            'slate-dark': "'IBM Plex Sans', sans-serif",
-            'obsidian': "'Space Grotesk', sans-serif",
+            'aurora-dark':  "'Inter', sans-serif",
+            'sand-light':   "'Lora', serif",
+            'sand-dark':    "'Lora', serif",
+            'slate-light':  "'IBM Plex Sans', sans-serif",
+            'slate-dark':   "'IBM Plex Sans', sans-serif",
+            'obsidian':     "'Space Grotesk', sans-serif",
           }
           const font = fontMap[app.theme]
           if (font) document.documentElement.style.setProperty('--font', font)
@@ -136,15 +136,15 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
       {/* Radial glow center */}
       <div style={{
         position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0,255,194,0.06) 0%, transparent 70%)',
+        background: 'radial-gradient(ellipse 60% 60% at 50% 50%, var(--mint-bg) 0%, transparent 70%)',
       }} />
 
       {/* Grid lines overlay */}
       <div style={{
         position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none',
         backgroundImage: `
-          linear-gradient(rgba(0,255,194,0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(0,255,194,0.03) 1px, transparent 1px)
+          linear-gradient(var(--mint-bg) 1px, transparent 1px),
+          linear-gradient(90deg, var(--mint-bg) 1px, transparent 1px)
         `,
         backgroundSize: '40px 40px',
       }} />
@@ -155,23 +155,23 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
         style={{
           position: 'relative', zIndex: 10,
           width: 360, background: 'rgba(10,10,10,0.85)',
-          border: '1px solid rgba(0,255,194,0.4)',
+          border: '1px solid var(--border2)',
           borderRadius: 12, padding: '40px 32px',
           backdropFilter: 'blur(20px)',
           boxShadow: `
-            0 0 0 1px rgba(0,255,194,0.08),
-            0 0 40px rgba(0,255,194,0.12),
-            0 0 80px rgba(0,255,194,0.06),
+            0 0 0 1px var(--mint-bg),
+            0 0 40px var(--mint-bg),
+            0 0 80px var(--mint-bg),
             0 20px 60px rgba(0,0,0,0.6)
           `,
         }}
       >
         {/* Corner accents */}
         {[
-          { top: -1, left: -1, borderTop: '2px solid #00FFC2', borderLeft: '2px solid #00FFC2', borderRadius: '12px 0 0 0' },
-          { top: -1, right: -1, borderTop: '2px solid #00FFC2', borderRight: '2px solid #00FFC2', borderRadius: '0 12px 0 0' },
-          { bottom: -1, left: -1, borderBottom: '2px solid #00FFC2', borderLeft: '2px solid #00FFC2', borderRadius: '0 0 0 12px' },
-          { bottom: -1, right: -1, borderBottom: '2px solid #00FFC2', borderRight: '2px solid #00FFC2', borderRadius: '0 0 12px 0' },
+          { top: -1, left: -1, borderTop: '2px solid var(--accent)', borderLeft: '2px solid var(--accent)', borderRadius: '12px 0 0 0' },
+          { top: -1, right: -1, borderTop: '2px solid var(--accent)', borderRight: '2px solid var(--accent)', borderRadius: '0 12px 0 0' },
+          { bottom: -1, left: -1, borderBottom: '2px solid var(--accent)', borderLeft: '2px solid var(--accent)', borderRadius: '0 0 0 12px' },
+          { bottom: -1, right: -1, borderBottom: '2px solid var(--accent)', borderRight: '2px solid var(--accent)', borderRadius: '0 0 12px 0' },
         ].map((s, i) => (
           <div key={i} style={{
             position: 'absolute', width: 20, height: 20, ...s,
@@ -181,13 +181,12 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <h1 style={{
-            fontSize: 32, fontWeight: 700, color: '#00FFC2',
+            fontSize: 32, fontWeight: 700, color: 'var(--accent)',
             letterSpacing: '-1px', fontFamily: 'var(--font)',
             textShadow: '0 0 20px rgba(0,255,194,0.8), 0 0 40px rgba(0,255,194,0.4), 0 0 80px rgba(0,255,194,0.2)',
           }}>JateamHub</h1>
-          <h3>Selamat Datang, Jagoan</h3>
           <div style={{
-            width: 50, height: 2, background: 'linear-gradient(90deg, transparent, #00FFC2, transparent)',
+            width: 50, height: 2, background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
             margin: '8px auto 0',
             boxShadow: '0 0 8px rgba(0,255,194,0.8)',
           }} />
@@ -207,7 +206,7 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
               autoFocus
               disabled={loading}
               style={{
-                width: '100%', background: 'rgba(0,255,194,0.04)',
+                width: '100%', background: 'var(--mint-bg)',
                 border: `1px solid ${err ? 'rgba(224,85,85,0.6)' : 'rgba(0,255,194,0.2)'}`,
                 borderRadius: 6, padding: '10px 12px',
                 color: '#E0E0E0', fontSize: 14, fontFamily: 'var(--font)',
@@ -228,7 +227,7 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
                 autoComplete="current-password"
                 disabled={loading}
                 style={{
-                  width: '100%', background: 'rgba(0,255,194,0.04)',
+                  width: '100%', background: 'var(--mint-bg)',
                   border: `1px solid ${err ? 'rgba(224,85,85,0.6)' : 'rgba(0,255,194,0.2)'}`,
                   borderRadius: 6, padding: '10px 12px',
                   color: '#E0E0E0', fontSize: 14, fontFamily: 'var(--font)',
@@ -256,7 +255,7 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
             style={{
               width: '100%', background: 'transparent',
               border: '1px solid rgba(0,255,194,0.6)',
-              color: '#00FFC2', padding: '12px',
+              color: 'var(--accent)', padding: '12px',
               borderRadius: 6, fontSize: 13, fontWeight: 700,
               letterSpacing: '2px', textTransform: 'uppercase',
               transition: 'all .2s', marginTop: 4,
@@ -268,9 +267,9 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
             onMouseEnter={e => {
               if (!loading) {
                 const b = e.currentTarget
-                b.style.background = 'rgba(0,255,194,0.12)'
+                b.style.background = 'var(--mint-bg)'
                 b.style.boxShadow = '0 0 20px rgba(0,255,194,0.3), 0 0 40px rgba(0,255,194,0.1)'
-                b.style.borderColor = '#00FFC2'
+                b.style.borderColor = 'var(--accent)'
               }
             }}
             onMouseLeave={e => {

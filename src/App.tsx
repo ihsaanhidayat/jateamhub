@@ -86,7 +86,7 @@ export default function App() {
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       minHeight: '100dvh', background: '#0A0A0A',
-      color: '#00FFC2', fontSize: 14, fontFamily: 'Space Grotesk, sans-serif', gap: 10,
+      color: 'var(--accent)', fontSize: 14, fontFamily: 'Space Grotesk, sans-serif', gap: 10,
     }}>
       <span style={{ animation: 'loginSpin 1s linear infinite', display: 'inline-block' }}>⟳</span>
       Memuat...

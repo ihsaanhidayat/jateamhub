@@ -190,7 +190,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                       Reset
                     </button>
                     <button onClick={() => setPreviewOpen(false)}
-                      style={{ flex: 1, padding: '6px', background: 'var(--mint-bg)', border: '1px solid var(--mint)', borderRadius: 4, color: 'var(--mint)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 700 }}>
+                      style={{ flex: 1, padding: '6px', background: 'var(--mint-bg)', border: '1px solid var(--accent)', borderRadius: 4, color: 'var(--accent)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 700 }}>
                       Terapkan
                     </button>
                   </div>
@@ -234,8 +234,8 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             {hamburgerOpen && (
               <div style={{
                 position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                background: 'rgba(12,12,12,0.98)',
-                border: '1px solid rgba(0,255,194,0.15)',
+                background: 'var(--bg3)',
+                border: '1px solid var(--mint-bg)',
                 borderRadius: 10, minWidth: 220,
                 boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                 zIndex: 500, overflow: 'hidden',
@@ -259,7 +259,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                   display: 'flex', alignItems: 'center', gap: 10,
                   width: '100%', padding: '12px 16px', background: editMode ? 'var(--mint-bg)' : 'none',
                   border: 'none', borderBottom: '1px solid var(--border)',
-                  color: editMode ? 'var(--mint)' : 'var(--silver2)', fontSize: 13,
+                  color: editMode ? 'var(--accent)' : 'var(--silver2)', fontSize: 13,
                   cursor: 'pointer', fontFamily: 'var(--font)', textAlign: 'left',
                 }}>
                   <span>✏️</span> Edit Mode {editMode ? '(Aktif)' : ''}
@@ -314,34 +314,13 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                     display: 'inline-block', marginTop: 4,
                   }}>{badge.label}</span>
                 </div>
-                {/* Actions */}
-                {/* Ganti foto — pakai label agar bisa tap di mobile */}
-                <label style={{
-                  display: 'block', width: '100%', padding: '9px 14px',
-                  textAlign: 'left', background: 'none', border: 'none',
-                  color: 'var(--silver2)', fontSize: 12, cursor: 'pointer',
-                  fontFamily: 'var(--font)', boxSizing: 'border-box',
-                }}
+                {/* Lihat Profil — semua role */}
+                <button onClick={() => { onOpenAdvanced(); setProfileDropdown(false) }}
+                  style={{ display: 'block', width: '100%', padding: '9px 14px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--silver2)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--mint-bg)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
-                  📷 Ganti Foto
-                  <input
-                    type="file" accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={e => {
-                      setProfileDropdown(false)
-                      handleAvatarUpload(e)
-                    }}
-                  />
-                </label>
-                {(session?.role === 'admin' || session?.role === 'superadmin') && (
-                  <button onClick={() => { onOpenAdvanced(); setProfileDropdown(false) }}
-                    style={{ display: 'block', width: '100%', padding: '9px 14px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--silver2)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--mint-bg)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
-                    ⚡ Advanced
-                  </button>
-                )}
+                  👤 Lihat Profil Saya
+                </button>
                 <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                 <button onClick={() => useAuthStore.getState().logout()}
                   style={{ display: 'block', width: '100%', padding: '9px 14px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--red)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}

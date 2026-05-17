@@ -60,41 +60,41 @@ export default function RegisterPage({ onBack }: Props) {
   }
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.15)',
+    width: '100%', background: 'var(--glass)',
+    border: '1px solid var(--border2)',
     borderRadius: 8, padding: '11px 14px',
-    color: '#F1F5F9', fontSize: 14, fontFamily: 'var(--font)',
+    color: 'var(--silver)', fontSize: 14, fontFamily: 'var(--font)',
     outline: 'none', boxSizing: 'border-box',
     transition: 'border-color 0.2s',
   }
   const labelStyle: React.CSSProperties = {
     display: 'block', fontSize: 11, fontWeight: 700,
-    color: '#94A3B8', textTransform: 'uppercase',
+    color: 'var(--silver3)', textTransform: 'uppercase',
     letterSpacing: '1px', marginBottom: 6, fontFamily: 'var(--mono)',
   }
 
   if (step === 'success') return (
     <div style={{
-      minHeight: '100dvh', background: '#0E0E0E',
+      minHeight: '100dvh', background: 'var(--bg)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
     }}>
       <div style={{
-        background: 'rgba(22,22,22,0.95)', border: '1px solid rgba(110,231,183,0.2)',
+        background: 'var(--card-bg)', border: '1px solid var(--border2)',
         borderRadius: 16, padding: '40px 32px', maxWidth: 400, width: '100%', textAlign: 'center',
         boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
       }}>
         <div style={{ fontSize: 48, marginBottom: 20 }}>✅</div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#6EE7B7', marginBottom: 12 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>
           Pendaftaran Terkirim!
         </h2>
-        <p style={{ fontSize: 13, color: '#94A3B8', lineHeight: 1.7, marginBottom: 28 }}>
+        <p style={{ fontSize: 13, color: 'var(--silver3)', lineHeight: 1.7, marginBottom: 28 }}>
           Pendaftaran kamu sudah diterima dan sedang menunggu persetujuan admin.
           Kamu akan dihubungi via WhatsApp setelah akun diaktifkan.
         </p>
         <button onClick={onBack} style={{
           width: '100%', padding: '12px', background: 'rgba(110,231,183,0.1)',
           border: '1px solid rgba(110,231,183,0.3)', borderRadius: 8,
-          color: '#6EE7B7', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
+          color: 'var(--accent)', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
         }}>Kembali ke Login</button>
       </div>
     </div>
@@ -102,12 +102,12 @@ export default function RegisterPage({ onBack }: Props) {
 
   return (
     <div style={{
-      minHeight: '100dvh', background: '#0E0E0E',
+      minHeight: '100dvh', background: 'var(--bg)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 20, fontFamily: 'var(--font)',
     }}>
       <div style={{
-        background: 'rgba(22,22,22,0.95)',
+        background: 'var(--card-bg)',
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 16, padding: '36px 32px',
         maxWidth: 480, width: '100%',
@@ -115,10 +115,10 @@ export default function RegisterPage({ onBack }: Props) {
       }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#6EE7B7', letterSpacing: '-0.5px', marginBottom: 6 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)', letterSpacing: '-0.5px', marginBottom: 6 }}>
             JateamHub
           </h1>
-          <p style={{ fontSize: 13, color: '#64748B' }}>Daftar Akun Baru</p>
+          <p style={{ fontSize: 13, color: 'var(--silver3)' }}>Daftar Akun Baru</p>
         </div>
 
         {/* Form */}
@@ -167,7 +167,7 @@ export default function RegisterPage({ onBack }: Props) {
                 style={{ ...inputStyle, appearance: 'auto', color: region ? '#F1F5F9' : '#64748B' }}>
                 <option value="" disabled>Pilih wilayah</option>
                 {REGIONS.filter(r => r.value !== 'global').map(r => (
-                  <option key={r.value} value={r.value} style={{ background: '#1E1E1E' }}>{r.label}</option>
+                  <option key={r.value} value={r.value} style={{ background: 'var(--bg3)' }}>{r.label}</option>
                 ))}
               </select>
             </div>
@@ -177,7 +177,7 @@ export default function RegisterPage({ onBack }: Props) {
                 style={{ ...inputStyle, appearance: 'auto', color: unit ? '#F1F5F9' : '#64748B' }}>
                 <option value="" disabled>Pilih unit</option>
                 {UNITS.map(u => (
-                  <option key={u.value} value={u.value} style={{ background: '#1E1E1E' }}>{u.label}</option>
+                  <option key={u.value} value={u.value} style={{ background: 'var(--bg3)' }}>{u.label}</option>
                 ))}
               </select>
             </div>
@@ -188,8 +188,8 @@ export default function RegisterPage({ onBack }: Props) {
         {err && (
           <div style={{
             marginTop: 14, padding: '10px 14px',
-            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: 8, color: '#FCA5A5', fontSize: 13,
+            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: 8, color: 'var(--red)', fontSize: 13,
           }}>{err}</div>
         )}
 
@@ -198,7 +198,7 @@ export default function RegisterPage({ onBack }: Props) {
           width: '100%', marginTop: 20, padding: '13px',
           background: loading ? 'rgba(110,231,183,0.3)' : 'rgba(110,231,183,0.15)',
           border: '1px solid rgba(110,231,183,0.4)',
-          borderRadius: 8, color: '#6EE7B7', fontSize: 14, fontWeight: 700,
+          borderRadius: 8, color: 'var(--accent)', fontSize: 14, fontWeight: 700,
           cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
           transition: 'all 0.2s',
         }}>
@@ -209,7 +209,7 @@ export default function RegisterPage({ onBack }: Props) {
         <button onClick={onBack} style={{
           width: '100%', marginTop: 10, padding: '11px',
           background: 'none', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 8, color: '#64748B', fontSize: 13, cursor: 'pointer',
+          borderRadius: 8, color: 'var(--silver3)', fontSize: 13, cursor: 'pointer',
           fontFamily: 'var(--font)',
         }}>← Kembali ke Login</button>
 
