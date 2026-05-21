@@ -257,9 +257,28 @@ export default memo(function SectionCard({
                   onDelete={handleDeleteItem}
                 />
               ))}
-              {/* Ghost add item — saat section focused */}
+              {/* Ghost add item — saat section focused (desktop edit mode) */}
               {isFocused && isAdmin && editMode && (
                 <GhostAddItem onClick={handleAddItem} />
+              )}
+              {/* Mobile: tombol tambah link selalu tampil untuk personal section */}
+              {!isShared && !editMode && (
+                <div
+                  className="mobile-only"
+                  onClick={handleAddItem}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 2, cursor: 'pointer', padding: '8px 4px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1.5px dashed var(--border2)',
+                    color: 'var(--silver3)', fontSize: 18,
+                    minHeight: 48,
+                    transition: 'border-color 150ms, color 150ms',
+                  }}
+                >
+                  <span>＋</span>
+                  <span style={{ fontSize: 9, fontWeight: 600 }}>Tambah</span>
+                </div>
               )}
             </div>
           ) : (
@@ -279,7 +298,7 @@ export default memo(function SectionCard({
                   onDelete={handleDeleteItem}
                 />
               ))}
-              {/* Poin 12: tombol tambah link di list view saat focused */}
+              {/* Poin 12: tombol tambah link di list view saat focused (desktop) */}
               {!!isFocused && isAdmin && editMode && (
                 <button
                   onMouseDown={e => e.stopPropagation()}
@@ -291,6 +310,23 @@ export default memo(function SectionCard({
                     border: '1px dashed var(--border2)',
                     borderRadius: 'var(--radius-sm)',
                     color: 'var(--accent)', fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'var(--font)',
+                  }}>
+                  ＋ Tambah Link
+                </button>
+              )}
+              {/* Mobile: tombol tambah link selalu tampil untuk personal section */}
+              {!isShared && !editMode && (
+                <button
+                  className="mobile-only"
+                  onClick={handleAddItem}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    gap: 6, height: 36, width: '100%',
+                    background: 'none',
+                    border: '1.5px dashed var(--border2)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--silver3)', fontSize: 12, fontWeight: 600,
                     cursor: 'pointer', fontFamily: 'var(--font)',
                   }}>
                   ＋ Tambah Link
