@@ -7,17 +7,17 @@ function MatrixRain() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const canvas = canvasRef.current!
-    const ctx    = canvas.getContext('2d')!
+    const ctx = canvas.getContext('2d')!
     const resize = () => {
-      canvas.width  = window.innerWidth
+      canvas.width = window.innerWidth
       canvas.height = window.innerHeight
     }
     resize()
     window.addEventListener('resize', resize)
-    const cols  = Math.floor(canvas.width / 14)
+    const cols = Math.floor(canvas.width / 14)
     const drops = Array(cols).fill(1)
     const chars = 'アイウエオカキクケコ0123456789ABCDEF'.split('')
-    const draw  = () => {
+    const draw = () => {
       ctx.fillStyle = 'rgba(8,8,8,0.05)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       drops.forEach((y, i) => {
@@ -47,12 +47,12 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
   const { login } = useAuthStore()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [showPw,   setShowPw]   = useState(false)
-  const [err,      setErr]      = useState('')
-  const [loading,   setLoading]   = useState(false)
-  const [shake,     setShake]     = useState(false)
+  const [showPw, setShowPw] = useState(false)
+  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [shake, setShake] = useState(false)
   const [isObsidian, setIsObsidian] = useState(false)
-  const [cooldown,  setCooldown]  = useState(0)  // brute force protection
+  const [cooldown, setCooldown] = useState(0)  // brute force protection
 
   // Countdown cooldown
   useEffect(() => {
@@ -68,8 +68,8 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem('jateamhub-appearance')
-      const app   = saved ? JSON.parse(saved) : null
-      const dark  = app?.themeBase === 'obsidian'
+      const app = saved ? JSON.parse(saved) : null
+      const dark = app?.themeBase === 'obsidian'
       setIsObsidian(dark)
       applyThemeToDOM(dark ? 'obsidian' : 'ivory-light')
     } catch {
@@ -163,33 +163,31 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
         }} />
 
         {/* Brand */}
-        <div style={{ marginBottom: 32, textAlign: isObsidian ? 'center' : 'left' }}>
+        <div style={{ marginBottom: 32, textAlign: 'center' }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6,
-            justifyContent: isObsidian ? 'center' : 'flex-start',
+            display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10,
+            justifyContent: 'center',
           }}>
             <div style={{
-              width: 34, height: 34, borderRadius: 10,
+              width: 38, height: 38, borderRadius: 10,
               background: 'var(--accent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 17, fontWeight: 800, color: isObsidian ? '#0C0C0C' : 'white',
+              fontSize: 18, fontWeight: 800, color: isObsidian ? '#0C0C0C' : 'white',
               flexShrink: 0,
             }}>J</div>
             <h1 style={{
-              fontSize: 20, fontWeight: 800,
-              color: 'var(--silver)',     // ← ikut tema
+              fontSize: 22, fontWeight: 800,
+              color: 'var(--silver)',
               letterSpacing: '-0.4px', margin: 0,
             }}>JateamHub</h1>
           </div>
           <p style={{
-            fontSize: 12,
-            color: 'var(--silver3)',     // ← ikut tema
+            fontSize: 13,
+            color: 'var(--silver2)',
             margin: 0,
-            fontFamily: isObsidian ? 'var(--mono)' : 'var(--font)',
-            letterSpacing: isObsidian ? '2px' : 'normal',
-            textTransform: isObsidian ? 'uppercase' : 'none',
+            fontFamily: 'var(--font)',
           }}>
-            {isObsidian ? 'Internal Portal' : 'Portal internal perusahaan'}
+            Selamat datang, Jagoan.
           </p>
         </div>
 
@@ -233,11 +231,11 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
               }}
               onFocus={e => {
                 e.target.style.borderColor = 'var(--accent)'
-                e.target.style.background  = 'var(--bg3)'
+                e.target.style.background = 'var(--bg3)'
               }}
               onBlur={e => {
                 e.target.style.borderColor = err ? 'var(--color-error)' : 'var(--border2)'
-                e.target.style.background  = 'var(--bg2)'
+                e.target.style.background = 'var(--bg2)'
               }}
             />
           </div>
@@ -279,11 +277,11 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
                 }}
                 onFocus={e => {
                   e.target.style.borderColor = 'var(--accent)'
-                  e.target.style.background  = 'var(--bg3)'
+                  e.target.style.background = 'var(--bg3)'
                 }}
                 onBlur={e => {
                   e.target.style.borderColor = err ? 'var(--color-error)' : 'var(--border2)'
-                  e.target.style.background  = 'var(--bg2)'
+                  e.target.style.background = 'var(--bg2)'
                 }}
               />
               {/* Show/hide password */}
