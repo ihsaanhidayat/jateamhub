@@ -58,7 +58,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 9000,
+      position: 'fixed', inset: 0, zIndex: 9000 /* overlay */,
       background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 20, animation: 'fadeIn 0.15s ease',

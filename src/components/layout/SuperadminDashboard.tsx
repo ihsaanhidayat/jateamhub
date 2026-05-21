@@ -131,7 +131,7 @@ export default function SuperadminDashboard() {
     fontFamily: 'var(--font)', boxSizing: 'border-box',
   }
   const labelSt: React.CSSProperties = {
-    fontSize: 9, color: 'var(--silver3)', display: 'block', marginBottom: 4,
+    fontSize: 10, color: 'var(--silver3)', display: 'block', marginBottom: 4,
     textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--mono)',
   }
 
@@ -209,7 +209,7 @@ export default function SuperadminDashboard() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                           <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>{reg.full_name}</span>
                           <span style={{
-                            fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 8,
+                            fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 8,
                             background: reg.status === 'pending' ? 'var(--accent)' : reg.status === 'approved' ? '#22C55E' : '#EF4444',
                             color: '#0A0A0A', fontFamily: 'var(--mono)', textTransform: 'uppercase',
                           }}>{reg.status}</span>
@@ -246,7 +246,7 @@ export default function SuperadminDashboard() {
             {/* Reject modal */}
             {rejectId && (
               <div style={{
-                position: 'fixed', inset: 0, zIndex: 9000,
+                position: 'fixed', inset: 0, zIndex: 9000 /* overlay */,
                 background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
               }}>
@@ -434,7 +434,7 @@ export default function SuperadminDashboard() {
                       <div style={{ fontSize: 11, color: 'var(--silver3)', marginTop: 2 }}>
                         {u.full_name && <span style={{ marginRight: 8 }}>{u.full_name}</span>}
                         <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 6px', borderRadius: 8, background: b.color, color: '#0A0A0A', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginRight: 4 }}>{b.label}</span>
-                        {(u.region_scope && u.region_scope !== 'global') && <span style={{ fontSize: 9, color: 'var(--silver3)', fontFamily: 'var(--mono)' }}>{REGION_LABELS[u.region_scope] ?? u.region_scope}</span>}
+                        {(u.region_scope && u.region_scope !== 'global') && <span style={{ fontSize: 10, color: 'var(--silver3)', fontFamily: 'var(--mono)' }}>{REGION_LABELS[u.region_scope] ?? u.region_scope}</span>}
                       </div>
                     </div>
                     {/* Actions */}

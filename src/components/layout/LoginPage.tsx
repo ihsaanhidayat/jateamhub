@@ -1,110 +1,87 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../../store/authStore'
+import { applyThemeToDOM } from '../../store/dashboardStore'
 
-// Matrix rain canvas
+// ── Matrix Rain — hanya untuk Obsidian ───────────────────────
 function MatrixRain() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
+    const canvas = canvasRef.current!
+    const ctx    = canvas.getContext('2d')!
     const resize = () => {
-      canvas.width = window.innerWidth
+      canvas.width  = window.innerWidth
       canvas.height = window.innerHeight
     }
     resize()
     window.addEventListener('resize', resize)
-
-    const CHARS = '01アイウエオカキクケコサシスセソタチツテトナニヌネノ∑∆∏√∞≈≠∈∉∩∪⊂⊃'
-    const fontSize = 13
-    let cols = Math.floor(canvas.width / fontSize)
-    let drops: number[] = Array(cols).fill(1)
-
-    const draw = () => {
-      ctx.fillStyle = 'rgba(10,10,10,0.05)'
+    const cols  = Math.floor(canvas.width / 14)
+    const drops = Array(cols).fill(1)
+    const chars = 'アイウエオカキクケコ0123456789ABCDEF'.split('')
+    const draw  = () => {
+      ctx.fillStyle = 'rgba(8,8,8,0.05)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-      cols = Math.floor(canvas.width / fontSize)
-      if (drops.length !== cols) drops = Array(cols).fill(1)
-
-      for (let i = 0; i < drops.length; i++) {
-        const char = CHARS[Math.floor(Math.random() * CHARS.length)]
-        const alpha = Math.random() > 0.95 ? 1 : 0.15 + Math.random() * 0.4
-
-        // Leading char — bright mint
-        if (drops[i] * fontSize > canvas.height * 0.7 + Math.random() * canvas.height * 0.3) {
-          ctx.fillStyle = `rgba(0,255,194,${alpha})`
-        } else {
-          ctx.fillStyle = `rgba(0,255,194,${alpha * 0.5})`
-        }
-
-        ctx.font = `${fontSize}px 'JetBrains Mono', monospace`
-        ctx.fillText(char, i * fontSize, drops[i] * fontSize)
-
-        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-          drops[i] = 0
-        }
+      drops.forEach((y, i) => {
+        const char = chars[Math.floor(Math.random() * chars.length)]
+        ctx.fillStyle = `rgba(110,231,183,${Math.random() * 0.5 + 0.1})`
+        ctx.font = '12px monospace'
+        ctx.fillText(char, i * 14, y * 14)
+        if (y * 14 > canvas.height && Math.random() > 0.975) drops[i] = 0
         drops[i]++
-      }
+      })
     }
-
-    const interval = setInterval(draw, 45)
+    const interval = setInterval(draw, 50)
     return () => {
       clearInterval(interval)
       window.removeEventListener('resize', resize)
     }
   }, [])
-
   return (
     <canvas
       ref={canvasRef}
-      style={{
-        position: 'fixed', inset: 0,
-        opacity: 0.35,
-        pointerEvents: 'none',
-        zIndex: 0,
-      }}
+      style={{ position: 'fixed', inset: 0, opacity: 0.2, pointerEvents: 'none', zIndex: 0 }}
     />
   )
 }
 
 export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
   const { login } = useAuthStore()
-  const [showPw, setShowPw] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [err, setErr] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [shake, setShake] = useState(false)
+  const [showPw,   setShowPw]   = useState(false)
+  const [err,      setErr]      = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [shake,     setShake]     = useState(false)
+  const [isObsidian, setIsObsidian] = useState(false)
+  const [cooldown,  setCooldown]  = useState(0)  // brute force protection
 
-  // Terapkan tema dari localStorage saat login page muncul
+  // Countdown cooldown
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setInterval(() => setCooldown(c => {
+      if (c <= 1) { clearInterval(t); return 0 }
+      return c - 1
+    }), 1000)
+    return () => clearInterval(t)
+  }, [cooldown])
+
+  // Baca tema dari localStorage — terapkan ke DOM seketika
   useEffect(() => {
     try {
       const saved = localStorage.getItem('jateamhub-appearance')
-      if (saved) {
-        const app = JSON.parse(saved)
-        if (app?.theme) {
-          document.documentElement.setAttribute('data-theme', app.theme)
-          const fontMap: Record<string, string> = {
-            'ivory-light': "'Inter', sans-serif",
-            'obsidian': "'Space Grotesk', sans-serif",
-            'sand-light': "'Lora', serif",
-            'sand-dark': "'Lora', serif",
-            'slate-light': "'IBM Plex Sans', sans-serif",
-            'slate-dark': "'IBM Plex Sans', sans-serif",
-          }
-          const font = fontMap[app.theme]
-          if (font) document.documentElement.style.setProperty('--font', font)
-        }
-      }
-    } catch { /* ignore */ }
+      const app   = saved ? JSON.parse(saved) : null
+      const dark  = app?.themeBase === 'obsidian'
+      setIsObsidian(dark)
+      applyThemeToDOM(dark ? 'obsidian' : 'ivory-light')
+    } catch {
+      applyThemeToDOM('ivory-light')
+    }
   }, [])
+
+  const [failCount, setFailCount] = useState(0)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (cooldown > 0) return
     if (!username.trim() || !password) {
       setErr('Username dan password wajib diisi.')
       triggerShake(); return
@@ -113,8 +90,17 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
     const error = await login(username.trim(), password)
     setLoading(false)
     if (error) {
-      setErr('Sampean salah atau lupa password? Colek admin ya 😄')
+      const newFail = failCount + 1
+      setFailCount(newFail)
+      // Cooldown bertingkat: 3 gagal = 10 detik, 5 = 30 detik, dst
+      if (newFail >= 5) setCooldown(30)
+      else if (newFail >= 3) setCooldown(10)
+      setErr(newFail >= 3
+        ? `Terlalu banyak percobaan. Tunggu ${newFail >= 5 ? '30' : '10'} detik.`
+        : 'Username atau password salah.')
       triggerShake()
+    } else {
+      setFailCount(0)
     }
   }
 
@@ -125,174 +111,262 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
 
   return (
     <div style={{
+      minHeight: '100dvh',
+      background: 'var(--bg)',        // ← ikut tema
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100vh', background: '#080808',
-      overflow: 'hidden', position: 'relative',
+      padding: 24,
+      fontFamily: 'var(--font)',       // ← ikut tema (Plus Jakarta / Space Grotesk)
+      position: 'relative',
+      transition: 'background 300ms ease',
     }}>
-      {/* Matrix rain background */}
-      <MatrixRain />
+      {/* Background effect per tema */}
+      {isObsidian ? (
+        <>
+          <MatrixRain />
+          <div style={{
+            position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1,
+            background: 'radial-gradient(ellipse 50% 40% at 50% 50%, rgba(110,231,183,0.04) 0%, transparent 70%)',
+          }} />
+        </>
+      ) : (
+        <div style={{
+          position: 'fixed', inset: 0, pointerEvents: 'none',
+          backgroundImage: `
+            radial-gradient(circle at 15% 50%, rgba(37,99,235,0.05) 0%, transparent 50%),
+            radial-gradient(circle at 85% 20%, rgba(37,99,235,0.04) 0%, transparent 40%)
+          `,
+        }} />
+      )}
 
-      {/* Radial glow center */}
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse 60% 60% at 50% 50%, var(--mint-bg) 0%, transparent 70%)',
-      }} />
-
-      {/* Grid lines overlay */}
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none',
-        backgroundImage: `
-          linear-gradient(var(--mint-bg) 1px, transparent 1px),
-          linear-gradient(90deg, var(--mint-bg) 1px, transparent 1px)
-        `,
-        backgroundSize: '40px 40px',
-      }} />
-
-      {/* Login box */}
+      {/* Card */}
       <div
         className={shake ? 'login-shake' : ''}
         style={{
-          position: 'relative', zIndex: 10,
-          width: 360, background: 'rgba(10,10,10,0.85)',
+          position: 'relative',
+          zIndex: 2,
+          width: '100%',
+          maxWidth: isObsidian ? 380 : 400,
+          background: 'var(--bg3)',      // ← ikut tema
           border: '1px solid var(--border2)',
-          borderRadius: 12, padding: '40px 32px',
-          backdropFilter: 'blur(20px)',
-          boxShadow: `
-            0 0 0 1px var(--mint-bg),
-            0 0 40px var(--mint-bg),
-            0 0 80px var(--mint-bg),
-            0 20px 60px rgba(0,0,0,0.6)
-          `,
+          borderRadius: 'var(--radius-xl)',
+          padding: '40px 36px',
+          boxShadow: 'var(--shadow-lg)', // ← ikut tema
+          backdropFilter: isObsidian ? 'blur(20px)' : 'none',
+          animation: 'scaleIn 300ms var(--ease)',
         }}
       >
-        {/* Corner accents */}
-        {[
-          { top: -1, left: -1, borderTop: '2px solid var(--accent)', borderLeft: '2px solid var(--accent)', borderRadius: '12px 0 0 0' },
-          { top: -1, right: -1, borderTop: '2px solid var(--accent)', borderRight: '2px solid var(--accent)', borderRadius: '0 12px 0 0' },
-          { bottom: -1, left: -1, borderBottom: '2px solid var(--accent)', borderLeft: '2px solid var(--accent)', borderRadius: '0 0 0 12px' },
-          { bottom: -1, right: -1, borderBottom: '2px solid var(--accent)', borderRight: '2px solid var(--accent)', borderRadius: '0 0 12px 0' },
-        ].map((s, i) => (
-          <div key={i} style={{
-            position: 'absolute', width: 20, height: 20, ...s,
-          }} />
-        ))}
+        {/* Accent top bar */}
+        <div style={{
+          position: 'absolute', top: 0, left: 24, right: 24, height: 2,
+          background: `linear-gradient(90deg, var(--accent), transparent)`,
+          borderRadius: '0 0 2px 2px',
+        }} />
 
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{
-            fontSize: 32, fontWeight: 700, color: 'var(--accent)',
-            letterSpacing: '-1px', fontFamily: 'var(--font)',
-            textShadow: '0 0 20px rgba(0,255,194,0.8), 0 0 40px rgba(0,255,194,0.4), 0 0 80px rgba(0,255,194,0.2)',
-          }}>JateamHub</h1>
-          <h3>Selamat datang, Jagoan</h3>
+        {/* Brand */}
+        <div style={{ marginBottom: 32, textAlign: isObsidian ? 'center' : 'left' }}>
           <div style={{
-            width: 50, height: 2, background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
-            margin: '8px auto 0',
-            boxShadow: '0 0 8px rgba(0,255,194,0.8)',
-          }} />
-          <div style={{ fontSize: 11, color: 'rgba(0,255,194,0.5)', marginTop: 8, letterSpacing: '2px', textTransform: 'uppercase', fontFamily: 'var(--mono)' }}>
-            Internal Portal
+            display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6,
+            justifyContent: isObsidian ? 'center' : 'flex-start',
+          }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 10,
+              background: 'var(--accent)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 17, fontWeight: 800, color: isObsidian ? '#0C0C0C' : 'white',
+              flexShrink: 0,
+            }}>J</div>
+            <h1 style={{
+              fontSize: 20, fontWeight: 800,
+              color: 'var(--silver)',     // ← ikut tema
+              letterSpacing: '-0.4px', margin: 0,
+            }}>JateamHub</h1>
           </div>
+          <p style={{
+            fontSize: 12,
+            color: 'var(--silver3)',     // ← ikut tema
+            margin: 0,
+            fontFamily: isObsidian ? 'var(--mono)' : 'var(--font)',
+            letterSpacing: isObsidian ? '2px' : 'normal',
+            textTransform: isObsidian ? 'uppercase' : 'none',
+          }}>
+            {isObsidian ? 'Internal Portal' : 'Portal internal perusahaan'}
+          </p>
         </div>
 
-        <form onSubmit={handleLogin}>
+        {/* Divider */}
+        <div style={{ height: 1, background: 'var(--border)', marginBottom: 24 }} />
+
+        <form onSubmit={handleLogin} autoComplete="on">
+          {/* Username */}
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 10, fontWeight: 600, letterSpacing: '1.2px', color: 'rgba(0,255,194,0.6)', textTransform: 'uppercase', marginBottom: 6, fontFamily: 'var(--mono)' }}>Username</label>
+            <label style={{
+              display: 'block',
+              fontSize: isObsidian ? 10 : 12,
+              fontWeight: 700,
+              color: 'var(--silver3)',
+              marginBottom: 6,
+              letterSpacing: isObsidian ? '1.5px' : 'normal',
+              textTransform: isObsidian ? 'uppercase' : 'none',
+              fontFamily: isObsidian ? 'var(--mono)' : 'var(--font)',
+            }}>
+              Username
+            </label>
             <input
               value={username}
               onChange={e => { setUsername(e.target.value); setErr('') }}
-              placeholder="username"
+              placeholder={isObsidian ? 'username' : 'Masukkan username'}
               autoComplete="username"
               autoFocus
               disabled={loading}
               style={{
-                width: '100%', background: 'var(--mint-bg)',
-                border: `1px solid ${err ? 'rgba(224,85,85,0.6)' : 'rgba(0,255,194,0.2)'}`,
-                borderRadius: 6, padding: '10px 12px',
-                color: '#E0E0E0', fontSize: 14, fontFamily: 'var(--font)',
-                transition: 'all .2s', outline: 'none', boxSizing: 'border-box',
+                width: '100%', height: 48,
+                background: 'var(--bg2)',
+                border: `1.5px solid ${err ? 'var(--color-error)' : 'var(--border2)'}`,
+                borderRadius: 'var(--radius-sm)',
+                padding: '0 14px',
+                color: 'var(--silver)',
+                fontSize: 14,
+                fontFamily: 'var(--font)',
+                outline: 'none',
+                boxSizing: 'border-box' as const,
+                transition: 'border-color 150ms ease, background 150ms ease',
               }}
-              onFocus={e => e.target.style.borderColor = 'rgba(0,255,194,0.7)'}
-              onBlur={e => e.target.style.borderColor = err ? 'rgba(224,85,85,0.6)' : 'rgba(0,255,194,0.2)'}
+              onFocus={e => {
+                e.target.style.borderColor = 'var(--accent)'
+                e.target.style.background  = 'var(--bg3)'
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = err ? 'var(--color-error)' : 'var(--border2)'
+                e.target.style.background  = 'var(--bg2)'
+              }}
             />
           </div>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 10, fontWeight: 600, letterSpacing: '1.2px', color: 'rgba(0,255,194,0.6)', textTransform: 'uppercase', marginBottom: 6, fontFamily: 'var(--mono)' }}>Password</label>
+
+          {/* Password */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{
+              display: 'block',
+              fontSize: isObsidian ? 10 : 12,
+              fontWeight: 700,
+              color: 'var(--silver3)',
+              marginBottom: 6,
+              letterSpacing: isObsidian ? '1.5px' : 'normal',
+              textTransform: isObsidian ? 'uppercase' : 'none',
+              fontFamily: isObsidian ? 'var(--mono)' : 'var(--font)',
+            }}>
+              Password
+            </label>
             <div style={{ position: 'relative' }}>
               <input
-                type="password"
+                type={showPw ? 'text' : 'password'}
                 value={password}
                 onChange={e => { setPassword(e.target.value); setErr('') }}
-                placeholder="••••••••"
+                placeholder={isObsidian ? '••••••••' : 'Masukkan password'}
                 autoComplete="current-password"
                 disabled={loading}
                 style={{
-                  width: '100%', background: 'var(--mint-bg)',
-                  border: `1px solid ${err ? 'rgba(224,85,85,0.6)' : 'rgba(0,255,194,0.2)'}`,
-                  borderRadius: 6, padding: '10px 12px',
-                  color: '#E0E0E0', fontSize: 14, fontFamily: 'var(--font)',
-                  transition: 'all .2s', outline: 'none', boxSizing: 'border-box',
+                  width: '100%', height: 48,
+                  background: 'var(--bg2)',
+                  border: `1.5px solid ${err ? 'var(--color-error)' : 'var(--border2)'}`,
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '0 44px 0 14px',
+                  color: 'var(--silver)',
+                  fontSize: 14,
+                  fontFamily: 'var(--font)',
+                  outline: 'none',
+                  boxSizing: 'border-box' as const,
+                  transition: 'border-color 150ms ease, background 150ms ease',
                 }}
-                onFocus={e => e.target.style.borderColor = 'rgba(0,255,194,0.7)'}
-                onBlur={e => e.target.style.borderColor = err ? 'rgba(224,85,85,0.6)' : 'rgba(0,255,194,0.2)'}
+                onFocus={e => {
+                  e.target.style.borderColor = 'var(--accent)'
+                  e.target.style.background  = 'var(--bg3)'
+                }}
+                onBlur={e => {
+                  e.target.style.borderColor = err ? 'var(--color-error)' : 'var(--border2)'
+                  e.target.style.background  = 'var(--bg2)'
+                }}
               />
+              {/* Show/hide password */}
+              <button
+                type="button"
+                onClick={() => setShowPw(v => !v)}
+                style={{
+                  position: 'absolute', right: 12, top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none', border: 'none',
+                  color: 'var(--silver3)', cursor: 'pointer',
+                  fontSize: 14, padding: 4, lineHeight: 1,
+                }}
+                tabIndex={-1}
+              >{showPw ? '🙈' : '👁'}</button>
             </div>
           </div>
 
+          {/* Error */}
           {err && (
             <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: 8,
-              background: 'rgba(224,85,85,0.08)', border: '1px solid rgba(224,85,85,0.25)',
-              borderRadius: 6, padding: '10px 12px',
-              color: '#ff8080', fontSize: 12, lineHeight: 1.5, marginBottom: 12,
+              display: 'flex', gap: 8, alignItems: 'flex-start',
+              background: 'var(--color-error-bg)',
+              border: '1px solid var(--color-error)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '10px 12px',
+              color: 'var(--color-error)',
+              fontSize: 12, lineHeight: 1.5, marginBottom: 16,
+              animation: 'fadeIn 150ms ease',
             }}>
-              <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
+              <span style={{ flexShrink: 0 }}>⚠</span>
               <span>{err}</span>
             </div>
           )}
 
-          <button type="submit" disabled={loading}
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading || cooldown > 0}
             style={{
-              width: '100%', background: 'transparent',
-              border: '1px solid rgba(0,255,194,0.6)',
-              color: 'var(--accent)', padding: '12px',
-              borderRadius: 6, fontSize: 13, fontWeight: 700,
-              letterSpacing: '2px', textTransform: 'uppercase',
-              transition: 'all .2s', marginTop: 4,
+              width: '100%', height: 48,
+              background: (loading || cooldown > 0) ? 'var(--border2)' : 'var(--accent)',
+              border: isObsidian ? '1px solid var(--accent)' : 'none',
+              borderRadius: 'var(--radius-sm)',
+              color: isObsidian ? 'var(--accent)' : 'white',
+              fontSize: 14, fontWeight: 700,
               cursor: loading ? 'not-allowed' : 'pointer',
               fontFamily: 'var(--font)',
-              boxShadow: '0 0 10px rgba(0,255,194,0.1)',
-              opacity: loading ? 0.7 : 1,
+              letterSpacing: isObsidian ? '1px' : 'normal',
+              transition: 'all 150ms ease',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              opacity: loading ? 0.6 : 1,
             }}
             onMouseEnter={e => {
               if (!loading) {
-                const b = e.currentTarget
-                b.style.background = 'var(--mint-bg)'
-                b.style.boxShadow = '0 0 20px rgba(0,255,194,0.3), 0 0 40px rgba(0,255,194,0.1)'
-                b.style.borderColor = 'var(--accent)'
+                const b = e.currentTarget as HTMLButtonElement
+                b.style.opacity = '0.88'
+                b.style.transform = 'translateY(-1px)'
               }
             }}
             onMouseLeave={e => {
-              const b = e.currentTarget
-              b.style.background = 'transparent'
-              b.style.boxShadow = '0 0 10px rgba(0,255,194,0.1)'
-              b.style.borderColor = 'rgba(0,255,194,0.6)'
+              const b = e.currentTarget as HTMLButtonElement
+              b.style.opacity = '1'
+              b.style.transform = 'translateY(0)'
             }}
           >
-            {loading ? (
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <span className="login-spinner" />
-                Masuk...
-              </span>
-            ) : 'LOGIN'}
+            {loading
+              ? <><span className="login-spinner" style={{ borderTopColor: isObsidian ? 'var(--accent)' : 'white' }} /> Masuk...</>
+              : cooldown > 0 ? `Tunggu ${cooldown}s...` : 'Masuk'
+            }
           </button>
         </form>
 
-        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.2)', lineHeight: 1.8, fontFamily: 'var(--mono)' }}>
-          Tidak punya akun?{' '}
-          <span onClick={onRegister} style={{ color: 'rgba(0,255,194,0.9)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
-            Daftar di sini
-          </span>
+        {/* Footer */}
+        <div style={{
+          marginTop: 24, textAlign: 'center',
+          fontSize: 12, color: 'var(--silver3)',
+        }}>
+          Belum punya akun?{' '}
+          <span
+            onClick={onRegister}
+            style={{ color: 'var(--accent)', fontWeight: 600, cursor: 'pointer' }}
+          >Daftar di sini</span>
         </div>
       </div>
     </div>

@@ -4,27 +4,34 @@
 // ─────────────────────────────────────────────────────────────
 import { create } from 'zustand'
 import type {
-  JateamConfig, Section, LinkItem,
-  AppearanceSettings, DisplayOptions, Preset, ThemeId, PageDef,
+  Section, LinkItem, AppearanceSettings, ThemeId,
 } from '../types'
 import {
-  DEFAULT_APPEARANCE, defaultDisplayOptions, DEFAULT_PAGES,
-  SECTION_DEFAULT_W, SECTION_DEFAULT_H, GRID_ROW_HEIGHT,
+  SECTION_DEFAULT_W, SECTION_DEFAULT_H, DEFAULT_APPEARANCE,
 } from '../types'
 import {
   getUserLayout, saveUserLayout,
   getSharedSections, getAllSharedSections,
   createSharedSection, updateSharedSection, deleteSharedSection,
   saveUserAppearance, loadUserAppearance,
-  saveGlobalTheme, loadGlobalTheme,
+  saveGlobalTheme,
 } from '../utils/supabaseClient'
 import type { SharedSection } from '../utils/supabaseClient'
 
+// ── Storage key constants ─────────────────────────────────────
+const STORAGE_KEYS = {
+  PERSONAL:    'jateamhub-personal',
+  APPEARANCE:  'jateamhub-appearance',
+  PRESETS:     'jateamhub-presets',
+  DEVICE_PREF: 'jateamhub-device-pref',
+} as const
+
+
 // ── Konstanta ─────────────────────────────────────────────────
-const CONFIG_VERSION = '5.0'   // versi format config
-const MAX_HISTORY = 20      // maksimal langkah undo
-const DATA_KEY = 'jateamhub-personal' // key localStorage section pribadi
-const APPEARANCE_KEY = 'jateamhub-appearance' // key localStorage preferensi tampilan
+const CONFIG_VERSION  = '5.0'   // versi format config
+const MAX_HISTORY     = 20      // maksimal langkah undo
+const DATA_KEY        = STORAGE_KEYS.PERSONAL // key localStorage section pribadi
+const APPEARANCE_KEY  = STORAGE_KEYS.APPEARANCE // key localStorage preferensi tampilan
 
 // ── Helper: simpan/baca preferensi tampilan dari localStorage ──
 const loadLocalAppearance = (): Partial<AppearanceSettings> => {
@@ -39,13 +46,16 @@ const saveLocalAppearance = (a: AppearanceSettings) =>
 // ── Helper: preset tampilan berdasarkan ukuran layar device ───
 const getDevicePreset = (): Partial<AppearanceSettings> => {
   const w = window.innerWidth
-  if (w < 480) return { itemDisplayMode: 'folderGrid', iconSize: 'medium', folderGridCols: 2 }
-  if (w < 768) return { itemDisplayMode: 'folderGrid', iconSize: 'large', folderGridCols: 3 }
-  return {} // desktop — pakai preferensi tersimpan
+  if (w < 768) {
+    // Mobile: grid 5 kolom, icon medium
+    return { itemDisplayMode: 'folderGrid', iconSize: 'medium', folderGridCols: 5 }
+  }
+  // Desktop: grid 5 kolom, icon large
+  return { itemDisplayMode: 'folderGrid', iconSize: 'large', folderGridCols: 5 }
 }
-const DEVICE_PREF_KEY = 'jateamhub-device-pref'
-const hasDevicePref = () => !!localStorage.getItem(DEVICE_PREF_KEY)
-const setDevicePref = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
+const DEVICE_PREF_KEY = STORAGE_KEYS.DEVICE_PREF
+const hasDevicePref   = () => !!localStorage.getItem(DEVICE_PREF_KEY)
+const setDevicePref   = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
 
 // ── Helper: generate ID unik untuk section/item ───────────────
 const uid = () => Math.random().toString(36).slice(2, 10)
@@ -72,91 +82,94 @@ const loadPersonalFromLocal = (): Section[] => {
 }
 
 // ── Helper: simpan section pribadi ke localStorage ────────────
+let _lastPersistedJson = ''
 const persistPersonal = (sections: Section[]) => {
-  try { localStorage.setItem(DATA_KEY, JSON.stringify(sections)) } catch { }
+  try {
+    const json = JSON.stringify(sections)
+    if (json === _lastPersistedJson) return  // skip jika tidak ada perubahan
+    _lastPersistedJson = json
+    localStorage.setItem(DATA_KEY, json)
+  } catch { /* storage full or unavailable */ }
 }
 
 // ── Debounce timer untuk sync ke DB ──────────────────────────
-let personalSyncTimer: ReturnType<typeof setTimeout> | null = null
+// Mutex dihapus — debounce sudah cukup sebagai protection
+let personalSyncTimer:  ReturnType<typeof setTimeout> | null = null
 let appearanceSyncTimer: ReturnType<typeof setTimeout> | null = null
 
 // ── Tipe interface store ──────────────────────────────────────
 interface DashboardStore {
   // -- State --
   personalSections: Section[]        // section pribadi user
-  sharedSections: SharedSection[]  // section dari admin (read-only)
-  appearance: AppearanceSettings
-  displayOptions: DisplayOptions
-  presets: Preset[]
-  editMode: boolean
-  searchQuery: string
-  previewFilter: { role: string; region: string; unit: string } // filter preview admin
-  currentUserId: string | null
-  currentUserRole: string
-  currentRegion: string
-  currentUnit: string
-  globalTheme: ThemeId
-  history: Section[][]   // stack undo
-  future: Section[][]   // stack redo
-  canUndo: boolean
-  canRedo: boolean
-  isDirty: boolean
-  isSyncing: boolean
-  syncStatus: 'saved' | 'saving' | 'error' | 'idle'
+  sharedSections:   SharedSection[]  // section dari admin (read-only)
+  appearance:       AppearanceSettings
+  editMode:         boolean
+  searchQuery:      string
+  currentUserId:    string | null
+  currentUserRole:  string
+  currentRegion:    string
+  currentUnit:      string
+  globalTheme:      ThemeId
+  history:          Section[][]   // stack undo
+  future:           Section[][]   // stack redo
+  canUndo:          boolean
+  canRedo:          boolean
+  isDirty:          boolean
+  isSyncing:          boolean
+  syncStatus:         'saved' | 'saving' | 'error' | 'idle'
+  isDataInitialized:  boolean
 
   // -- Init & Load --
-  initUser: (userId: string, role: string, region: string, unit: string) => Promise<void>
-  setCurrentUserId: (id: string | null) => void
+  initUser:    (userId: string, role: string, region: string, unit: string) => Promise<void>
+  setCurrentUserId: (id: string | null | '') => void
 
   // -- Section Pribadi --
   addPersonalSectionAuto: () => void
-  addPersonalSection: (data: Partial<Section>) => void
+  addPersonalSection:    (data: Partial<Section>) => void
   updatePersonalSection: (id: string, updates: Partial<Section>) => void
   deletePersonalSection: (id: string) => void
-  toggleCollapse: (id: string) => void
-  batchUpdateLayouts: (layouts: Array<{ id: string; layout: any }>) => void
+  toggleCollapse:        (id: string) => void
+  batchUpdateLayouts:    (layouts: Array<{ id: string; layout: any }>) => void
 
   // -- Items (dalam section pribadi) --
-  addItem: (sectionId: string, data: Omit<LinkItem, 'id'>) => void
+  addItem:    (sectionId: string, data: Omit<LinkItem, 'id'>) => void
   updateItem: (sectionId: string, itemId: string, data: Omit<LinkItem, 'id'>) => void
   deleteItem: (sectionId: string, itemId: string) => void
-  moveItem: (srcId: string, itemId: string, tgtId: string, tgtItemId?: string) => void
+  moveItem:   (srcId: string, itemId: string, tgtId: string, tgtItemId?: string) => void
 
   // -- Shared Sections (admin only) --
-  loadSharedSections: () => Promise<void>
-  addSharedSection: (data: Omit<SharedSection, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
+  loadSharedSections:    () => Promise<void>
+  addSharedSection:      (data: Omit<SharedSection, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateSharedSectionFn: (id: string, updates: Partial<SharedSection>) => Promise<void>
   deleteSharedSectionFn: (id: string) => Promise<void>
 
   // -- Favorites --
-  toggleFavoriteSection: (id: string) => void
-  toggleFavoriteItem: (sectionId: string, itemId: string) => void
 
   // -- UI State --
-  toggleEditMode: () => void
-  setSearch: (q: string) => void
-  setPreviewFilter: (filter: { role: string; region: string; unit: string }) => void
+  toggleEditMode:    () => void
+  setSearch:         (q: string) => void
 
   // -- Tampilan / Appearance --
-  setAppearance: (o: Partial<AppearanceSettings>) => void
-  setDisplayOptions: (o: Partial<DisplayOptions>) => void
-  setGlobalTheme: (theme: ThemeId) => void
+  setAppearance:     (o: Partial<AppearanceSettings>) => void
+  setGlobalTheme:    (theme: ThemeId) => void
 
   // -- Presets --
-  savePreset: (name: string) => void
-  applyPreset: (id: string) => void
-  deletePreset: (id: string) => void
+  presets:       Array<{ id: string; name: string; appearance: Partial<AppearanceSettings> }>
+  addPreset:     (name: string) => void
+  applyPreset:   (id: string) => void
+  removePreset:  (id: string) => void
 
   // -- Undo/Redo --
   undo: () => void
   redo: () => void
 
   // -- Sync --
-  syncPersonalToDb: () => Promise<void>
+  syncPersonalToDb:    () => Promise<void>
+  syncPersonalToDbNow: () => Promise<void>
 
   // -- Toast --
-  toast: (msg: string, type?: 'success' | 'error' | 'warn') => void
-  toasts: Array<{ id: string; msg: string; type: 'success' | 'error' | 'warn' }>
+  toast:       (msg: string, type?: 'success' | 'error' | 'warn') => void
+  toasts:      Array<{ id: string; msg: string; type: 'success' | 'error' | 'warn' }>
   removeToast: (id: string) => void
 }
 
@@ -164,26 +177,25 @@ interface DashboardStore {
 export const useStore = create<DashboardStore>((set, get) => ({
   // -- Nilai awal state --
   personalSections: loadPersonalFromLocal(),
-  sharedSections: [],
-  appearance: { ...DEFAULT_APPEARANCE, ...loadLocalAppearance() },
-  displayOptions: { ...defaultDisplayOptions },
-  presets: [],
-  editMode: false,
-  searchQuery: '',
-  previewFilter: { role: '', region: '', unit: '' },
-  currentUserId: null,
-  currentUserRole: 'user',
-  currentRegion: 'global',
-  currentUnit: 'general',
-  globalTheme: 'pearl-light' as any,
-  history: [],
-  future: [],
-  canUndo: false,
-  canRedo: false,
-  isDirty: false,
-  isSyncing: false,
-  syncStatus: 'idle',
-  toasts: [],
+  sharedSections:   [],
+  appearance:       { ...DEFAULT_APPEARANCE, ...loadLocalAppearance() },
+  editMode:         false,
+  searchQuery:      '',
+  currentUserId:    null,
+  currentUserRole:  'user',
+  currentRegion:    'global',
+  currentUnit:      'general',
+  globalTheme:      'ivory-light' as ThemeId,
+  history:          [],
+  presets:          [],
+  future:           [],
+  canUndo:          false,
+  canRedo:          false,
+  isDirty:           false,
+  isSyncing:         false,
+  isDataInitialized: false,
+  syncStatus:       'idle',
+  toasts:           [],
 
   // ── Toast: tampilkan notifikasi ───────────────────────────
   toast: (msg, type = 'success') => {
@@ -194,14 +206,27 @@ export const useStore = create<DashboardStore>((set, get) => ({
   removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 
   // ── Set ID user yang sedang login ─────────────────────────
-  setCurrentUserId: (id) => set({ currentUserId: id }),
+  setCurrentUserId: (id) => {
+    // Jika id null (logout), clear semua pending timers
+    if (!id) {
+      if (personalSyncTimer)  { clearTimeout(personalSyncTimer);  personalSyncTimer  = null }
+      if (appearanceSyncTimer){ clearTimeout(appearanceSyncTimer); appearanceSyncTimer = null }
+      set({ isDirty: false, syncStatus: 'idle', isSyncing: false })
+    }
+    if (!id) set({ isDataInitialized: false, currentUserId: '' })
+    else set({ currentUserId: id as string })
+  },
 
   // ── Init: load semua data saat user login ─────────────────
+  // OPTIMASI: getUserLayout + getSharedSections + loadUserAppearance
+  // dijalankan PARALLEL dengan Promise.all → ~150ms vs ~750ms sequential
   initUser: async (userId, role, region, unit) => {
-    set({ currentUserId: userId, currentUserRole: role, currentRegion: region, currentUnit: unit })
+    // Jangan re-init hanya jika userId SAMA dan data SUDAH ada
+    if (get().currentUserId === userId && get().isDataInitialized) return
+    // Reset state untuk user baru
+    set({ currentUserId: userId, currentUserRole: role, currentRegion: region, currentUnit: unit, isDataInitialized: false, personalSections: [], sharedSections: [] })
 
-    // ── Terapkan tema dari localStorage SEGERA (sinkron, tanpa tunggu DB) ──
-    // Ini mencegah flash of wrong theme saat login
+    // Tema dari localStorage SEGERA — sinkron, tidak tunggu DB
     const localApp = loadLocalAppearance()
     if (localApp?.theme) {
       applyThemeToDOM(localApp.theme as string)
@@ -210,20 +235,24 @@ export const useStore = create<DashboardStore>((set, get) => ({
       applyThemeToDOM('ivory-light')
     }
 
-    // Load section pribadi dari DB
-    const dbSections = await getUserLayout(userId)
+    // ── Parallel DB calls ─────────────────────────────────────
+    const [dbSections, shared, dbAppearance] = await Promise.all([
+      getUserLayout(userId),
+      getSharedSections(role, region, unit),
+      loadUserAppearance(userId),
+    ])
+
+    // Process personal sections
     if (dbSections && Array.isArray(dbSections) && dbSections.length > 0) {
-      // User sudah punya layout — reset posisi dari atas (y:0) agar tidak melayang
-      const raw = dbSections as Section[]
-      // Sort by posisi lama lalu re-layout dari atas
-      const sorted = [...raw].sort((a, b) => (a.layout.y * 100 + a.layout.x) - (b.layout.y * 100 + b.layout.x))
+      const raw     = dbSections as Section[]
+      const sorted  = [...raw].sort((a, b) => (a.layout.y * 100 + a.layout.x) - (b.layout.y * 100 + b.layout.x))
       const sections = autoLayout(sorted)
       persistPersonal(sections)
       set({ personalSections: sections })
-      // Simpan posisi baru ke DB
-      await saveUserLayout(userId, sections)
+      // Save layout baru di background — tidak blocking
+      saveUserLayout(userId, sections).catch(() => {})
     } else {
-      // User pertama kali login — buat 2 section default: Layanan Bersama + Favorit
+      // Pertama kali login — default sections
       const genId = () => 's' + Math.random().toString(36).slice(2, 10)
       const defaultSections: Section[] = [
         {
@@ -237,38 +266,37 @@ export const useStore = create<DashboardStore>((set, get) => ({
           subtitle: 'Section pribadiku', items: [],
           layout: { x: 4, y: 0, w: 4, h: 5 },
           visibility: 'all', targetUnits: [], pageId: 'beranda', type: 'section',
-          isFavorite: false,
         },
       ]
       persistPersonal(defaultSections)
       set({ personalSections: defaultSections })
-      await saveUserLayout(userId, defaultSections)
+      saveUserLayout(userId, defaultSections).catch(() => {})
     }
 
-    // Load shared sections sesuai role/region/unit user
-    const shared = await getSharedSections(role, region, unit)
-    set({ sharedSections: shared })
+    // Process shared sections
+    if (shared) set({ sharedSections: shared })
 
-    // Load preferensi tampilan dari DB profil user (override localStorage jika ada)
-    const dbAppearance = await loadUserAppearance(userId)
+    // Mark data sebagai selesai di-load
+    set({ isDataInitialized: true })
+
+    // Process appearance dari DB (override localStorage jika ada)
     if (dbAppearance && Object.keys(dbAppearance).length > 0) {
-      saveLocalAppearance(dbAppearance)
-      set({ appearance: dbAppearance })
-      // Terapkan tema dari DB (mungkin berbeda dari localStorage)
-      if (dbAppearance.theme) applyThemeToDOM(dbAppearance.theme as string)
-    } else if (!hasDevicePref()) {
-      const preset = getDevicePreset()
-      if (Object.keys(preset).length > 0) {
-        const next = { ...get().appearance, ...preset }
-        saveLocalAppearance(next)
-        set({ appearance: next })
-        setDevicePref()
+      const merged = { ...DEFAULT_APPEARANCE, ...dbAppearance }
+      // Paksa folderGridCols = 5 jika masih pakai default lama
+      if (!dbAppearance.folderGridCols || dbAppearance.folderGridCols < 5) {
+        merged.folderGridCols = 5
       }
+      saveLocalAppearance(merged)
+      set({ appearance: merged })
+      if (merged.theme) applyThemeToDOM(merged.theme as string)
+    } else {
+      // Terapkan device preset
+      const preset = getDevicePreset()
+      const next = { ...DEFAULT_APPEARANCE, ...preset }
+      saveLocalAppearance(next)
+      set({ appearance: next })
+      setDevicePref()
     }
-
-    // Load presets tampilan
-    const localPresets = localStorage.getItem('jateamhub-presets')
-    if (localPresets) set({ presets: JSON.parse(localPresets) })
   },
 
   // ── Load shared sections — bisa dipanggil ulang saat preview ─
@@ -285,27 +313,31 @@ export const useStore = create<DashboardStore>((set, get) => ({
     }
   },
 
-  // ── Sync section pribadi ke DB ────────────────────────────
-  // localStorage update INSTANT, DB update dengan debounce 300ms
+  // ── Sync section pribadi ke DB — debounce 300ms ──────────
+  // ── Sync ke DB — debounce 300ms, TANPA mutex ───────────────
   syncPersonalToDb: async () => {
-    if (personalSyncTimer) clearTimeout(personalSyncTimer)
-    set({ isDirty: true, syncStatus: 'saving' })
+    if (personalSyncTimer) { clearTimeout(personalSyncTimer); personalSyncTimer = null }
+    set({ isDirty: true })
     personalSyncTimer = setTimeout(async () => {
+      personalSyncTimer = null
       const { personalSections, currentUserId } = get()
       if (!currentUserId) return
-      set({ isSyncing: true })
-      try {
-        const result = await saveUserLayout(currentUserId, personalSections)
-        if ((result as any)?.error) {
-          set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-        } else {
-          set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
-          setTimeout(() => set({ syncStatus: 'idle' }), 2000)
-        }
-      } catch {
-        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-      }
-    }, 300) // 300ms debounce — jauh lebih responsif
+      set({ isSyncing: true, syncStatus: 'saving' })
+      const ok = await saveUserLayout(currentUserId, personalSections)
+      set({ isSyncing: false, syncStatus: ok ? 'saved' : 'error', isDirty: !ok })
+      if (ok) setTimeout(() => set({ syncStatus: 'idle' }), 2000)
+    }, 300)
+  },
+
+  // ── Sync langsung tanpa debounce (visibility change, logout, dll) ──
+  syncPersonalToDbNow: async () => {
+    if (personalSyncTimer) { clearTimeout(personalSyncTimer); personalSyncTimer = null }
+    const { personalSections, currentUserId } = get()
+    if (!currentUserId || personalSections.length === 0) return
+    set({ isSyncing: true, syncStatus: 'saving' })
+    const ok = await saveUserLayout(currentUserId, personalSections)
+    set({ isSyncing: false, syncStatus: ok ? 'saved' : 'error', isDirty: !ok })
+    if (ok) setTimeout(() => set({ syncStatus: 'idle' }), 2000)
   },
 
   // ── Helper: push snapshot ke history untuk undo ───────────
@@ -318,9 +350,9 @@ export const useStore = create<DashboardStore>((set, get) => ({
   // ── Tambah section langsung tanpa modal (poin 5) ─────────
   addPersonalSectionAuto: () => {
     const current = get().personalSections
-    const maxY = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
+    const maxY    = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
     const lastRow = current.filter(s => s.layout.y + s.layout.h >= maxY)
-    const maxX = lastRow.reduce((m, s) => Math.max(m, s.layout.x + s.layout.w), 0)
+    const maxX    = lastRow.reduce((m, s) => Math.max(m, s.layout.x + s.layout.w), 0)
     const sameRow = maxX + 4 <= 12
     const newSection: Section = {
       id: 's' + uid(), title: 'Section Baru', icon: '📁', subtitle: '',
@@ -334,23 +366,23 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   // ── Tambah section pribadi baru ───────────────────────────
   addPersonalSection: (data) => {
-    ; (get() as any).pushHistory()
+    ;(get() as any).pushHistory()
     const current = get().personalSections
     // Hitung posisi Y setelah section terakhir
     const maxY = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
     const newSection: Section = {
-      id: 's' + uid(),
-      title: data.title ?? 'Section Baru',
-      icon: data.icon ?? '📁',
-      subtitle: data.subtitle ?? '',
-      items: [],
-      layout: { x: 0, y: maxY, w: data.layout?.w ?? SECTION_DEFAULT_W, h: data.layout?.h ?? SECTION_DEFAULT_H },
-      visibility: 'all',   // section pribadi selalu 'all' (hanya milik user ini)
+      id:          's' + uid(),
+      title:       data.title       ?? 'Section Baru',
+      icon:        data.icon        ?? '📁',
+      subtitle:    data.subtitle    ?? '',
+      items:       [],
+      layout:      { x: 0, y: maxY, w: data.layout?.w ?? SECTION_DEFAULT_W, h: data.layout?.h ?? SECTION_DEFAULT_H },
+      visibility:  'all',   // section pribadi selalu 'all' (hanya milik user ini)
       targetUnits: [],
-      pageId: 'beranda',
+      pageId:      'beranda',
       accentColor: data.accentColor,
-      type: data.type ?? 'section',
-      widgetType: data.widgetType,
+      type:        data.type        ?? 'section',
+      widgetType:  data.widgetType,
     }
     const next = [...current, newSection]
     persistPersonal(next)
@@ -370,7 +402,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   // ── Hapus section pribadi ─────────────────────────────────
   deletePersonalSection: (id) => {
-    ; (get() as any).pushHistory()
+    ;(get() as any).pushHistory()
     const next = get().personalSections.filter(s => s.id !== id)
     persistPersonal(next)
     set({ personalSections: next })
@@ -403,20 +435,17 @@ export const useStore = create<DashboardStore>((set, get) => ({
     })
     persistPersonal(next)
     set({ personalSections: next, isDirty: true, syncStatus: 'saving' })
-    // Debounce lebih panjang (3 detik) untuk drag — banyak update kecil
-    if (personalSyncTimer) clearTimeout(personalSyncTimer)
+    // Debounce 800ms untuk drag/resize — lebih cepat dari 3 detik tapi tidak spam
+    if (personalSyncTimer) { clearTimeout(personalSyncTimer); personalSyncTimer = null }
     personalSyncTimer = setTimeout(async () => {
+      personalSyncTimer = null
       const { currentUserId } = get()
       if (!currentUserId) return
-      set({ isSyncing: true })
-      try {
-        await saveUserLayout(currentUserId, next)
-        set({ isSyncing: false, syncStatus: 'saved', isDirty: false })
-        setTimeout(() => set({ syncStatus: 'idle' }), 3000)
-      } catch {
-        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-      }
-    }, 3000)
+      set({ isSyncing: true, syncStatus: 'saving' })
+      const ok = await saveUserLayout(currentUserId, get().personalSections)
+      set({ isSyncing: false, syncStatus: ok ? 'saved' : 'error', isDirty: !ok })
+      if (ok) setTimeout(() => set({ syncStatus: 'idle' }), 2000)
+    }, 800)
   },
 
   // ── Tambah item/link ke dalam section pribadi ─────────────
@@ -433,11 +462,11 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   // ── Update item/link di dalam section pribadi ─────────────
   updateItem: (sectionId, itemId, data) => {
-    const next = get().personalSections.map(s => {
+    const next = get().personalSections.map((s: Section) => {
       if (s.id !== sectionId) return s
       return {
         ...s,
-        items: s.items.map(i => i.id === itemId ? { id: itemId, ...data } : i)
+        items: s.items.map((i: any) => i.id === itemId ? { id: itemId, ...data } : i)
       }
     })
     persistPersonal(next)
@@ -511,48 +540,6 @@ export const useStore = create<DashboardStore>((set, get) => ({
     await get().loadSharedSections()
   },
 
-  // ── Toggle favorite section ──────────────────────────────────
-  // Tandai section sebagai favorit — re-layout posisi otomatis
-  toggleFavoriteSection: (id: string) => {
-    const sections = get().personalSections
-    // Toggle isFavorite
-    const toggled = sections.map(s =>
-      s.id === id ? { ...s, isFavorite: !s.isFavorite } : s
-    )
-    // Re-assign layout: favorit dulu (x:0), sisanya setelahnya
-    const favs = toggled.filter(s => s.isFavorite)
-    const rest = toggled.filter(s => !s.isFavorite)
-    const COLS = 12
-    let x = 0, y = 0, rowH = 0
-    const reLayout = (list: typeof toggled) => list.map(s => {
-      if (x + s.layout.w > COLS) { y += rowH; x = 0; rowH = 0 }
-      const updated = { ...s, layout: { ...s.layout, x, y } }
-      x += s.layout.w; rowH = Math.max(rowH, s.layout.h)
-      return updated
-    })
-    const next = [...reLayout(favs), ...reLayout(rest)]
-    persistPersonal(next)
-    set({ personalSections: next })
-    get().syncPersonalToDb()
-  },
-
-  // ── Toggle favorite item/link ──────────────────────────────
-  // Tandai link sebagai favorit — badge ⭐ muncul di pojok icon
-  toggleFavoriteItem: (sectionId: string, itemId: string) => {
-    const next = get().personalSections.map(s => {
-      if (s.id !== sectionId) return s
-      return {
-        ...s,
-        items: s.items.map(i =>
-          i.id === itemId ? { ...i, isFavorite: !i.isFavorite } : i
-        )
-      }
-    })
-    persistPersonal(next)
-    set({ personalSections: next })
-    get().syncPersonalToDb()
-  },
-
   // ── Toggle edit mode ──────────────────────────────────────
   toggleEditMode: () => set(s => ({ editMode: !s.editMode, searchQuery: '' })),
 
@@ -560,7 +547,6 @@ export const useStore = create<DashboardStore>((set, get) => ({
   setSearch: (q) => set({ searchQuery: q }),
 
   // ── Set filter preview untuk admin (role + region + unit) ─
-  setPreviewFilter: (filter) => set({ previewFilter: filter }),
 
   // ── Update preferensi tampilan user ──────────────────────
   setAppearance: (o) => {
@@ -576,7 +562,6 @@ export const useStore = create<DashboardStore>((set, get) => ({
   },
 
   // ── Update pilihan tampilan (show desc, show tags) ────────
-  setDisplayOptions: (o) => set(s => ({ displayOptions: { ...s.displayOptions, ...o } })),
 
   // ── Set theme global (superadmin saja) ───────────────────
   setGlobalTheme: (theme) => {
@@ -587,23 +572,23 @@ export const useStore = create<DashboardStore>((set, get) => ({
   },
 
   // ── Simpan preset tampilan ────────────────────────────────
-  savePreset: (name) => {
+  addPreset: (name: string) => {
     const preset = { id: uid(), name, appearance: { ...get().appearance } }
-    const presets = [...get().presets, preset]
-    localStorage.setItem('jateamhub-presets', JSON.stringify(presets))
+    const presets = [...(get().presets ?? []), preset]
+    localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(presets))
     set({ presets })
   },
 
   // ── Terapkan preset tampilan yang dipilih ─────────────────
-  applyPreset: (id) => {
-    const preset = get().presets.find(p => p.id === id)
+  applyPreset: (id: string) => {
+    const preset = (get().presets ?? []).find((p: any) => p.id === id)
     if (preset) get().setAppearance(preset.appearance)
   },
 
   // ── Hapus preset tampilan ─────────────────────────────────
-  deletePreset: (id) => {
-    const presets = get().presets.filter(p => p.id !== id)
-    localStorage.setItem('jateamhub-presets', JSON.stringify(presets))
+  removePreset: (id: string) => {
+    const presets = (get().presets ?? []).filter((p: any) => p.id !== id)
+    localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(presets))
     set({ presets })
   },
 
@@ -611,28 +596,24 @@ export const useStore = create<DashboardStore>((set, get) => ({
   undo: () => {
     const { history, personalSections, future } = get()
     if (!history.length) return
-    const prev = history[history.length - 1]
+    const prev       = history[history.length - 1]
     const newHistory = history.slice(0, -1)
-    const newFuture = [structuredClone(personalSections), ...future].slice(0, MAX_HISTORY)
+    const newFuture  = [structuredClone(personalSections), ...future].slice(0, MAX_HISTORY)
     persistPersonal(prev)
-    set({
-      personalSections: prev, history: newHistory, future: newFuture,
-      canUndo: newHistory.length > 0, canRedo: true
-    })
+    set({ personalSections: prev, history: newHistory, future: newFuture,
+          canUndo: newHistory.length > 0, canRedo: true })
   },
 
   // ── Redo: maju ke state berikutnya ───────────────────────
   redo: () => {
     const { history, personalSections, future } = get()
     if (!future.length) return
-    const next = future[0]
-    const newFuture = future.slice(1)
+    const next       = future[0]
+    const newFuture  = future.slice(1)
     const newHistory = [...history, structuredClone(personalSections)].slice(-MAX_HISTORY)
     persistPersonal(next)
-    set({
-      personalSections: next, history: newHistory, future: newFuture,
-      canUndo: true, canRedo: newFuture.length > 0
-    })
+    set({ personalSections: next, history: newHistory, future: newFuture,
+          canUndo: true, canRedo: newFuture.length > 0 })
   },
 }))
 
@@ -641,7 +622,8 @@ export const useStore = create<DashboardStore>((set, get) => ({
 export function applyThemeToDOM(theme: string) {
   // Semua tema gelap → obsidian, semua yang lain → ivory-light
   const darkThemes = ['obsidian', 'dark-mint', 'dark-soft', 'enterprise',
-    'aurora-dark', 'sand-dark', 'slate-dark', 'pearl-dark', 'ivory-dark', 'sage-dark']
+    'aurora-dark', 'sand-dark', 'slate-dark', 'pearl-dark', 'ivory-dark', 'sage-dark',
+    'dark']
   const resolvedTheme = darkThemes.includes(theme) ? 'obsidian' : 'ivory-light'
 
   document.documentElement.setAttribute('data-theme', resolvedTheme)
@@ -651,3 +633,12 @@ export function applyThemeToDOM(theme: string) {
     : "'Plus Jakarta Sans', sans-serif"
   document.documentElement.style.setProperty('--font', font)
 }
+
+// ── Granular selectors — cegah unnecessary re-renders ─────────
+// Gunakan selector ini di komponen untuk subscribe hanya ke data yang dibutuhkan
+export const usePersonalSections = () => useStore(s => s.personalSections)
+export const useSharedSections   = () => useStore(s => s.sharedSections)
+export const useEditMode         = () => useStore(s => s.editMode)
+export const useSearchQuery      = () => useStore(s => s.searchQuery)
+export const useAppearance       = () => useStore(s => s.appearance)
+export const useSyncStatus       = () => useStore(s => ({ syncStatus: s.syncStatus, isSyncing: s.isSyncing, isDirty: s.isDirty }))

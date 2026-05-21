@@ -4,9 +4,10 @@
 import { createClient } from '@supabase/supabase-js'
 import type { AppearanceSettings, ThemeId } from '../types'
 
-// URL dan kunci publik Supabase — aman dipakai di frontend
-const SUPABASE_URL  = 'https://qsvrqdnyjywjzxkqwszl.supabase.co'
-const SUPABASE_ANON = 'sb_publishable_wzaKkf02vmfOvqIb3wHgKQ_mZgecfAn'
+// URL dan kunci publik Supabase
+// Gunakan env vars jika tersedia, fallback ke hardcode untuk development
+const SUPABASE_URL  = (import.meta as any).env?.VITE_SUPABASE_URL  ?? 'https://qsvrqdnyjywjzxkqwszl.supabase.co'
+const SUPABASE_ANON = (import.meta as any).env?.VITE_SUPABASE_ANON ?? 'sb_publishable_wzaKkf02vmfOvqIb3wHgKQ_mZgecfAn'
 
 // Buat koneksi Supabase dengan konfigurasi sesi otomatis
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -159,12 +160,36 @@ export const getUserLayout = async (
 // Simpan layout section pribadi user — upsert (insert atau update)
 export const saveUserLayout = async (
   userId: string,
-  sections: unknown[]
-) => supabase.from('user_layouts').upsert({
-  user_id:    userId,
-  sections,
-  updated_at: new Date().toISOString(),
-}, { onConflict: 'user_id' })
+  sections: unknown[],
+  retries = 2
+): Promise<boolean> => {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const { error } = await supabase.from('user_layouts').upsert({
+        user_id:    userId,
+        sections,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+
+      if (!error) return true
+
+      // Jika auth error, refresh session dan coba lagi
+      if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+        await supabase.auth.refreshSession()
+        continue
+      }
+
+      console.error('saveUserLayout error:', error)
+      if (i === retries) return false
+    } catch (e) {
+      console.error('saveUserLayout exception:', e)
+      if (i === retries) return false
+      // Tunggu sebentar sebelum retry
+      await new Promise(r => setTimeout(r, 500 * (i + 1)))
+    }
+  }
+  return false
+}
 
 // ── Fungsi Shared Sections (section dari admin) ───────────────
 
@@ -350,5 +375,5 @@ export const rejectRegistration = async (regId: string, reviewerId: string, note
 // Kirim notif WA via Fonnte (dipanggil dari edge function nanti)
 export const sendWaNotification = async (phone: string, message: string) => {
   // TODO: panggil edge function send-wa saat token Fonnte sudah ada
-  console.log('[WA Notif placeholder]', phone, message)
+  // console.log('[WA Notif placeholder]', phone, message)
 }

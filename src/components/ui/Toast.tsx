@@ -1,23 +1,30 @@
 import { useStore } from '../../store/dashboardStore'
 
+// Pakai semantic color vars — ikut tema aktif
 const TOAST_STYLES = {
   success: {
     background: 'var(--bg3)',
-    border: '1px solid var(--accent)',
-    color: 'var(--accent)',
+    border: '1px solid var(--color-success)',
+    iconColor: 'var(--color-success)',
     icon: '✓',
   },
   error: {
     background: 'var(--bg3)',
-    border: '1px solid var(--red)',
-    color: 'var(--red)',
+    border: '1px solid var(--color-error)',
+    iconColor: 'var(--color-error)',
     icon: '✕',
   },
   warn: {
     background: 'var(--bg3)',
-    border: '1px solid #F59E0B',
-    color: '#F59E0B',
+    border: '1px solid var(--color-warning)',
+    iconColor: 'var(--color-warning)',
     icon: '⚠',
+  },
+  info: {
+    background: 'var(--bg3)',
+    border: '1px solid var(--color-info)',
+    iconColor: 'var(--color-info)',
+    icon: 'ℹ',
   },
 }
 
@@ -28,39 +35,38 @@ export default function ToastContainer() {
     <div style={{
       position: 'fixed',
       top: 72,
-      right: 'var(--sp-4, 16px)',
-      zIndex: 9999,
+      right: 16,
+      zIndex: 500, /* --z-toast */
       display: 'flex',
       flexDirection: 'column',
-      gap: 'var(--sp-2, 8px)',
+      gap: 8,
       pointerEvents: 'none',
+      maxWidth: 360,
     }}>
-      {toasts.slice(-3).map(t => {
-        const s = TOAST_STYLES[t.type as keyof typeof TOAST_STYLES] ?? TOAST_STYLES.success
+      {toasts.slice(-4).map(t => {
+        const s = TOAST_STYLES[t.type as keyof typeof TOAST_STYLES] ?? TOAST_STYLES.info
         return (
           <div
             key={t.id}
             onClick={() => removeToast(t.id)}
             style={{
               display: 'flex', alignItems: 'center',
-              gap: 'var(--sp-2, 8px)',
-              padding: '10px 14px',
-              borderRadius: 'var(--radius, 12px)',
-              fontSize: 'var(--text-sm, 13px)',
-              fontWeight: 500,
+              gap: 8, padding: '10px 14px',
+              borderRadius: 'var(--radius)',
+              fontSize: 13, fontWeight: 500,
               fontFamily: 'var(--font)',
-              pointerEvents: 'auto',
-              cursor: 'pointer',
-              minWidth: 220, maxWidth: 340,
-              boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+              pointerEvents: 'auto', cursor: 'pointer',
+              boxShadow: 'var(--shadow)',
               backdropFilter: 'blur(12px)',
-              animation: 'slideInRight 200ms var(--ease, cubic-bezier(0.22,1,0.36,1))',
+              animation: 'slideInRight 200ms var(--ease)',
               ...s,
             }}
           >
-            <span style={{ fontSize: 14, flexShrink: 0, fontWeight: 700 }}>{s.icon}</span>
-            <span style={{ flex: 1, color: 'var(--silver)' }}>{t.msg}</span>
-            <span style={{ opacity: 0.4, fontSize: 11, flexShrink: 0 }}>✕</span>
+            <span style={{ fontSize: 13, flexShrink: 0, fontWeight: 700, color: s.iconColor }}>
+              {s.icon}
+            </span>
+            <span style={{ flex: 1, color: 'var(--silver)', lineHeight: 1.4 }}>{t.msg}</span>
+            <span style={{ opacity: 0.3, fontSize: 11, flexShrink: 0 }}>✕</span>
           </div>
         )
       })}

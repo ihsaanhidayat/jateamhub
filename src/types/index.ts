@@ -136,7 +136,6 @@ export interface LinkItem {
   newTab:      boolean
   iconUrl?:    string
   useFavicon?: boolean
-  isFavorite?: boolean  // item ini di-pin sebagai favorit
 }
 
 export interface Section {
@@ -154,22 +153,19 @@ export interface Section {
   accentColor?: string
   type?:        SectionType
   widgetType?:  WidgetType
-  isFavorite?:  boolean  // section ini di-pin sebagai favorit
 }
 
 
 
 // ── Appearance ────────────────────────────────
 export type IconSize       = 'small' | 'medium' | 'large' | 'xl'
-export type LabelMode      = 'show' | 'hide' | 'hover'
-export type ItemDisplayMode = 'button' | 'list' | 'iconText' | 'folderGrid'
+export type ItemDisplayMode = 'folderGrid' | 'list'
 export type ColorMode      = 'dark' | 'light'
 export type SectionDensity = 'compact' | 'comfortable' | 'spacious'
 
 export interface AppearanceSettings {
   itemDisplayMode:  ItemDisplayMode
   iconSize:         IconSize
-  labelMode:        LabelMode
   folderGridCols:   number
   tooltipEnabled:   boolean
   faviconEnabled:   boolean
@@ -183,19 +179,16 @@ export interface AppearanceSettings {
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
   itemDisplayMode: 'folderGrid',
   iconSize:        'large',
-  labelMode:       'show',
-  folderGridCols:  4,
+  folderGridCols:  5,
   tooltipEnabled:  true,
   faviconEnabled:  true,
   colorMode:       'light',
-  theme:           'ivory-light' as ThemeId,
+  theme: 'ivory-light' as ThemeId,
   themeBase:       'ivory',
   isDarkMode:      false,
 }
 
 // ── Display options ───────────────────────────
-export interface DisplayOptions { showDesc: boolean; showTags: boolean }
-export const defaultDisplayOptions: DisplayOptions = { showDesc: true, showTags: false }
 
 // ── Icon size map ─────────────────────────────
 export const ICON_SIZE_MAP: Record<string, { wrapper: number; img: number }> = {
@@ -221,7 +214,6 @@ export interface JateamConfig {
   pages:          PageDef[]
   sections:       Section[]
   appearance:     AppearanceSettings
-  displayOptions: DisplayOptions
   presets:        Preset[]
 }
 

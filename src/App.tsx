@@ -1,145 +1,214 @@
-// ─────────────────────────────────────────────────────────────
-// APP.TSX — Root component, routing auth, inisialisasi app
-// ─────────────────────────────────────────────────────────────
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useAuthStore } from './store/authStore'
 import { useStore, applyThemeToDOM } from './store/dashboardStore'
-import LoginPage from './components/layout/LoginPage'
+import { supabase } from './utils/supabaseClient'
+import LoginPage    from './components/layout/LoginPage'
 import RegisterPage from './components/layout/RegisterPage'
-import SuperadminDashboard from './components/layout/SuperadminDashboard'
-import Header from './components/layout/Header'
-import OptionsPanel from './components/layout/OptionsPanel'
-import EditBar from './components/layout/EditBar'
-import GridLayout from './components/layout/GridLayout'
-import ProfilePage from './components/layout/ProfilePage'
-import PanduanFAB from './components/layout/PanduanFAB'
-import CoffeeModal from './components/ui/CoffeeModal'
-import SectionModal from './components/section/SectionModal'
-import AddSectionModal from './components/layout/AddSectionModal'
+import Header       from './components/layout/Header'
+import GridLayout   from './components/layout/GridLayout'
+import OfflineBar   from './components/ui/OfflineBar'
 import ToastContainer from './components/ui/Toast'
 
+// Lazy load komponen berat
+const SuperadminDashboard = lazy(() => import('./components/layout/SuperadminDashboard'))
+const OptionsPanel        = lazy(() => import('./components/layout/OptionsPanel'))
+const ProfilePage         = lazy(() => import('./components/layout/ProfilePage'))
+const PanduanFAB          = lazy(() => import('./components/layout/PanduanFAB'))
+const CoffeeModal         = lazy(() => import('./components/ui/CoffeeModal'))
+const AddSectionModal     = lazy(() => import('./components/layout/AddSectionModal'))
+const OnboardingOverlay   = lazy(() => import('./components/ui/OnboardingOverlay'))
+
+import './styles/global.css'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 
 export default function App() {
-  // Ambil state auth dan store yang diperlukan
   const { profile, initialized, init } = useAuthStore()
-  const {
-    editMode, initUser, toast, setCurrentUserId,
-    isDirty, isSyncing, globalTheme,
-  } = useStore()
+  const editMode     = useStore(s => s.editMode)
+  const globalTheme  = useStore(s => s.globalTheme)
+  const isDirty      = useStore(s => s.isDirty)
+  const isSyncing    = useStore(s => s.isSyncing)
+  const { toggleEditMode, initUser, toast, setCurrentUserId, syncPersonalToDb } = useStore()
 
-  // State UI lokal
-  const [optionsOpen, setOptionsOpen] = useState(false)
-  const [showRegister, setShowRegister] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
+  const [optionsOpen,    setOptionsOpen]    = useState(false)
+  const [showRegister,   setShowRegister]   = useState(false)
+  const [profileOpen,    setProfileOpen]    = useState(false)
   const [addSectionOpen, setAddSectionOpen] = useState(false)
-  const [coffeeOpen, setCoffeeOpen] = useState(false)
+  const [coffeeOpen,     setCoffeeOpen]     = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
-  // Inisialisasi auth saat app pertama kali dibuka
+  // Onboarding — tampilkan untuk user baru (dashboard kosong + belum pernah lihat)
+  const personalSections = useStore(s => s.personalSections)
+
+  // Apply tema dari localStorage SEKETIKA sebelum apapun dirender
+  // Ini mencegah flash of wrong theme
+  const themeApplied = useRef(false)
+  if (!themeApplied.current) {
+    themeApplied.current = true
+    try {
+      const saved = localStorage.getItem('jateamhub-appearance')
+      if (saved) {
+        const app = JSON.parse(saved)
+        if (app?.themeBase) applyThemeToDOM(app.themeBase === 'obsidian' ? 'obsidian' : 'ivory-light')
+      }
+    } catch { /* ignore */ }
+  }
+
+  // Init auth
   useEffect(() => { init() }, [])
 
-  // Peringatkan user saat mau meninggalkan halaman dengan perubahan belum tersimpan
+  // Safety: jika 6 detik masih loading, paksa ke login
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!useAuthStore.getState().initialized) {
+        useAuthStore.setState({ initialized: true, loading: false, profile: null })
+      }
+    }, 6000)
+    return () => clearTimeout(t)
+  }, [])
+
+  // ── Page Visibility API — simpan saat hidden, sync saat visible ──
+  useEffect(() => {
+    const handle = async () => {
+      const state = useStore.getState()
+
+      if (document.visibilityState === 'hidden') {
+        // Simpan ke localStorage (selalu berhasil, synchronous)
+        if (state.personalSections.length > 0) {
+          try { localStorage.setItem('jateamhub-personal', JSON.stringify(state.personalSections)) } catch {}
+        }
+        // Auto close edit mode
+        if (state.editMode) state.toggleEditMode()
+        return
+      }
+
+      // visible — cek session lalu sync
+      if (!state.currentUserId) return
+      try {
+        const { error } = await supabase.auth.getSession()
+        if (error) { useAuthStore.getState().logout(); return }
+        // Sync ke DB
+        if (state.personalSections.length > 0) {
+          await state.syncPersonalToDbNow()
+        }
+      } catch {}
+    }
+    document.addEventListener('visibilitychange', handle)
+    return () => document.removeEventListener('visibilitychange', handle)
+  }, [])
+
+  // Warn before unload + simpan localStorage
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (isDirty || isSyncing) {
+      // Selalu simpan ke localStorage saat close
+      const state = useStore.getState()
+      if (state.personalSections.length > 0) {
+        try {
+          localStorage.setItem('jateamhub-personal', JSON.stringify(state.personalSections))
+        } catch { /* ignore */ }
+      }
+      if (state.isDirty || state.isSyncing) {
         e.preventDefault()
-        e.returnValue = 'Ada perubahan yang belum tersimpan. Yakin mau meninggalkan halaman?'
-        return e.returnValue
+        e.returnValue = ''
       }
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [isDirty, isSyncing])
+  }, [])
 
-  // Jalankan saat user berhasil login — load semua data user
+  // Saat user login → init data
   useEffect(() => {
     if (profile) {
       setCurrentUserId(profile.id)
-      // Init store dengan data user: section pribadi + shared sections + preferences
       initUser(
         profile.id,
         profile.role,
         (profile as any).region_scope ?? 'global',
-        (profile as any).unit_scope ?? 'general',
+        (profile as any).unit_scope   ?? 'general',
       )
-      // Inject fungsi toast ke authStore agar bisa tampilkan notifikasi
       useAuthStore.getState().setToastFn(toast)
 
-      // Tampilkan coffee modal sekali per session — semua role kecuali admin global
-      const sessionKey = `coffee-shown-${profile.id}`
-      const _isAdminGlobal = profile.role === 'admin' &&
-        (profile as any).region_scope === 'global' &&
-        ((profile as any).unit_scope === 'general' || !(profile as any).unit_scope)
-      if (!sessionStorage.getItem(sessionKey) && !_isAdminGlobal) {
-        sessionStorage.setItem(sessionKey, '1')
-        setTimeout(() => setCoffeeOpen(true), 1500)
+      // Onboarding untuk user baru
+      const onboardingKey = `jateamhub-onboarded-${profile.id}`
+      if (!localStorage.getItem(onboardingKey)) {
+        // Tampilkan setelah data load selesai
+        setTimeout(() => setShowOnboarding(true), 1200)
       }
+      // Coffee modal — dinonaktifkan sementara
+      // const sessionKey = `coffee-shown-${profile.id}`
+      // if (!sessionStorage.getItem(sessionKey)) { ... }
     }
   }, [profile?.id])
 
-  // Terapkan theme ke DOM setiap kali theme berubah
-  useEffect(() => { applyThemeToDOM(globalTheme) }, [globalTheme])
-
-  // Edit mode — tambah class ke body untuk CSS indicator
+  // Reset dashboardStore saat logout
   useEffect(() => {
-    if (editMode) {
-      document.body.classList.add('edit-mode-active')
-    } else {
-      document.body.classList.remove('edit-mode-active')
+    if (!profile) {
+      const store = useStore.getState()
+      // Reset semua state dashboard
+      store.setCurrentUserId('')
+      // Clear sync timer
+      if (store.isSyncing) {
+        useStore.setState({ isSyncing: false, isDirty: false, syncStatus: 'idle', isDataInitialized: false, personalSections: [], sharedSections: [] })
+      } else {
+        useStore.setState({ isDataInitialized: false, personalSections: [], sharedSections: [] })
+      }
     }
+  }, [profile])
+
+  // Sync theme ke DOM
+  useEffect(() => { if (globalTheme) applyThemeToDOM(globalTheme) }, [globalTheme])
+
+  // Edit mode body class
+  useEffect(() => {
+    if (editMode) document.body.classList.add('edit-mode-active')
+    else           document.body.classList.remove('edit-mode-active')
     return () => document.body.classList.remove('edit-mode-active')
   }, [editMode])
 
-  // Tampilkan loading spinner saat init auth belum selesai
+  // Loading screen
   if (!initialized) return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100dvh', background: '#0A0A0A',
-      color: 'var(--accent)', fontSize: 14, fontFamily: 'Space Grotesk, sans-serif', gap: 10,
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      minHeight: '100dvh', background: 'var(--bg)',
+      gap: 16, fontFamily: 'var(--font)',
     }}>
-      <span style={{ animation: 'loginSpin 1s linear infinite', display: 'inline-block' }}>⟳</span>
-      Memuat...
+      <div style={{
+        width: 32, height: 32, border: '3px solid var(--border2)',
+        borderTopColor: 'var(--accent)', borderRadius: '50%',
+        animation: 'loginSpin 0.8s linear infinite',
+      }} />
+      <span style={{ fontSize: 13, color: 'var(--silver3)' }}>Memuat...</span>
     </div>
   )
 
-  // Tampilkan halaman register jika diminta
   if (!profile && showRegister) return <RegisterPage onBack={() => setShowRegister(false)} />
-
-  // Tampilkan halaman login jika belum login
   if (!profile) return <LoginPage onRegister={() => setShowRegister(true)} />
 
-  // Superadmin: tampilkan dashboard khusus
   if (profile.role === 'superadmin') return (
-    <>
-      <SuperadminDashboard />
-      <ToastContainer />
-    </>
+    <Suspense fallback={null}>
+      <SuperadminDashboard /><ToastContainer />
+    </Suspense>
   )
 
-  // Dashboard utama untuk semua role selain superadmin
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
-      {/* Header dengan semua kontrol navigasi */}
+    <div style={{
+      display: 'flex', flexDirection: 'column', minHeight: '100dvh',
+      position: 'relative',
+      // Poin 3: border jelas saat edit mode
+      boxShadow: editMode
+        ? `inset 0 0 0 2px var(--accent), inset 0 0 0 4px var(--mint-bg2)`
+        : 'none',
+      transition: 'box-shadow 200ms var(--ease)',
+    }}>
       <Header
-        onToggleOptions={() => setOptionsOpen(v => !v)}
+        onToggleOptions={() => setOptionsOpen((v: boolean) => !v)}
         optionsOpen={optionsOpen}
         onOpenAdvanced={() => setProfileOpen(true)}
         onAddSection={() => setAddSectionOpen(true)}
       />
 
-      {/* Options panel — tersedia untuk semua user */}
-      <OptionsPanel open={optionsOpen} onClose={() => setOptionsOpen(false)} />
-
-      {/* Konten utama — grid layout */}
-      <main className={`main${editMode ? ' edit-active' : ''}`} style={{ flex: 1 }}>
-        <GridLayout onAddSection={() => setAddSectionOpen(true)} />
-      </main>
-
-      {/* Edit bar — muncul saat edit mode aktif */}
-      {editMode && <EditBar onAddSection={() => setAddSectionOpen(true)} />}
-
-      {/* Edit mode topbar — slim bar di bawah header saat edit aktif */}
+      {/* Edit mode topbar — slim, di bawah header */}
       {editMode && (
         <div style={{
           height: 36, flexShrink: 0,
@@ -148,48 +217,60 @@ export default function App() {
           display: 'flex', alignItems: 'center',
           padding: '0 var(--sp-5)', gap: 'var(--sp-3)',
           animation: 'slideInUp 200ms var(--ease)',
+          zIndex: 90,
         }}>
           <span style={{
-            width: 7, height: 7, borderRadius: '50%',
+            width: 6, height: 6, borderRadius: '50%',
             background: 'var(--accent)', flexShrink: 0,
             animation: 'editPulse 2s ease-in-out infinite',
           }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--mono)', letterSpacing: '0.8px' }}>
-            EDIT MODE
-          </span>
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: 'var(--accent)',
+            fontFamily: 'var(--mono)', letterSpacing: '1px',
+          }}>EDIT MODE</span>
           <span style={{ fontSize: 11, color: 'var(--silver3)', flex: 1 }}>
             Klik section untuk mulai edit
           </span>
           <button
-            onClick={() => useStore.getState().toggleEditMode()}
+            aria-label="Selesai edit" onClick={() => useStore.getState().toggleEditMode()}
             style={{
               height: 24, padding: '0 10px',
               background: 'none', border: '1px solid var(--border2)',
               borderRadius: 'var(--radius-sm)', color: 'var(--silver3)',
               fontSize: 10, fontWeight: 700, cursor: 'pointer',
-              fontFamily: 'var(--font)', letterSpacing: '0.5px',
-            }}>
-            ✕ SELESAI
-          </button>
+              fontFamily: 'var(--font)',
+            }}>✕ Selesai</button>
         </div>
       )}
 
-      {/* Modal tambah section/widget — muncul saat klik ＋ di header */}
-      <AddSectionModal
-        open={addSectionOpen}
-        onClose={() => setAddSectionOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <OptionsPanel open={optionsOpen} onClose={() => setOptionsOpen(false)} />
+      </Suspense>
 
-      {/* Modal profile advanced (users + settings) */}
-      {profileOpen && <ProfilePage onClose={() => setProfileOpen(false)} />}
+      <OfflineBar />
 
-      {/* Popup coffee — sekali per session untuk user/guest */}
-      {coffeeOpen && <CoffeeModal onClose={() => setCoffeeOpen(false)} />}
+      <main className={`main${editMode ? ' edit-active' : ''}`} style={{ flex: 1 }} role="main">
+        <GridLayout onAddSection={() => setAddSectionOpen(true)} />
+      </main>
 
-      {/* FAB panduan — floating button kanan bawah */}
-      <PanduanFAB />
-
-      {/* Toast notifikasi — kanan atas */}
+      <Suspense fallback={null}>
+        <AddSectionModal open={addSectionOpen} onClose={() => setAddSectionOpen(false)} />
+        {profileOpen  && <ProfilePage onClose={() => setProfileOpen(false)} />}
+        {coffeeOpen   && <CoffeeModal onClose={() => setCoffeeOpen(false)} />}
+        {showOnboarding && (
+          <OnboardingOverlay
+            onDismiss={() => {
+              setShowOnboarding(false)
+              if (profile) localStorage.setItem(`jateamhub-onboarded-${profile.id}`, '1')
+            }}
+            onStartEdit={() => {
+              useStore.getState().toggleEditMode()
+              setAddSectionOpen(true)
+            }}
+          />
+        )}
+        <PanduanFAB />
+      </Suspense>
       <ToastContainer />
     </div>
   )

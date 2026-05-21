@@ -18,9 +18,17 @@ export const getFaviconUrl = (url: string, size = 64): string => {
 }
 
 export const highlight = (text: string, query: string): string => {
-  if (!query) return text
-  const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-  return text.replace(re, '<mark class="hl">$1</mark>')
+  // Escape HTML dulu sebelum inject — cegah XSS via item title
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+  if (!query) return escaped
+  const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(`(${safeQuery})`, 'gi')
+  return escaped.replace(re, '<mark class="hl">$1</mark>')
 }
 
 export const isValidUrl = (url: string): boolean => {

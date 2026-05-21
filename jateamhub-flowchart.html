@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JateamHub — Architecture Flowchart</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #FAFAF8;
+    --bg2:      #F4F3F0;
+    --bg3:      #FFFFFF;
+    --border:   #E8E7E3;
+    --border2:  #D0CFC9;
+    --silver:   #1A1A1A;
+    --silver2:  #4B4B4B;
+    --silver3:  #8A8A8A;
+    --accent:   #2563EB;
+    --accent2:  #1D4ED8;
+    --success:  #16A34A;
+    --warning:  #D97706;
+    --red:      #DC2626;
+    --purple:   #7C3AED;
+    --teal:     #0D9488;
+    --font:     'Plus Jakarta Sans', sans-serif;
+    --mono:     'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--silver);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ─────────────────────────── */
+  .header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(250,250,248,0.94);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 56px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .header h1 {
+    font-size: 15px; font-weight: 800;
+    letter-spacing: -0.3px;
+  }
+  .header span {
+    font-size: 11px; color: var(--silver3);
+    font-family: var(--mono);
+  }
+  .header-right {
+    margin-left: auto;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .tab-btn {
+    height: 32px; padding: 0 14px;
+    background: none; border: 1px solid var(--border);
+    border-radius: 6px; color: var(--silver2);
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: var(--font);
+    transition: all 150ms ease;
+  }
+  .tab-btn:hover  { border-color: var(--accent); color: var(--accent); }
+  .tab-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+  /* ── Canvas ─────────────────────────── */
+  .canvas-wrap {
+    position: relative;
+    overflow: auto;
+    height: calc(100vh - 56px);
+    cursor: grab;
+  }
+  .canvas-wrap:active { cursor: grabbing; }
+  .canvas {
+    position: relative;
+    transform-origin: 0 0;
+  }
+  svg.lines {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  /* ── Node ─────────────────────────── */
+  .node {
+    position: absolute;
+    background: var(--bg3);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    min-width: 160px;
+    cursor: pointer;
+    transition: box-shadow 150ms ease, border-color 150ms ease, transform 150ms ease;
+    user-select: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .node:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    transform: translateY(-1px);
+  }
+  .node.selected {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.15), 0 4px 16px rgba(0,0,0,0.10);
+  }
+  .node.dragging {
+    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+    z-index: 1000;
+    transform: scale(1.02);
+  }
+  .node-icon  { font-size: 18px; margin-bottom: 6px; display: block; }
+  .node-label {
+    font-size: 12px; font-weight: 700;
+    letter-spacing: -0.2px; line-height: 1.3;
+  }
+  .node-sub {
+    font-size: 10px; color: var(--silver3);
+    margin-top: 3px; font-family: var(--mono);
+    line-height: 1.4;
+  }
+  .node-badge {
+    display: inline-block;
+    margin-top: 6px; padding: 2px 7px;
+    border-radius: 99px;
+    font-size: 9px; font-weight: 700;
+    font-family: var(--mono); text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Color variants */
+  .node.blue   { border-color: #93C5FD; background: #EFF6FF; }
+  .node.green  { border-color: #86EFAC; background: #F0FDF4; }
+  .node.red    { border-color: #FCA5A5; background: #FEF2F2; }
+  .node.purple { border-color: #C4B5FD; background: #F5F3FF; }
+  .node.amber  { border-color: #FCD34D; background: #FFFBEB; }
+  .node.teal   { border-color: #5EEAD4; background: #F0FDFA; }
+  .node.gray   { border-color: var(--border2); background: var(--bg2); }
+  .node.dark   { border-color: #374151; background: #111827; color: #F9FAFB; }
+  .node.dark .node-sub { color: #9CA3AF; }
+
+  /* Group label */
+  .group-label {
+    position: absolute;
+    font-size: 10px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--silver3);
+    font-family: var(--mono);
+    pointer-events: none;
+  }
+  .group-bg {
+    position: absolute;
+    border: 1.5px dashed var(--border);
+    border-radius: 16px;
+    pointer-events: none;
+  }
+
+  /* ── Sidebar info ─────────────────── */
+  .sidebar {
+    position: fixed;
+    top: 56px; right: 0;
+    width: 280px; height: calc(100vh - 56px);
+    background: var(--bg3);
+    border-left: 1px solid var(--border);
+    padding: 20px;
+    transform: translateX(100%);
+    transition: transform 250ms ease;
+    overflow-y: auto;
+    z-index: 200;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar h3 { font-size: 13px; font-weight: 800; margin-bottom: 4px; }
+  .sidebar .meta {
+    font-size: 10px; color: var(--silver3);
+    font-family: var(--mono); margin-bottom: 16px;
+  }
+  .sidebar .field { margin-bottom: 12px; }
+  .sidebar .field label {
+    display: block; font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--silver3); font-family: var(--mono);
+    margin-bottom: 4px;
+  }
+  .sidebar .field p {
+    font-size: 12px; color: var(--silver2);
+    line-height: 1.6;
+  }
+  .sidebar .tag {
+    display: inline-block; padding: 2px 8px;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 4px; font-size: 10px;
+    font-family: var(--mono); margin: 2px;
+  }
+  .close-sidebar {
+    position: absolute; top: 16px; right: 16px;
+    width: 28px; height: 28px;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: var(--silver3);
+  }
+
+  /* ── Legend ─────────────────────── */
+  .legend {
+    position: fixed; bottom: 24px; left: 24px;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px;
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+  .legend-title {
+    font-size: 9px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--silver3); font-family: var(--mono);
+    margin-bottom: 8px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 4px; font-size: 11px; color: var(--silver2);
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
+  }
+
+  /* ── Toolbar ─────────────────────── */
+  .toolbar {
+    position: fixed; bottom: 24px; right: 24px;
+    display: flex; gap: 6px; z-index: 100;
+  }
+  .tool-btn {
+    width: 40px; height: 40px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; transition: all 150ms ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .tool-btn:hover { border-color: var(--accent); background: #EFF6FF; }
+
+  /* Connection line label */
+  .conn-label {
+    font-size: 9px; fill: var(--silver3);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>JateamHub</h1>
+  <span>Architecture Flow v1.0</span>
+  <div class="header-right">
+    <button class="tab-btn active" onclick="showView('app')">App Flow</button>
+    <button class="tab-btn" onclick="showView('auth')">Auth Flow</button>
+    <button class="tab-btn" onclick="showView('data')">Data Flow</button>
+    <button class="tab-btn" onclick="showView('roles')">Role System</button>
+  </div>
+</div>
+
+<div class="canvas-wrap" id="canvasWrap">
+  <div class="canvas" id="canvas">
+    <svg class="lines" id="svg"></svg>
+    <!-- Nodes injected by JS -->
+  </div>
+</div>
+
+<div class="sidebar" id="sidebar">
+  <button class="close-sidebar" onclick="closeSidebar()">×</button>
+  <div id="sidebar-content"></div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="toolbar">
+  <button class="tool-btn" onclick="zoom(1.15)" title="Zoom In">＋</button>
+  <button class="tool-btn" onclick="zoom(0.87)" title="Zoom Out">－</button>
+  <button class="tool-btn" onclick="resetZoom()" title="Reset">⊡</button>
+</div>
+
+<script>
+// ── DATA FLOWS ────────────────────────────────────────────────
+const FLOWS = {
+  app: {
+    title: 'App Flow',
+    nodes: [
+      { id: 'browser', x: 360, y: 40,  label: 'Browser / PWA',     icon: '🌐', sub: 'Chrome · Safari · Firefox', color: 'gray' },
+      { id: 'main',    x: 360, y: 160, label: 'main.tsx',           icon: '⚡', sub: 'ErrorBoundary → StrictMode', color: 'blue' },
+      { id: 'app',     x: 360, y: 280, label: 'App.tsx',            icon: '🏠', sub: 'Root component\nPage Visibility API', color: 'blue',
+        detail: { desc: 'Komponen root. Mengelola auth state, visibility API, edit mode, dan lazy loading komponen.', tags: ['useState', 'useEffect', 'lazy', 'Suspense'] }},
+
+      // Auth path
+      { id: 'login',   x: 100, y: 420, label: 'LoginPage',          icon: '🔐', sub: 'Ivory / Obsidian variant', color: 'amber',
+        detail: { desc: 'Login page dengan 2 varian tema. Baca localStorage untuk tema sebelum render.', tags: ['IvoryLogin', 'ObsidianLogin'] }},
+      { id: 'register',x: 100, y: 560, label: 'RegisterPage',       icon: '📝', sub: 'Form pendaftaran', color: 'amber' },
+
+      // Dashboard path
+      { id: 'header',  x: 360, y: 420, label: 'Header',             icon: '🗂', sub: 'Nav · Search · Profile', color: 'blue',
+        detail: { desc: 'Sticky header. Edit mode toggle, search filter, profile dropdown, mobile tombol langsung.', tags: ['editMode', 'searchQuery', 'profileDropdown'] }},
+      { id: 'grid',    x: 360, y: 560, label: 'GridLayout',         icon: '⊞', sub: 'RGL · Mobile layout', color: 'blue',
+        detail: { desc: 'Dashboard utama. Mengelola RGL, focus-edit system, keyboard shortcuts, drag-drop.', tags: ['react-grid-layout', 'useMemo×7', 'useCallback', 'memo'] }},
+      { id: 'section', x: 200, y: 700, label: 'SectionCard',        icon: '📁', sub: 'memo() · Focus edit', color: 'teal',
+        detail: { desc: 'Section card dengan focus-edit system. Di-memo untuk performa. Drag handle terpisah.', tags: ['React.memo', 'drag-handle', 'blur-effect', 'is-blurred'] }},
+      { id: 'widget',  x: 500, y: 700, label: 'Widgets',            icon: '🧩', sub: 'Clock · Notes', color: 'teal' },
+      { id: 'item',    x: 200, y: 840, label: 'FolderItem / ListItem',icon: '🔗', sub: 'Link items', color: 'gray' },
+
+      // Superadmin
+      { id: 'superadmin', x: 640, y: 420, label: 'SuperadminDashboard', icon: '👑', sub: 'Pending · Users', color: 'purple',
+        detail: { desc: 'Dashboard khusus superadmin. Lazy loaded. Kelola pending registrations dan semua user.', tags: ['lazy()', 'pendingRegistrations', 'userManagement'] }},
+
+      // Store
+      { id: 'authstore', x: 640, y: 280, label: 'authStore',        icon: '🔑', sub: 'Zustand · Auth state', color: 'green',
+        detail: { desc: 'Global auth state. profile, users, _usersLoaded flag. Logout optimistic.', tags: ['Zustand', 'profile', 'loadUsers(force?)', 'logout()'] }},
+      { id: 'dashstore', x: 500, y: 280, label: 'dashboardStore',   icon: '📦', sub: 'Zustand · App state', color: 'green',
+        detail: { desc: 'Global dashboard state. personalSections, appearance, editMode, syncStatus. Granular selectors.', tags: ['Zustand', 'Promise.all', 'persistPersonal', 'isSavingMutex'] }},
+    ],
+    edges: [
+      { from: 'browser', to: 'main', label: '' },
+      { from: 'main', to: 'app', label: 'ErrorBoundary' },
+      { from: 'app', to: 'login', label: '!profile' },
+      { from: 'app', to: 'header', label: 'profile' },
+      { from: 'app', to: 'superadmin', label: 'superadmin' },
+      { from: 'login', to: 'register', label: 'daftar' },
+      { from: 'header', to: 'grid', label: '' },
+      { from: 'grid', to: 'section', label: 'personal' },
+      { from: 'grid', to: 'widget', label: 'widget' },
+      { from: 'section', to: 'item', label: '' },
+      { from: 'app', to: 'authstore', label: '' },
+      { from: 'app', to: 'dashstore', label: '' },
+    ],
+  },
+
+  auth: {
+    title: 'Auth Flow',
+    nodes: [
+      { id: 'start',    x: 340, y: 40,  label: 'App dibuka',           icon: '🚀', sub: 'Buka browser / PWA', color: 'gray' },
+      { id: 'theme',    x: 340, y: 140, label: 'Apply tema localStorage', icon: '🎨', sub: 'Instant · Sinkron', color: 'amber' },
+      { id: 'init',     x: 340, y: 240, label: 'authStore.init()',      icon: '🔍', sub: 'getSession() dari Supabase', color: 'blue' },
+      { id: 'nosession',x: 100, y: 360, label: 'Tidak ada session',     icon: '❌', sub: 'Token tidak valid', color: 'red' },
+      { id: 'session',  x: 580, y: 360, label: 'Session valid',         icon: '✅', sub: 'User terautentikasi', color: 'green' },
+      { id: 'loginpage',x: 100, y: 480, label: 'LoginPage',             icon: '🔐', sub: 'Input username + password', color: 'amber' },
+      { id: 'supabase', x: 100, y: 600, label: 'Supabase Auth',         icon: '⚡', sub: 'signInWithPassword()', color: 'blue' },
+      { id: 'failed',   x: 100, y: 720, label: 'Login Gagal',           icon: '⚠️', sub: 'shake animation + error msg', color: 'red' },
+      { id: 'inituser', x: 580, y: 480, label: 'initUser()',            icon: '🔄', sub: 'Promise.all 3 DB calls', color: 'blue',
+        detail: { desc: 'Load 3 data secara PARALLEL:\n1. getUserLayout(userId)\n2. getSharedSections(role)\n3. loadUserAppearance(userId)\n\n~150ms vs ~750ms sequential', tags: ['Promise.all', '~150ms', 'parallel'] }},
+      { id: 'dashboard',x: 580, y: 600, label: 'Dashboard Ready',      icon: '🏠', sub: 'Sections · Shared · Tema', color: 'green' },
+      { id: 'visibility',x: 340, y: 720,label: 'Page Visibility API',   icon: '👁', sub: 'Tab pindah / kembali', color: 'purple' },
+      { id: 'refresh',  x: 340, y: 840, label: 'Refresh Session',       icon: '🔁', sub: 'getSession() → sync dirty', color: 'blue' },
+      { id: 'logout',   x: 580, y: 720, label: 'Logout',                icon: '🚪', sub: 'Optimistic · signOut bg', color: 'gray' },
+    ],
+    edges: [
+      { from: 'start', to: 'theme' },
+      { from: 'theme', to: 'init' },
+      { from: 'init', to: 'nosession', label: 'tidak ada' },
+      { from: 'init', to: 'session', label: 'ada' },
+      { from: 'nosession', to: 'loginpage' },
+      { from: 'loginpage', to: 'supabase', label: 'submit' },
+      { from: 'supabase', to: 'failed', label: 'error' },
+      { from: 'failed', to: 'loginpage', label: 'retry' },
+      { from: 'supabase', to: 'session', label: 'berhasil' },
+      { from: 'session', to: 'inituser' },
+      { from: 'inituser', to: 'dashboard' },
+      { from: 'dashboard', to: 'visibility', label: 'tab keluar' },
+      { from: 'visibility', to: 'refresh', label: 'tab kembali' },
+      { from: 'refresh', to: 'dashboard', label: 'session ok' },
+      { from: 'refresh', to: 'loginpage', label: 'expired' },
+      { from: 'dashboard', to: 'logout', label: 'logout' },
+      { from: 'logout', to: 'loginpage', label: 'clear state' },
+    ],
+  },
+
+  data: {
+    title: 'Data Flow',
+    nodes: [
+      // Client
+      { id: 'user',       x: 40,  y: 300, label: 'User Action',        icon: '👤', sub: 'edit · tambah · hapus', color: 'gray' },
+      { id: 'component',  x: 220, y: 300, label: 'Component',          icon: '⚛️', sub: 'SectionCard · ItemModal', color: 'blue' },
+      { id: 'store',      x: 420, y: 300, label: 'dashboardStore',     icon: '📦', sub: 'Zustand global state', color: 'green',
+        detail: { desc: 'State management dengan granular selectors. localStorage sebagai cache layer.', tags: ['personalSections', 'syncStatus', 'isSavingMutex'] }},
+      { id: 'localstorage',x: 420, y: 460, label: 'localStorage',      icon: '💾', sub: 'Instant · Cache layer', color: 'amber' },
+      { id: 'debounce',   x: 620, y: 300, label: 'Debounce 300ms',     icon: '⏱', sub: 'Item ops · 800ms drag', color: 'purple' },
+      { id: 'mutex',      x: 620, y: 460, label: 'isSavingMutex',      icon: '🔒', sub: 'Cegah concurrent saves', color: 'purple' },
+      { id: 'supabase',   x: 820, y: 300, label: 'Supabase DB',        icon: '⚡', sub: 'user_layouts table', color: 'blue',
+        detail: { desc: 'Data tersimpan di user_layouts (JSONB). Realtime tidak dipakai — polling on-demand.', tags: ['user_layouts', 'profiles', 'shared_sections', 'pending_registrations'] }},
+      { id: 'sync',       x: 820, y: 460, label: 'syncPersonalToDb()', icon: '🔄', sub: 'saveUserLayout()', color: 'green' },
+
+      // Shared
+      { id: 'admin',      x: 40,  y: 100, label: 'Admin',              icon: '👨‍💼', sub: 'Manage shared sections', color: 'purple' },
+      { id: 'shared_db',  x: 820, y: 100, label: 'shared_sections',    icon: '🗄', sub: 'Supabase table', color: 'blue' },
+      { id: 'rls',        x: 620, y: 100, label: 'RLS Policy',         icon: '🛡', sub: 'Row Level Security', color: 'red' },
+
+      // Status
+      { id: 'status',     x: 420, y: 140, label: 'syncStatus',         icon: '📊', sub: 'idle·saving·saved·error', color: 'teal' },
+    ],
+    edges: [
+      { from: 'user', to: 'component', label: 'interact' },
+      { from: 'component', to: 'store', label: 'dispatch' },
+      { from: 'store', to: 'localstorage', label: 'instant' },
+      { from: 'store', to: 'debounce', label: 'trigger' },
+      { from: 'debounce', to: 'mutex', label: 'check' },
+      { from: 'mutex', to: 'sync', label: 'acquire' },
+      { from: 'sync', to: 'supabase', label: 'HTTP' },
+      { from: 'supabase', to: 'status', label: 'result' },
+      { from: 'status', to: 'store', label: 'update' },
+      { from: 'admin', to: 'rls', label: 'write' },
+      { from: 'rls', to: 'shared_db', label: 'allowed' },
+    ],
+  },
+
+  roles: {
+    title: 'Role System',
+    nodes: [
+      // Superadmin
+      { id: 'superadmin', x: 340, y: 40,  label: 'Superadmin',         icon: '👑', sub: 'Dashboard khusus\nPending + User mgmt', color: 'purple',
+        detail: { desc: 'Akses penuh. Dashboard terpisah untuk approve registrasi dan kelola semua user.', tags: ['SuperadminDashboard', 'pendingRegistrations', 'getAllProfiles'] }},
+
+      // Admin Global
+      { id: 'admin_global',x: 340, y: 180, label: 'Admin Global',      icon: '🌐', sub: 'region:global · unit:general\nKelola semua user', color: 'blue',
+        detail: { desc: 'Admin tertinggi. Bisa kelola semua user kecuali sesama admin global. Tidak ada View Filter.', tags: ['canManageUser', 'PanduanFAB', 'no-view-filter'] }},
+
+      // Admin Regional
+      { id: 'admin_region',x: 100, y: 320, label: 'Admin Regional',    icon: '🗺', sub: 'region:tertentu · unit:general\nKelola user+section di region', color: 'teal',
+        detail: { desc: 'Kelola user dan shared section dalam regionnya. Bisa buat shared section untuk region.', tags: ['region_scope', 'canShareSection', 'addSharedSection'] }},
+
+      // Admin Unit
+      { id: 'admin_unit',  x: 340, y: 320, label: 'Admin Unit',        icon: '🏢', sub: 'region:tertentu · unit:tertentu\nKelola user+section di unit', color: 'teal',
+        detail: { desc: 'Kelola user dan shared section dalam unit+region spesifik.', tags: ['unit_scope', 'region_scope', 'canShareSection'] }},
+
+      // User
+      { id: 'user',        x: 580, y: 320, label: 'User',              icon: '👤', sub: 'Section pribadi\nShared yang di-assign', color: 'gray',
+        detail: { desc: 'Akses section pribadi dan shared section yang sesuai scope-nya. Tidak bisa manage user.', tags: ['personalSections', 'sharedSections', 'editMode'] }},
+
+      // Guest
+      { id: 'guest',       x: 580, y: 460, label: 'Guest',             icon: '👻', sub: 'View only\nShared sections', color: 'gray' },
+
+      // Sections
+      { id: 'shared_reg',  x: 100, y: 480, label: 'Shared Section\n(Regional)',  icon: '🌐', sub: 'visibility: region', color: 'blue' },
+      { id: 'shared_unit', x: 340, y: 480, label: 'Shared Section\n(Unit)',      icon: '🏢', sub: 'visibility: unit', color: 'teal' },
+      { id: 'personal',    x: 580, y: 600, label: 'Personal Section',            icon: '📁', sub: 'Hanya pemilik', color: 'amber' },
+
+      // Registration flow
+      { id: 'register',    x: 100, y: 640, label: 'Pendaftaran Baru',  icon: '📝', sub: 'pending_registrations', color: 'amber' },
+      { id: 'approve',     x: 340, y: 640, label: 'Approve/Reject',    icon: '✅', sub: 'Superadmin action', color: 'purple' },
+    ],
+    edges: [
+      { from: 'superadmin', to: 'admin_global', label: 'manage' },
+      { from: 'admin_global', to: 'admin_region', label: 'manage' },
+      { from: 'admin_global', to: 'admin_unit', label: 'manage' },
+      { from: 'admin_global', to: 'user', label: 'manage' },
+      { from: 'admin_region', to: 'user', label: 'manage (same region)' },
+      { from: 'admin_region', to: 'shared_reg', label: 'create/edit' },
+      { from: 'admin_unit', to: 'shared_unit', label: 'create/edit' },
+      { from: 'user', to: 'personal', label: 'own' },
+      { from: 'user', to: 'guest', label: '' },
+      { from: 'shared_reg', to: 'user', label: 'visible to region' },
+      { from: 'shared_unit', to: 'user', label: 'visible to unit' },
+      { from: 'register', to: 'approve', label: 'pending' },
+      { from: 'approve', to: 'user', label: 'approved' },
+    ],
+  },
+}
+
+// ── LEGENDS ────────────────────────────────────────────────────
+const LEGENDS = {
+  app:   [
+    { color: '#BFDBFE', label: 'React Component' },
+    { color: '#BBF7D0', label: 'Zustand Store' },
+    { color: '#D9F99D', label: 'Widget' },
+    { color: '#FEF08A', label: 'Auth Screen' },
+    { color: '#E9D5FF', label: 'Superadmin' },
+  ],
+  auth:  [
+    { color: '#BBF7D0', label: 'Success / Valid' },
+    { color: '#FECACA', label: 'Error / Invalid' },
+    { color: '#BFDBFE', label: 'Process / API call' },
+    { color: '#E9D5FF', label: 'System Event' },
+    { color: '#FEF08A', label: 'UI Screen' },
+  ],
+  data:  [
+    { color: '#BFDBFE', label: 'Component / API' },
+    { color: '#BBF7D0', label: 'State / Store' },
+    { color: '#FEF08A', label: 'Cache (localStorage)' },
+    { color: '#E9D5FF', label: 'Optimization' },
+    { color: '#CCFBF1', label: 'Status / Meta' },
+  ],
+  roles: [
+    { color: '#E9D5FF', label: 'Superadmin' },
+    { color: '#BFDBFE', label: 'Admin Global' },
+    { color: '#CCFBF1', label: 'Admin Region/Unit' },
+    { color: '#F3F4F6', label: 'User / Guest' },
+    { color: '#FEF08A', label: 'Content / Action' },
+  ],
+}
+
+// ── STATE ──────────────────────────────────────────────────────
+let currentView = 'app'
+let scale = 1
+let panX = 40, panY = 40
+let isPanning = false
+let panStart = { x: 0, y: 0 }
+let selectedNode = null
+let dragNode = null
+let dragOffset = { x: 0, y: 0 }
+let nodePositions = {}
+
+// ── RENDER ─────────────────────────────────────────────────────
+function getNodes() {
+  return FLOWS[currentView].nodes.map(n => ({
+    ...n,
+    x: nodePositions[currentView]?.[n.id]?.x ?? n.x,
+    y: nodePositions[currentView]?.[n.id]?.y ?? n.y,
+  }))
+}
+
+function render() {
+  const canvas = document.getElementById('canvas')
+  const svg    = document.getElementById('svg')
+  const wrap   = document.getElementById('canvasWrap')
+  const flow   = FLOWS[currentView]
+  const nodes  = getNodes()
+
+  // Set canvas size
+  const maxX = Math.max(...nodes.map(n => n.x)) + 300
+  const maxY = Math.max(...nodes.map(n => n.y)) + 200
+  canvas.style.width  = maxX + 'px'
+  canvas.style.height = maxY + 'px'
+  canvas.style.transform = `scale(${scale}) translate(${panX/scale}px, ${panY/scale}px)`
+
+  // Clear existing nodes (keep svg)
+  Array.from(canvas.children).forEach(c => {
+    if (c !== svg) c.remove()
+  })
+
+  // Render nodes
+  nodes.forEach(n => {
+    const el = document.createElement('div')
+    el.className = `node ${n.color || ''}`
+    el.id = 'node-' + n.id
+    el.style.left = n.x + 'px'
+    el.style.top  = n.y + 'px'
+    if (selectedNode === n.id) el.classList.add('selected')
+    el.innerHTML = `
+      <span class="node-icon">${n.icon}</span>
+      <div class="node-label">${n.label.replace('\n', '<br>')}</div>
+      ${n.sub ? `<div class="node-sub">${n.sub.replace(/\n/g, '<br>')}</div>` : ''}
+    `
+    el.addEventListener('mousedown', e => startNodeDrag(e, n.id))
+    el.addEventListener('click', e => { e.stopPropagation(); selectNode(n.id) })
+    canvas.appendChild(el)
+  })
+
+  // Render edges after nodes (so we can get positions)
+  requestAnimationFrame(renderEdges)
+
+  // Render legend
+  renderLegend()
+}
+
+function renderEdges() {
+  const svg   = document.getElementById('svg')
+  const nodes = getNodes()
+  const flow  = FLOWS[currentView]
+
+  // Size SVG
+  const canvas = document.getElementById('canvas')
+  svg.setAttribute('width',  canvas.style.width)
+  svg.setAttribute('height', canvas.style.height)
+
+  svg.innerHTML = `<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+      markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#C4C4C0" />
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5"
+      markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#93C5FD" />
+    </marker>
+  </defs>`
+
+  flow.edges.forEach(edge => {
+    const fromNode = nodes.find(n => n.id === edge.from)
+    const toNode   = nodes.find(n => n.id === edge.to)
+    if (!fromNode || !toNode) return
+
+    const fromEl = document.getElementById('node-' + edge.from)
+    const toEl   = document.getElementById('node-' + edge.to)
+    if (!fromEl || !toEl) return
+
+    const fw = fromEl.offsetWidth  || 180
+    const fh = fromEl.offsetHeight || 80
+    const tw = toEl.offsetWidth    || 180
+    const th = toEl.offsetHeight   || 80
+
+    const x1 = fromNode.x + fw / 2
+    const y1 = fromNode.y + fh / 2
+    const x2 = toNode.x   + tw / 2
+    const y2 = toNode.y   + th / 2
+
+    // Calculate edge points (from border, not center)
+    const dx = x2 - x1, dy = y2 - y1
+    const angle = Math.atan2(dy, dx)
+    const sx = x1 + Math.cos(angle) * fw/2
+    const sy = y1 + Math.sin(angle) * fh/2
+    const ex = x2 - Math.cos(angle) * (tw/2 + 8)
+    const ey = y2 - Math.sin(angle) * (th/2 + 8)
+
+    // Bezier curve
+    const mx = (sx + ex) / 2
+    const my = (sy + ey) / 2
+    const bx = mx - dy * 0.15
+    const by = my + dx * 0.15
+
+    const isHighlighted = selectedNode === edge.from || selectedNode === edge.to
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    path.setAttribute('d', `M ${sx} ${sy} Q ${bx} ${by} ${ex} ${ey}`)
+    path.setAttribute('fill', 'none')
+    path.setAttribute('stroke', isHighlighted ? '#93C5FD' : '#D0CFC9')
+    path.setAttribute('stroke-width', isHighlighted ? '2' : '1.5')
+    path.setAttribute('marker-end', isHighlighted ? 'url(#arrow-blue)' : 'url(#arrow)')
+    path.setAttribute('stroke-dasharray', '0')
+    svg.appendChild(path)
+
+    if (edge.label) {
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+      text.setAttribute('x', bx)
+      text.setAttribute('y', by - 6)
+      text.setAttribute('text-anchor', 'middle')
+      text.setAttribute('class', 'conn-label')
+      text.textContent = edge.label
+      svg.appendChild(text)
+    }
+  })
+}
+
+function renderLegend() {
+  const legend = document.getElementById('legend')
+  const items  = LEGENDS[currentView] || []
+  legend.innerHTML = `<div class="legend-title">Legend</div>` +
+    items.map(i => `
+      <div class="legend-item">
+        <div class="legend-dot" style="background:${i.color};border:1px solid rgba(0,0,0,0.08)"></div>
+        <span>${i.label}</span>
+      </div>
+    `).join('')
+}
+
+// ── NODE INTERACTIONS ──────────────────────────────────────────
+function selectNode(id) {
+  const nodes = getNodes()
+  const node  = nodes.find(n => n.id === id)
+  selectedNode = (selectedNode === id) ? null : id
+  render()
+  if (selectedNode && node?.detail) {
+    openSidebar(node)
+  } else {
+    closeSidebar()
+  }
+}
+
+function openSidebar(node) {
+  const sb      = document.getElementById('sidebar')
+  const content = document.getElementById('sidebar-content')
+  sb.classList.add('open')
+  content.innerHTML = `
+    <h3>${node.icon} ${node.label.replace('<br>', ' ')}</h3>
+    <div class="meta">${node.sub || ''}</div>
+    ${node.detail?.desc ? `
+      <div class="field">
+        <label>Deskripsi</label>
+        <p>${node.detail.desc.replace(/\n/g, '<br>')}</p>
+      </div>` : ''}
+    ${node.detail?.tags?.length ? `
+      <div class="field">
+        <label>Tags / Dependencies</label>
+        <div>${node.detail.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+      </div>` : ''}
+  `
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open')
+  selectedNode = null
+  renderEdges()
+}
+
+// ── NODE DRAG ──────────────────────────────────────────────────
+function startNodeDrag(e, id) {
+  if (e.button !== 0) return
+  e.stopPropagation()
+  const nodes = getNodes()
+  const node  = nodes.find(n => n.id === id)
+  dragNode   = id
+  dragOffset = {
+    x: e.clientX / scale - node.x - panX/scale,
+    y: e.clientY / scale - node.y - panY/scale,
+  }
+  document.getElementById('node-' + id)?.classList.add('dragging')
+}
+
+document.addEventListener('mousemove', e => {
+  if (dragNode) {
+    const x = e.clientX / scale - dragOffset.x - panX/scale
+    const y = e.clientY / scale - dragOffset.y - panY/scale
+    if (!nodePositions[currentView]) nodePositions[currentView] = {}
+    nodePositions[currentView][dragNode] = { x: Math.max(0, x), y: Math.max(0, y) }
+    const el = document.getElementById('node-' + dragNode)
+    if (el) {
+      el.style.left = Math.max(0, x) + 'px'
+      el.style.top  = Math.max(0, y) + 'px'
+    }
+    requestAnimationFrame(renderEdges)
+  }
+})
+
+document.addEventListener('mouseup', e => {
+  if (dragNode) {
+    document.getElementById('node-' + dragNode)?.classList.remove('dragging')
+    dragNode = null
+  }
+  if (isPanning) isPanning = false
+})
+
+// ── PAN ────────────────────────────────────────────────────────
+const wrap = document.getElementById('canvasWrap')
+wrap.addEventListener('mousedown', e => {
+  if (e.button !== 0 || dragNode) return
+  isPanning  = true
+  panStart   = { x: e.clientX - panX, y: e.clientY - panY }
+})
+wrap.addEventListener('mousemove', e => {
+  if (!isPanning) return
+  panX = e.clientX - panStart.x
+  panY = e.clientY - panStart.y
+  document.getElementById('canvas').style.transform =
+    `scale(${scale}) translate(${panX/scale}px, ${panY/scale}px)`
+  requestAnimationFrame(renderEdges)
+})
+
+// ── ZOOM ────────────────────────────────────────────────────────
+wrap.addEventListener('wheel', e => {
+  e.preventDefault()
+  const delta = e.deltaY > 0 ? 0.9 : 1.1
+  zoom(delta)
+}, { passive: false })
+
+function zoom(factor) {
+  scale = Math.min(Math.max(scale * factor, 0.3), 3)
+  document.getElementById('canvas').style.transform =
+    `scale(${scale}) translate(${panX/scale}px, ${panY/scale}px)`
+  requestAnimationFrame(renderEdges)
+}
+
+function resetZoom() {
+  scale = 1; panX = 40; panY = 40
+  document.getElementById('canvas').style.transform =
+    `scale(1) translate(40px, 40px)`
+  requestAnimationFrame(renderEdges)
+}
+
+// ── VIEW SWITCHER ──────────────────────────────────────────────
+function showView(view) {
+  currentView  = view
+  selectedNode = null
+  document.getElementById('sidebar').classList.remove('open')
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('active', b.textContent.toLowerCase().includes(view) ||
+      (view === 'app' && b.textContent === 'App Flow') ||
+      (view === 'auth' && b.textContent === 'Auth Flow') ||
+      (view === 'data' && b.textContent === 'Data Flow') ||
+      (view === 'roles' && b.textContent === 'Role System'))
+  )
+  resetZoom()
+  render()
+}
+
+// Click canvas to deselect
+document.getElementById('canvas').addEventListener('click', e => {
+  if (e.target === document.getElementById('canvas') ||
+      e.target === document.getElementById('svg')) {
+    selectedNode = null
+    closeSidebar()
+    renderEdges()
+  }
+})
+
+// ── INIT ──────────────────────────────────────────────────────
+render()
+</script>
+</body>
+</html>

@@ -30,7 +30,7 @@ export default function ClockWidget() {
         fontFamily: 'var(--mono)',
         fontSize: 'clamp(24px, 5vw, 48px)',
         fontWeight: 700,
-        color: 'var(--mint)',
+        color: 'var(--accent)',
         letterSpacing: '-1px',
         lineHeight: 1,
         display: 'flex',
@@ -62,7 +62,7 @@ export default function ClockWidget() {
           cursor: 'pointer', fontFamily: 'var(--mono)',
           transition: 'all .15s',
         }}
-        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--mint)')}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border2)')}
       >
         {is24h ? '24H' : '12H'}

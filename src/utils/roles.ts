@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // CENTRALIZED RBAC — Hierarchical Region+Unit Scope
 // ─────────────────────────────────────────────────────────────
-import { hasPermission, PERMISSIONS, REGIONS, UNITS } from '../types'
+import { hasPermission, REGIONS, UNITS } from '../types'
 import type { Role, RegionScope, UnitScope, Permission } from '../types'
 
 export { hasPermission }
@@ -172,7 +172,7 @@ export const UNIT_LABELS: Record<string, string> = {
   general: 'General', pro: 'PRO', cro: 'CRO', klaim: 'Klaim', ae: 'AE', '': 'User',
 }
 export const UNIT_BADGE_COLOR: Record<string, string> = {
-  general: '#888', pro: '#00FFC2', cro: '#FFD93D', klaim: '#FF8C42', ae: '#A78BFA', '': '#888',
+  general: '#888', pro: 'var(--accent)', cro: '#FFD93D', klaim: '#FF8C42', ae: '#A78BFA', '': '#888',
 }
 export const REGION_LABELS: Record<string, string> = {
   global: 'Global', sby: 'Surabaya', mks: 'Makassar', jkt: 'Jakarta',

@@ -20,5 +20,21 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "categories": [
+    "productivity",
+    "business"
+  ],
+  "dir": "ltr",
+  "lang": "id-ID",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Home",
+      "url": "/",
+      "description": "Buka dashboard utama"
+    }
   ]
 }

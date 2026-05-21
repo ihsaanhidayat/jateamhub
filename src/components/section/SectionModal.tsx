@@ -8,7 +8,7 @@ import Modal from '../ui/Modal'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import type { Section } from '../../types'
-import { REGIONS, UNITS } from '../../types'
+import { UNITS } from '../../types'
 
 interface Props {
   open:    boolean

@@ -23,7 +23,7 @@ export default function CoffeeModal({ onClose }: Props) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 9000,
+      position: 'fixed', inset: 0, zIndex: 9000 /* overlay */,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)',
       padding: 20, animation: 'fadeIn 0.2s ease',

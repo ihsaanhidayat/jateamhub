@@ -1,106 +1,27 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { useStore } from '../../store/dashboardStore'
-import { canManageUser, canAssignRole, getAllowedRegions, getAllowedUnits, getAllowedRoles, getDisplayBadge, REGION_LABELS, UNIT_LABELS } from '../../utils/roles'
-import { REGIONS, UNITS } from '../../types'
-import { updateProfile } from '../../utils/supabaseClient'
+import { REGION_LABELS, UNIT_LABELS, canManageUser, getDisplayBadge } from '../../utils/roles'
 import type { Role } from '../../types'
+import { UNITS } from '../../types'
+import { updateProfile } from '../../utils/supabaseClient'
 import type { Profile } from '../../utils/supabaseClient'
+import { useUserManagement, EMOJI_PRESETS } from '../../hooks/useUserManagement'
 
 interface Props { onClose: () => void }
 
-const EMOJI_PRESETS = ['','🌸','🔥','⭐','🎯','💎','🚀','🌊','🦁','🐯','🌺','🎨','💡','🍀','🎭','🏆','🦋','🌙','☀️','🍉']
-
 export default function ProfilePage({ onClose }: Props) {
-  const { profile, users, loadUsers, addUser, updateUser, removeUser } = useAuthStore()
-  const { toast } = useStore()
+  const { profile } = useAuthStore()
+  const { toast }   = useStore()
 
-  const isSuperAdmin = profile?.role === 'superadmin'
-  const isAdminLevel = profile?.role === 'admin' || isSuperAdmin
-  const canManage    = isAdminLevel
+  const um = useUserManagement()
+  const { canManage, isSuperAdmin } = um
 
-  // tab state di-handle oleh tabState di bawah
-
-  // Users state
-  const [search,      setSearch]      = useState('')
-  const [filterRegion,setFilterRegion]= useState('')
-  const [filterUnit,  setFilterUnit]  = useState('')
-  const [filterRole,  setFilterRole]  = useState('')
-  const [page,        setPage]        = useState(0)
-  const [editTarget,  setEditTarget]  = useState<Profile | null>(null)
-  const [editRole,    setEditRole]    = useState<Role>('user')
-  const [editUnit,    setEditUnit]    = useState('')
-  const [editRegion,  setEditRegion]  = useState('global')
-  const [editUnitScope,setEditUnitScope]=useState('general')
-  const [editPass,    setEditPass]    = useState('')
-  const [editEmoji,   setEditEmoji]   = useState('')
-  const [addMode,     setAddMode]     = useState(false)
-  const [newUser,     setNewUser]     = useState('')
-  const [newUPass,    setNewUPass]    = useState('')
-  const [newRole,     setNewRole]     = useState<Role>('user')
-  const [newRegion,   setNewRegion]   = useState('global')
-  const [newUnitScope,setNewUnitScope]= useState('general')
-  const [newUnitId,   setNewUnitId]   = useState('')
-  const [err, setErr] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  // Settings state
+  // Settings state (hanya di superadmin tab)
   const [siteTitle,    setSiteTitle]    = useState('')
   const [siteSubtitle, setSiteSubtitle] = useState('')
   const [coffeeUrl,    setCoffeeUrl]    = useState('')
   const [logoUrl,      setLogoUrl]      = useState('')
-
-  const PER_PAGE = 50
-
-  useEffect(() => { if (canManage) loadUsers() }, [])
-
-  const allowedRegions = getAllowedRegions(profile as any)
-  const allowedUnits   = getAllowedUnits(profile as any)
-  const allowedRoles   = getAllowedRoles(profile as any)
-
-  const filteredUsers = users.filter(u => {
-    const matchSearch = !search || u.username.toLowerCase().includes(search.toLowerCase()) ||
-      (u.full_name ?? '').toLowerCase().includes(search.toLowerCase())
-    const matchRegion = !filterRegion || (u.region_scope ?? 'global') === filterRegion
-    const matchUnit   = !filterUnit   || (u.unit_scope ?? 'general') === filterUnit
-    const matchRole   = !filterRole   || u.role === filterRole
-    return matchSearch && matchRegion && matchUnit && matchRole
-  })
-  const pagedUsers = filteredUsers.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
-  const totalPages = Math.ceil(filteredUsers.length / PER_PAGE)
-
-  const getBadge = (u: Profile) => getDisplayBadge(u as any)
-
-  const openEdit = (u: Profile) => {
-    setEditTarget(u); setEditRole(u.role as Role)
-    setEditUnit(u.unit_id ?? ''); setEditRegion(u.region_scope ?? 'global')
-    setEditUnitScope(u.unit_scope ?? 'general')
-    setEditPass(''); setEditEmoji(u.emoji ?? u.avatar_emoji ?? ''); setErr('')
-    setAddMode(false)
-  }
-
-  const handleSaveUser = async () => {
-    if (!editTarget) return
-    setErr(''); setSaving(true)
-    const error = await updateUser(
-      editTarget.id, editRole, editUnit,
-      editPass || undefined, editEmoji,
-      editRegion, editUnitScope,
-    )
-    setSaving(false)
-    if (error) { setErr(error); return }
-    toast('User diperbarui.', 'success'); setEditTarget(null); loadUsers()
-  }
-
-  const handleAddUser = async () => {
-    setErr(''); setSaving(true)
-    const error = await addUser(newUser.trim(), newUPass, newRole, newUnitId, newRegion, newUnitScope)
-    setSaving(false)
-    if (error) { setErr(error); return }
-    toast(`"${newUser}" ditambahkan.`, 'success')
-    setNewUser(''); setNewUPass(''); setNewRole('user'); setNewRegion('global'); setNewUnitScope('general'); setNewUnitId('')
-    setAddMode(false); loadUsers()
-  }
 
   const handleSaveSettings = async () => {
     // Simpan settings ke dashboard_config di Supabase
@@ -118,7 +39,7 @@ export default function ProfilePage({ onClose }: Props) {
 
   const TABS = [
     { id: 'profile', label: '👤 Profil Saya' },
-    ...(canManage ? [{ id: 'users', label: `👥 User Management (${users.length})` }] : []),
+    ...(canManage ? [{ id: 'users', label: `👥 User Management (${um.users.length})` }] : []),
     ...(isSuperAdmin ? [{ id: 'settings', label: '⚙️ Settings' }] : []),
   ] as const
 
@@ -132,15 +53,22 @@ export default function ProfilePage({ onClose }: Props) {
   const handleSaveName = async () => {
     if (!profile || !nameValue.trim()) return
     setNameSaving(true)
-    // Update initials otomatis
-    const parts = nameValue.trim().split(' ').filter(Boolean)
-    const initials = parts.length >= 2
-      ? (parts[0][0] + parts[1][0]).toUpperCase()
-      : nameValue.slice(0, 2).toUpperCase()
-    await updateProfile(profile.id, { full_name: nameValue.trim(), initials } as any)
-    setNameSaving(false)
-    setEditingName(false)
-    toast('Nama berhasil diperbarui.', 'success')
+    try {
+      const parts    = nameValue.trim().split(' ').filter(Boolean)
+      const initials = parts.length >= 2
+        ? (parts[0][0] + parts[1][0]).toUpperCase()
+        : nameValue.slice(0, 2).toUpperCase()
+      await updateProfile(profile.id, { full_name: nameValue.trim(), initials } as any)
+      useAuthStore.setState(s => ({
+        profile: s.profile ? { ...s.profile, full_name: nameValue.trim() } : s.profile
+      }))
+      setEditingName(false)
+      toast('Nama berhasil diperbarui.', 'success')
+    } catch {
+      toast('Gagal menyimpan nama. Coba lagi.', 'error')
+    } finally {
+      setNameSaving(false)
+    }
   }
 
   const badge = profile ? getDisplayBadge(profile as any) : null
@@ -158,7 +86,7 @@ export default function ProfilePage({ onClose }: Props) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 9000,
+      position: 'fixed', inset: 0, zIndex: 9000 /* overlay */,
       background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--sp-4)',
     }} onClick={onClose}>
@@ -222,7 +150,7 @@ export default function ProfilePage({ onClose }: Props) {
                     fontSize: 22, color: 'var(--accent)',
                   }}>
                     {profile?.avatar_url
-                      ? <img src={profile.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ? <img src={profile.avatar_url} alt={profile.full_name || profile.username || 'Avatar'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : ((profile?.full_name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') ?? profile?.username?.slice(0,2) ?? '?').toUpperCase())
                     }
                   </div>
@@ -312,7 +240,7 @@ export default function ProfilePage({ onClose }: Props) {
                     <span style={{ fontSize: 14, color: 'var(--silver)', fontWeight: 500 }}>@{profile?.username}</span>
                     {badge && (
                       <span style={{
-                        fontSize: 9, fontWeight: 800, padding: '2px 8px', borderRadius: 99,
+                        fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99,
                         background: badge.color, color: '#0A0A0A',
                         fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.5px',
                       }}>{badge.label}</span>
@@ -367,49 +295,49 @@ export default function ProfilePage({ onClose }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {/* Filters */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }} placeholder="🔍 Cari username / nama..."
+                <input value={um.search} onChange={e => { um.setSearch(e.target.value); um.setPage(0) }} placeholder="🔍 Cari username / nama..."
                   style={{ ...inputStyle, flex: 1, minWidth: 140 }} />
-                <select value={filterRegion} onChange={e => { setFilterRegion(e.target.value); setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
+                <select value={um.filterRegion} onChange={e => { um.setFilterRegion(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Wilayah</option>
-                  {allowedRegions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  {um.allowedRegions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
-                <select value={filterUnit} onChange={e => { setFilterUnit(e.target.value); setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
+                <select value={um.filterUnit} onChange={e => { um.setFilterUnit(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Unit</option>
                   {(UNITS as readonly {label: string; value: string}[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                 </select>
-                <select value={filterRole} onChange={e => { setFilterRole(e.target.value); setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
+                <select value={um.filterRole} onChange={e => { um.setFilterRole(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Role</option>
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
                   {isSuperAdmin && <option value="superadmin">Superadmin</option>}
                 </select>
-                <button onClick={() => { setAddMode(true); setEditTarget(null); setErr('') }} style={{
+                <button onClick={() => { um.openAdd() }} style={{
                   padding: '7px 14px', background: 'var(--mint-bg)', border: '1px solid var(--accent-glow)',
                   borderRadius: 6, color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap',
                 }}>＋ Tambah</button>
               </div>
 
               <div style={{ fontSize: 11, color: 'var(--silver3)' }}>
-                {filteredUsers.length} dari {users.length} user
-                {totalPages > 1 && ` · Hal. ${page + 1}/${totalPages}`}
+                {um.filteredUsers.length} dari {um.users.length} user
+                {um.totalPages > 1 && ` · Hal. ${um.page + 1}/${um.totalPages}`}
               </div>
 
               {/* Add / Edit form */}
-              {(addMode || editTarget) && (
+              {(um.addMode || um.editTarget) && (
                 <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: 16 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 14 }}>
-                    {addMode ? '＋ Tambah User Baru' : `✏️ Edit: ${editTarget?.username}${editEmoji ? ' ' + editEmoji : ''}`}
+                    {um.addMode ? '＋ Tambah User Baru' : `✏️ Edit: ${um.editTarget?.username}${um.editEmoji ? ' ' + um.editEmoji : ''}`}
                   </div>
 
-                  {addMode && (
+                  {um.addMode && (
                     <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                       <div style={{ flex: 1 }}>
                         <label style={labelStyle}>Username</label>
-                        <input value={newUser} onChange={e => setNewUser(e.target.value)} placeholder="username" style={inputStyle} />
+                        <input value={um.newUser} onChange={e => um.setNewUser(e.target.value)} placeholder="username" style={inputStyle} />
                       </div>
                       <div style={{ flex: 1 }}>
                         <label style={labelStyle}>Password</label>
-                        <input type="password" value={newUPass} onChange={e => setNewUPass(e.target.value)} placeholder="min. 6 karakter" style={inputStyle} />
+                        <input type="password" value={um.newUPass} onChange={e => um.setNewUPass(e.target.value)} placeholder="min. 6 karakter" style={inputStyle} />
                       </div>
                     </div>
                   )}
@@ -417,51 +345,51 @@ export default function ProfilePage({ onClose }: Props) {
                   <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: 100 }}>
                       <label style={labelStyle}>Role</label>
-                      <select value={addMode ? newRole : editRole}
-                        onChange={e => addMode ? setNewRole(e.target.value as Role) : setEditRole(e.target.value as Role)}
-                        disabled={!addMode && (editTarget?.role === 'superadmin' || editTarget?.id === profile?.id)}
+                      <select value={um.addMode ? um.newRole : um.editRole}
+                        onChange={e => um.addMode ? um.setNewRole(e.target.value as Role) : um.setEditRole(e.target.value as Role)}
+                        disabled={!um.addMode && (um.editTarget?.role === 'superadmin' || um.editTarget?.id === profile?.id)}
                         style={selectStyle}>
-                        {allowedRoles.map(r => <option key={r} value={r}>{r}</option>)}
-                        {!addMode && editTarget?.role === 'superadmin' && <option value="superadmin">superadmin</option>}
+                        {um.allowedRoles.map(r => <option key={r} value={r}>{r}</option>)}
+                        {!um.addMode && um.editTarget?.role === 'superadmin' && <option value="superadmin">superadmin</option>}
                       </select>
                     </div>
                     <div style={{ flex: 1, minWidth: 100 }}>
                       <label style={labelStyle}>Wilayah</label>
-                      <select value={addMode ? newRegion : editRegion}
-                        onChange={e => addMode ? setNewRegion(e.target.value) : setEditRegion(e.target.value)}
+                      <select value={um.addMode ? um.newRegion : um.editRegion}
+                        onChange={e => um.addMode ? um.setNewRegion(e.target.value) : um.setEditRegion(e.target.value)}
                         style={selectStyle}>
-                        {allowedRegions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                        {um.allowedRegions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
                     <div style={{ flex: 1, minWidth: 100 }}>
                       <label style={labelStyle}>Unit</label>
-                      <select value={addMode ? newUnitScope : editUnitScope}
-                        onChange={e => { if (addMode) { setNewUnitScope(e.target.value); setNewUnitId(e.target.value) } else { setEditUnitScope(e.target.value); setEditUnit(e.target.value) } }}
+                      <select value={um.addMode ? um.newUnitScope : um.editUnitScope}
+                        onChange={e => { if (um.addMode) { um.setNewUnitScope(e.target.value); um.setNewUnitId(e.target.value) } else { um.setEditUnitScope(e.target.value); um.setEditUnit(e.target.value) } }}
                         style={selectStyle}>
-                        {allowedUnits.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                        {um.allowedUnits.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                       </select>
                     </div>
                   </div>
 
                   {/* Reset password — hanya saat edit */}
-                  {!addMode && profile?.role === 'admin' || profile?.role === 'superadmin' && (
+                  {!um.addMode && profile?.role === 'admin' || profile?.role === 'superadmin' && (
                     <div style={{ marginBottom: 10 }}>
                       <label style={labelStyle}>Reset Password (kosong = tidak berubah)</label>
-                      <input type="password" value={editPass} onChange={e => setEditPass(e.target.value)} placeholder="Password baru min. 6 karakter" style={inputStyle} />
+                      <input type="password" value={um.editPass} onChange={e => um.setEditPass(e.target.value)} placeholder="Password baru min. 6 karakter" style={inputStyle} />
                     </div>
                   )}
 
                   {/* Emoji — admin ke atas saja */}
-                  {!addMode && (profile?.role === 'superadmin' || profile?.role === 'admin') && (
+                  {!um.addMode && (profile?.role === 'superadmin' || profile?.role === 'admin') && (
                     <div style={{ marginBottom: 10 }}>
                       <label style={labelStyle}>Emoji (tampil di samping nama)</label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
                         {EMOJI_PRESETS.map(e => (
-                          <div key={e} onClick={() => setEditEmoji(e)} style={{
+                          <div key={e} onClick={() => um.setEditEmoji(e)} style={{
                             width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: e ? 14 : 9, cursor: 'pointer', borderRadius: 5,
-                            border: `1px solid ${editEmoji === e ? 'var(--accent)' : 'var(--border2)'}`,
-                            background: editEmoji === e ? 'var(--mint-bg2)' : 'var(--bg4)',
+                            border: `1px solid ${um.editEmoji === e ? 'var(--accent)' : 'var(--border2)'}`,
+                            background: um.editEmoji === e ? 'var(--mint-bg2)' : 'var(--bg4)',
                             transition: 'all .12s', color: e ? 'inherit' : 'var(--silver3)',
                           }}>{e || '✕'}</div>
                         ))}
@@ -469,13 +397,13 @@ export default function ProfilePage({ onClose }: Props) {
                     </div>
                   )}
 
-                  {err && <div style={{ color: 'var(--red)', fontSize: 12, marginBottom: 8 }}>{err}</div>}
+                  {um.err && <div style={{ color: 'var(--red)', fontSize: 12, marginBottom: 8 }}>{um.err}</div>}
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => { setAddMode(false); setEditTarget(null); setErr('') }}
+                    <button onClick={() => { um.setAddMode(false); um.setErr('') }}
                       style={{ flex: 1, padding: '8px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12 }}>Batal</button>
-                    <button onClick={addMode ? handleAddUser : handleSaveUser} disabled={saving}
+                    <button onClick={um.addMode ? um.handleAddUser : um.handleSaveUser} disabled={um.saving}
                       style={{ flex: 2, padding: '8px', background: 'var(--mint-bg)', border: '1px solid var(--accent)', borderRadius: 6, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700 }}>
-                      {saving ? 'Menyimpan...' : 'Simpan'}
+                      {um.saving ? 'Menyimpan...' : 'Simpan'}
                     </button>
                   </div>
                 </div>
@@ -483,8 +411,8 @@ export default function ProfilePage({ onClose }: Props) {
 
               {/* User list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {pagedUsers.map(u => {
-                  const b       = getBadge(u)
+                {um.pagedUsers.map(u => {
+                  const b       = um.getBadge(u)
                   const isMe    = u.id === profile?.id
                   // Pastikan field scope tersedia untuk permission check
                   const currentUser = { ...profile, region_scope: (profile as any).region_scope ?? 'global', unit_scope: (profile as any).unit_scope ?? 'general' }
@@ -512,23 +440,21 @@ export default function ProfilePage({ onClose }: Props) {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 6px', borderRadius: 8, background: b.color, color: '#0A0A0A', textTransform: 'uppercase', fontFamily: 'var(--mono)' }}>{b.label}</span>
-                          {region && region !== 'Global' && <span style={{ fontSize: 9, color: 'var(--silver3)', fontFamily: 'var(--mono)' }}>{region}</span>}
-                          {unit && unit !== 'General' && <span style={{ fontSize: 9, color: 'var(--silver3)', fontFamily: 'var(--mono)' }}>· {unit}</span>}
+                          {region && region !== 'Global' && <span style={{ fontSize: 10, color: 'var(--silver3)', fontFamily: 'var(--mono)' }}>{region}</span>}
+                          {unit && unit !== 'General' && <span style={{ fontSize: 10, color: 'var(--silver3)', fontFamily: 'var(--mono)' }}>· {unit}</span>}
                         </div>
                       </div>
 
                       {/* Actions */}
                       {canEdit_ && (
-                        <button onClick={() => openEdit(u)}
+                        <button onClick={() => um.openEdit(u)}
                           style={{ background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 5, color: 'var(--silver3)', padding: '4px 9px', fontSize: 11, cursor: 'pointer' }}
                           onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
                           onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border2)')}>Edit</button>
                       )}
                       {canEdit_ && u.role !== 'superadmin' && !isMe && (
                         <button onClick={async () => {
-                          const err = await removeUser(u.id)
-                          if (err) toast(err, 'error')
-                          else { toast(`"${u.username}" dihapus.`, 'success'); loadUsers() }
+                          um.handleDeleteUser(u.id, u.username)
                         }} style={{ background: 'none', border: 'none', color: 'var(--silver3)', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}
                           onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
                           onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>🗑</button>
@@ -539,16 +465,16 @@ export default function ProfilePage({ onClose }: Props) {
               </div>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {um.totalPages > 1 && (
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 5, marginTop: 8 }}>
-                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                    style={{ padding: '5px 12px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 5, color: page === 0 ? 'var(--silver3)' : 'var(--silver)', cursor: page === 0 ? 'not-allowed' : 'pointer', fontSize: 12 }}>← Prev</button>
-                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                    const p = totalPages <= 7 ? i : Math.max(0, Math.min(page - 3, totalPages - 7)) + i
-                    return <button key={p} onClick={() => setPage(p)} style={{ padding: '5px 10px', background: p === page ? 'var(--mint-bg2)' : 'var(--bg3)', border: `1px solid ${p === page ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 5, color: p === page ? 'var(--accent)' : 'var(--silver)', cursor: 'pointer', fontSize: 12 }}>{p + 1}</button>
+                  <button onClick={() => um.setPage(p => Math.max(0, p - 1))} disabled={um.page === 0}
+                    style={{ padding: '5px 12px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 5, color: um.page === 0 ? 'var(--silver3)' : 'var(--silver)', cursor: um.page === 0 ? 'not-allowed' : 'pointer', fontSize: 12 }}>← Prev</button>
+                  {Array.from({ length: Math.min(um.totalPages, 7) }, (_, i) => {
+                    const p = um.totalPages <= 7 ? i : Math.max(0, Math.min(um.page - 3, um.totalPages - 7)) + i
+                    return <button key={p} onClick={() => um.setPage(p)} style={{ padding: '5px 10px', background: p === um.page ? 'var(--mint-bg2)' : 'var(--bg3)', border: `1px solid ${p === um.page ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 5, color: p === um.page ? 'var(--accent)' : 'var(--silver)', cursor: 'pointer', fontSize: 12 }}>{p + 1}</button>
                   })}
-                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-                    style={{ padding: '5px 12px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 5, color: page >= totalPages - 1 ? 'var(--silver3)' : 'var(--silver)', cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer', fontSize: 12 }}>Next →</button>
+                  <button onClick={() => um.setPage(p => Math.min(um.totalPages - 1, p + 1))} disabled={um.page >= um.totalPages - 1}
+                    style={{ padding: '5px 12px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 5, color: um.page >= um.totalPages - 1 ? 'var(--silver3)' : 'var(--silver)', cursor: um.page >= um.totalPages - 1 ? 'not-allowed' : 'pointer', fontSize: 12 }}>Next →</button>
                 </div>
               )}
             </div>

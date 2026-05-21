@@ -81,7 +81,7 @@ export default function RegisterPage({ onBack }: Props) {
       <div style={{
         background: 'var(--card-bg)', border: '1px solid var(--border2)',
         borderRadius: 16, padding: '40px 32px', maxWidth: 400, width: '100%', textAlign: 'center',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+        boxShadow: 'var(--shadow-lg)',
       }}>
         <div style={{ fontSize: 48, marginBottom: 20 }}>✅</div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>
@@ -92,8 +92,8 @@ export default function RegisterPage({ onBack }: Props) {
           Kamu akan dihubungi via WhatsApp setelah akun diaktifkan.
         </p>
         <button onClick={onBack} style={{
-          width: '100%', padding: '12px', background: 'rgba(110,231,183,0.1)',
-          border: '1px solid rgba(110,231,183,0.3)', borderRadius: 8,
+          width: '100%', padding: '12px', background: 'var(--mint-bg)',
+          border: '1px solid var(--accent)', borderRadius: 8,
           color: 'var(--accent)', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
         }}>Kembali ke Login</button>
       </div>
@@ -108,10 +108,10 @@ export default function RegisterPage({ onBack }: Props) {
     }}>
       <div style={{
         background: 'var(--card-bg)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        border: '1px solid var(--border2)',
         borderRadius: 16, padding: '36px 32px',
         maxWidth: 480, width: '100%',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+        boxShadow: 'var(--shadow-lg)',
       }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
@@ -208,7 +208,7 @@ export default function RegisterPage({ onBack }: Props) {
         {/* Back */}
         <button onClick={onBack} style={{
           width: '100%', marginTop: 10, padding: '11px',
-          background: 'none', border: '1px solid rgba(255,255,255,0.08)',
+          background: 'none', border: '1px solid var(--border2)',
           borderRadius: 8, color: 'var(--silver3)', fontSize: 13, cursor: 'pointer',
           fontFamily: 'var(--font)',
         }}>← Kembali ke Login</button>

@@ -23,7 +23,7 @@ export default function Modal({ open, title, onClose, children, footer }: Props)
       <div className="modal">
         <div className="modal-header">
           <h3>{title}</h3>
-          <button className="close-btn" onClick={onClose}>×</button>
+          <button className="close-btn" onClick={onClose} aria-label="Tutup modal">×</button>
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
