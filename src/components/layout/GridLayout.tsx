@@ -365,12 +365,15 @@ export default function GridLayout({ onAddSection }: Props) {
     if (pullY >= PULL_THRESHOLD) {
       setIsRefreshing(true)
       setPullY(PULL_THRESHOLD)
+      // Safety timeout — jika 5 detik tidak selesai, paksa reset
+      const safety = setTimeout(() => { setIsRefreshing(false); setPullY(0) }, 5000)
       try {
-        // Sync ke DB dulu
         await useStore.getState().syncPersonalToDbNow()
-        // Reload shared sections
-        await useStore.getState().loadSharedSections()
-      } finally {
+        if (useStore.getState().loadSharedSections) {
+          await useStore.getState().loadSharedSections()
+        }
+      } catch {} finally {
+        clearTimeout(safety)
         setIsRefreshing(false)
         setPullY(0)
       }

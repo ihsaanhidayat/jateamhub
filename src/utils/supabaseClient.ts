@@ -165,26 +165,29 @@ export const saveUserLayout = async (
 ): Promise<boolean> => {
   for (let i = 0; i <= retries; i++) {
     try {
-      const { error } = await supabase.from('user_layouts').upsert({
-        user_id:    userId,
-        sections,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' })
+      // Timeout 8 detik — jika lebih lama, anggap gagal dan retry
+      const result = await Promise.race([
+        supabase.from('user_layouts').upsert({
+          user_id:    userId,
+          sections,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' }),
+        new Promise<{ error: { message: string } }>((_, reject) =>
+          setTimeout(() => reject({ error: { message: 'Timeout 8s' } }), 8000)
+        )
+      ]) as { error: any }
 
-      if (!error) return true
+      if (!result.error) return true
 
-      // Jika auth error, refresh session dan coba lagi
-      if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+      // Auth error → refresh session lalu retry
+      if (result.error.code === 'PGRST301' || result.error.message?.includes('JWT')) {
         await supabase.auth.refreshSession()
         continue
       }
 
-      console.error('saveUserLayout error:', error)
       if (i === retries) return false
-    } catch (e) {
-      console.error('saveUserLayout exception:', e)
+    } catch {
       if (i === retries) return false
-      // Tunggu sebentar sebelum retry
       await new Promise(r => setTimeout(r, 500 * (i + 1)))
     }
   }

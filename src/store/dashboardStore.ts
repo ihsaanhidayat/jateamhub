@@ -314,30 +314,41 @@ export const useStore = create<DashboardStore>((set, get) => ({
   },
 
   // ── Sync section pribadi ke DB — debounce 300ms ──────────
-  // ── Sync ke DB — debounce 300ms, TANPA mutex ───────────────
+  // ── Sync ke DB — LANGSUNG setiap operasi ────────────────
   syncPersonalToDb: async () => {
     if (personalSyncTimer) { clearTimeout(personalSyncTimer); personalSyncTimer = null }
-    set({ isDirty: true })
-    personalSyncTimer = setTimeout(async () => {
-      personalSyncTimer = null
-      const { personalSections, currentUserId } = get()
-      if (!currentUserId) return
-      set({ isSyncing: true, syncStatus: 'saving' })
-      const ok = await saveUserLayout(currentUserId, personalSections)
-      set({ isSyncing: false, syncStatus: ok ? 'saved' : 'error', isDirty: !ok })
-      if (ok) setTimeout(() => set({ syncStatus: 'idle' }), 2000)
-    }, 300)
+    const { personalSections, currentUserId } = get()
+    if (!currentUserId) return
+    persistPersonal(personalSections)
+    set({ isSyncing: true, syncStatus: 'saving', isDirty: true })
+    // Safety: jika 10 detik tidak selesai, paksa reset
+    const safety = setTimeout(() => {
+      if (get().syncStatus === 'saving') {
+        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+      }
+    }, 10000)
+    const ok = await saveUserLayout(currentUserId, personalSections)
+    clearTimeout(safety)
+    set({ isSyncing: false, syncStatus: ok ? 'saved' : 'error', isDirty: !ok })
+    if (ok) setTimeout(() => { if (get().syncStatus === 'saved') set({ syncStatus: 'idle' }) }, 2000)
   },
 
-  // ── Sync langsung tanpa debounce (visibility change, logout, dll) ──
+  // ── Sync langsung (untuk visibility change, pull-to-refresh) ──
   syncPersonalToDbNow: async () => {
     if (personalSyncTimer) { clearTimeout(personalSyncTimer); personalSyncTimer = null }
     const { personalSections, currentUserId } = get()
     if (!currentUserId || personalSections.length === 0) return
+    persistPersonal(personalSections)
     set({ isSyncing: true, syncStatus: 'saving' })
+    const safety = setTimeout(() => {
+      if (get().syncStatus === 'saving') {
+        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+      }
+    }, 10000)
     const ok = await saveUserLayout(currentUserId, personalSections)
+    clearTimeout(safety)
     set({ isSyncing: false, syncStatus: ok ? 'saved' : 'error', isDirty: !ok })
-    if (ok) setTimeout(() => set({ syncStatus: 'idle' }), 2000)
+    if (ok) setTimeout(() => { if (get().syncStatus === 'saved') set({ syncStatus: 'idle' }) }, 2000)
   },
 
   // ── Helper: push snapshot ke history untuk undo ───────────

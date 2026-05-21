@@ -67,7 +67,39 @@ export default function App() {
     return () => clearTimeout(t)
   }, [])
 
-  // ── Page Visibility API — simpan saat hidden, sync saat visible ──
+  // ── Idle timeout 30 menit — auto logout ────────────────────
+  useEffect(() => {
+    if (!profile) return
+
+    const IDLE_MS = 30 * 60 * 1000 // 30 menit
+    let timer: ReturnType<typeof setTimeout>
+
+    const resetTimer = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        // Simpan data dulu sebelum logout
+        const state = useStore.getState()
+        if (state.personalSections.length > 0) {
+          try { localStorage.setItem('jateamhub-personal', JSON.stringify(state.personalSections)) } catch {}
+        }
+        if (state.editMode) state.toggleEditMode()
+        toast('Sesi berakhir karena tidak aktif 30 menit.', 'warn')
+        setTimeout(() => useAuthStore.getState().logout(), 1500)
+      }, IDLE_MS)
+    }
+
+    // Reset timer setiap ada aktivitas user
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll']
+    events.forEach(e => document.addEventListener(e, resetTimer, { passive: true }))
+    resetTimer() // mulai timer
+
+    return () => {
+      clearTimeout(timer)
+      events.forEach(e => document.removeEventListener(e, resetTimer))
+    }
+  }, [profile?.id])
+
+  // ── Page Visibility API — simpan saat hidden, refresh saat visible ──
   useEffect(() => {
     const handle = async () => {
       const state = useStore.getState()
@@ -77,19 +109,36 @@ export default function App() {
         if (state.personalSections.length > 0) {
           try { localStorage.setItem('jateamhub-personal', JSON.stringify(state.personalSections)) } catch {}
         }
-        // Auto close edit mode
         if (state.editMode) state.toggleEditMode()
         return
       }
 
-      // visible — cek session lalu sync
+      // ── Visible — app kembali dibuka ──
       if (!state.currentUserId) return
+
       try {
-        const { error } = await supabase.auth.getSession()
-        if (error) { useAuthStore.getState().logout(); return }
-        // Sync ke DB
+        // 1. Cek session masih valid
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error || !session) {
+          useAuthStore.getState().logout()
+          return
+        }
+
+        // 2. Refresh session jika hampir expired
+        const expiresAt = session.expires_at ?? 0
+        const now = Math.floor(Date.now() / 1000)
+        if (expiresAt - now < 300) {
+          await supabase.auth.refreshSession()
+        }
+
+        // 3. SELALU sync ke DB saat kembali — data di localStorage lebih baru
         if (state.personalSections.length > 0) {
           await state.syncPersonalToDbNow()
+        }
+
+        // 4. Reload shared sections
+        if (state.loadSharedSections) {
+          await state.loadSharedSections()
         }
       } catch {}
     }
