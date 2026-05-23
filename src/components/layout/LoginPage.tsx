@@ -129,13 +129,50 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
           }} />
         </>
       ) : (
-        <div style={{
-          position: 'fixed', inset: 0, pointerEvents: 'none',
-          backgroundImage: `
-            radial-gradient(circle at 15% 50%, rgba(37,99,235,0.05) 0%, transparent 50%),
-            radial-gradient(circle at 85% 20%, rgba(37,99,235,0.04) 0%, transparent 40%)
-          `,
-        }} />
+        <>
+          {/* Geometric grid pattern */}
+          <div style={{
+            position: 'fixed', inset: 0, pointerEvents: 'none',
+            backgroundImage: `
+              linear-gradient(rgba(37,99,235,0.03) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(37,99,235,0.03) 1px, transparent 1px)
+            `,
+            backgroundSize: '60px 60px',
+          }} />
+          {/* Gradient orbs */}
+          <div style={{
+            position: 'fixed', inset: 0, pointerEvents: 'none',
+            backgroundImage: `
+              radial-gradient(circle 600px at 10% 20%, rgba(37,99,235,0.08) 0%, transparent 70%),
+              radial-gradient(circle 500px at 90% 80%, rgba(99,102,241,0.06) 0%, transparent 70%),
+              radial-gradient(circle 400px at 50% 50%, rgba(37,99,235,0.04) 0%, transparent 60%)
+            `,
+          }} />
+          {/* Diagonal accent line */}
+          <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+            pointerEvents: 'none', overflow: 'hidden',
+          }}>
+            <div style={{
+              position: 'absolute', top: '-20%', right: '-10%',
+              width: '50%', height: '140%',
+              background: 'linear-gradient(135deg, transparent 40%, rgba(37,99,235,0.03) 50%, transparent 60%)',
+              transform: 'rotate(-12deg)',
+            }} />
+            <div style={{
+              position: 'absolute', bottom: '-20%', left: '-10%',
+              width: '40%', height: '140%',
+              background: 'linear-gradient(135deg, transparent 40%, rgba(99,102,241,0.025) 50%, transparent 60%)',
+              transform: 'rotate(-12deg)',
+            }} />
+          </div>
+          {/* Bottom decorative bar */}
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, height: 3,
+            background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
+            opacity: 0.3, pointerEvents: 'none',
+          }} />
+        </>
       )}
 
       {/* Card */}

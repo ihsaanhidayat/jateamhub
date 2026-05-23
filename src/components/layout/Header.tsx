@@ -8,12 +8,13 @@ import AvatarCropModal from '../ui/AvatarCropModal'
 
 interface Props {
   onToggleOptions: () => void
-  optionsOpen: boolean
-  onOpenAdvanced: () => void
-  onAddSection: () => void
+  optionsOpen:     boolean
+  onOpenAdvanced:  () => void
+  onAddSection:    () => void
+  onImportLinks:   () => void
 }
 
-export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection }: Props) {
+export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks }: Props) {
   const {
     editMode, toggleEditMode,
     searchQuery, setSearch,
@@ -21,14 +22,14 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const { profile: session } = useAuthStore()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
-  const [cropDataUrl, setCropDataUrl] = useState<string | null>(null)
+  const [cropDataUrl,     setCropDataUrl]     = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
 
-  const isEditable = canEdit(session as any)
-  const showOptions = canSeeOptions(session as any)
+  const isEditable   = canEdit(session as any)
+  const showOptions  = canSeeOptions(session as any)
   const isAdminLevel = isAdmin(session as any)
-  const badge = getDisplayBadge(session as any)
-  const emoji = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
+  const badge        = getDisplayBadge(session as any)
+  const emoji        = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
 
 
 
@@ -83,12 +84,12 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   }
 
   const PREVIEW_OPTS = [
-    { value: null, label: 'Admin View' },
-    { value: '', label: 'User Umum' },
-    { value: 'pro', label: 'PRO' },
-    { value: 'cro', label: 'CRO' },
-    { value: 'klaim', label: 'Klaim' },
-    { value: 'ae', label: 'AE' },
+    { value: null,    label: 'Admin View' },
+    { value: '',      label: 'User Umum'  },
+    { value: 'pro',   label: 'PRO'        },
+    { value: 'cro',   label: 'CRO'        },
+    { value: 'klaim', label: 'Klaim'      },
+    { value: 'ae',    label: 'AE'         },
   ]
 
 
@@ -126,6 +127,8 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             <>
               <button className="icon-btn desktop-only" onClick={onAddSection}
                 style={{ fontWeight: 700, fontSize: 16 }} title="Tambah Section" aria-label="Tambah Section">＋</button>
+              <button className="icon-btn desktop-only" onClick={onImportLinks}
+                style={{ fontWeight: 600, fontSize: 13 }} title="Import Link" aria-label="Import Link">📥</button>
               <button
                 className="icon-btn desktop-only active"
                 onClick={e => {

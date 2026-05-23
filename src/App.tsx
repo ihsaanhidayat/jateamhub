@@ -16,6 +16,7 @@ const ProfilePage         = lazy(() => import('./components/layout/ProfilePage')
 const PanduanFAB          = lazy(() => import('./components/layout/PanduanFAB'))
 const CoffeeModal         = lazy(() => import('./components/ui/CoffeeModal'))
 const AddSectionModal     = lazy(() => import('./components/layout/AddSectionModal'))
+const ImportLinksModal    = lazy(() => import('./components/ui/ImportLinksModal'))
 const OnboardingOverlay   = lazy(() => import('./components/ui/OnboardingOverlay'))
 
 import './styles/global.css'
@@ -34,6 +35,7 @@ export default function App() {
   const [showRegister,   setShowRegister]   = useState(false)
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [addSectionOpen, setAddSectionOpen] = useState(false)
+  const [importLinksOpen, setImportLinksOpen] = useState(false)
   const [coffeeOpen,     setCoffeeOpen]     = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
@@ -255,6 +257,7 @@ export default function App() {
         optionsOpen={optionsOpen}
         onOpenAdvanced={() => setProfileOpen(true)}
         onAddSection={() => setAddSectionOpen(true)}
+        onImportLinks={() => setImportLinksOpen(true)}
       />
 
       {/* Edit mode topbar — slim, di bawah header */}
@@ -304,6 +307,7 @@ export default function App() {
 
       <Suspense fallback={null}>
         <AddSectionModal open={addSectionOpen} onClose={() => setAddSectionOpen(false)} />
+        <ImportLinksModal open={importLinksOpen} onClose={() => setImportLinksOpen(false)} />
         {profileOpen  && <ProfilePage onClose={() => setProfileOpen(false)} />}
         {coffeeOpen   && <CoffeeModal onClose={() => setCoffeeOpen(false)} />}
         {showOnboarding && (
