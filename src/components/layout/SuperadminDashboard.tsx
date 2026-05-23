@@ -108,10 +108,11 @@ export default function SuperadminDashboard() {
       ? (nameParts[0][0] + nameParts[1][0]).toUpperCase()
       : editFullName.slice(0, 2).toUpperCase()
 
-    const error = await updateUser(editTarget.id, editRole, editUnit, editPass || undefined, editEmoji, editRegion, editUnit)
+    // unit_id = nilai asli dari DB (pro/cro/klaim/''), editUnit = unit_scope (general/pro/dll)
+    const unitId = editTarget.unit_id ?? ''
+    const error = await updateUser(editTarget.id, editRole, unitId, editPass || undefined, editEmoji, editRegion, editUnit)
     if (!error) {
       await updateProfile(editTarget.id, { full_name: editFullName, initials } as any)
-      // Simpan email jika berubah
       if (editEmail !== ((editTarget as any).email ?? '')) {
         await supabase.from('profiles').update({ email: editEmail }).eq('id', editTarget.id)
       }
@@ -123,6 +124,8 @@ export default function SuperadminDashboard() {
 
   const handleAddUser = async () => {
     setErr(''); setSaving(true)
+    // unit_id untuk user baru = newUnit (bisa 'pro','cro','klaim','')
+    // unit_scope = newUnit juga (scope akses)
     const error = await addUser(newUser.trim(), newPass, newRole, newUnit, newRegion, newUnit)
     setSaving(false)
     if (error) { setErr(error); return }

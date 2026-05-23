@@ -223,6 +223,6 @@ export const GRID_ROW_HEIGHT   = 60  // 60px per baris — 3 baris = 180px
 // Default lebar: 4 kolom (3 section × 4 = 12 kolom penuh di layar)
 export const SECTION_MIN_W     = 1
 export const SECTION_MIN_H     = 2
-export const SECTION_DEFAULT_W = 4
+export const SECTION_DEFAULT_W = 3   // 4 section per baris di 12 cols
 // Default tinggi: h:3 = 3×60 = 180px — muat 3 baris icon large (44px+label)
 export const SECTION_DEFAULT_H = 3

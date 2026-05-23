@@ -244,13 +244,16 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
     // Process personal sections
     if (dbSections && Array.isArray(dbSections) && dbSections.length > 0) {
-      // DB punya data — gunakan
       const raw = dbSections as Section[]
       const sorted = [...raw].sort((a, b) => (a.layout.y * 100 + a.layout.x) - (b.layout.y * 100 + b.layout.x))
       const sections = autoLayout(sorted)
-      persistPersonal(sections)
-      set({ personalSections: sections })
-      saveUserLayout(userId, sections).catch(() => { })
+      // Notes widget selalu collapsed saat login — hanya di memory, tidak overwrite DB
+      const withCollapsed = sections.map(s =>
+        s.type === 'widget' ? { ...s, collapsed: true } : s
+      )
+      persistPersonal(withCollapsed)
+      set({ personalSections: withCollapsed })
+      saveUserLayout(userId, sections).catch(() => { }) // simpan sections tanpa collapsed override
     } else {
       // DB kosong — cek localStorage (mungkin ada data yang belum sync)
       const localRaw = localStorage.getItem(STORAGE_KEYS.PERSONAL)

@@ -489,34 +489,29 @@ export default function GridLayout({ onAddSection }: Props) {
           layout={allLayouts}
           cols={12}
           rowHeight={GRID_ROW_HEIGHT}
-          margin={[20, 20]}
-          containerPadding={[0, 0]}
+          margin={[16, 16]}
+          containerPadding={[16, 16]}
           onLayoutChange={handleLayoutChange}
+          onDragStart={() => { /* unfocus saat mulai drag */ if (focusedId) setFocusedId(null) }}
           isDraggable={editMode}
           isResizable={editMode}
           draggableHandle=".drag-handle"
           resizeHandles={['se', 'e', 'w']}
-          useCSSTransforms
+          useCSSTransforms={false}
           compactType="vertical"
           preventCollision={false}
+          style={{ width: '100%' }}
         >
-          {/* Render semua section */}
           {allSections.map(({ section, isShared, sharedSource }) => (
             <div
               key={section.id}
-              style={{
-                height: '100%',
-                opacity: q && !visibleIds.has(section.id) ? 0.2 : 1,
-                transition: 'opacity .2s',
-                position: 'relative',
-                paddingTop: 10,
-                boxSizing: 'border-box',
-              }}
-              onClick={() => {
+              onClick={e => {
+                // Hanya trigger focus jika bukan dari drag handle
+                const target = e.target as HTMLElement
+                if (target.closest('.drag-handle')) return
                 if (editMode && !isShared) handleFocus(section.id)
               }}
             >
-              {/* Badge: ADM REG/UNIT untuk shared, OWN+⭐ untuk personal */}
               <SectionBadge
                 sharedSection={isShared ? (sharedSource ?? null) : null}
                 personalSection={!isShared ? section : null}

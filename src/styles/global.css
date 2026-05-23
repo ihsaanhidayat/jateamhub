@@ -423,12 +423,16 @@ button { cursor: pointer; }
 
 .rgl-grid {
   width: 100%; min-height: 200px;
-  padding: var(--sp-6); /* 24px semua sisi */
   box-sizing: border-box;
 }
 
-/* RGL placeholder */
-.rgl-grid .react-grid-item { transition: none !important; }
+/* RGL grid items harus full height */
+.rgl-grid .react-grid-item {
+  transition: none !important;
+}
+.rgl-grid .react-grid-item > div {
+  height: 100%;
+}
 .rgl-grid .react-grid-item.react-grid-placeholder {
   background: var(--mint-bg2) !important;
   border: 2px dashed var(--accent) !important;
