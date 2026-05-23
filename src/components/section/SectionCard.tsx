@@ -161,13 +161,20 @@ export default memo(function SectionCard({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Drag handle — hanya tampil saat edit mode, tidak focused */}
-        {editMode && !isFocused && (
-          <div className="drag-handle" style={{
-            cursor: 'grab', padding: '0 6px', color: 'var(--silver3)',
-            fontSize: 12, display: 'flex', alignItems: 'center',
-            flexShrink: 0, userSelect: 'none',
-          }}>⠿</div>
+        {/* Drag handle — tampil saat edit mode */}
+        {editMode && (
+          <div
+            className="drag-handle"
+            onMouseDown={e => {
+              // Saat mulai drag, unfocus section agar isDraggable aktif
+              e.stopPropagation()
+            }}
+            style={{
+              cursor: 'grab', padding: '0 6px', color: 'var(--silver3)',
+              fontSize: 12, display: 'flex', alignItems: 'center',
+              flexShrink: 0, userSelect: 'none',
+            }}
+          >⠿</div>
         )}
 
         <span className="section-icon" style={{ marginTop: section.subtitle ? 1 : 0 }}>

@@ -12,16 +12,28 @@ interface Props { onClose: () => void }
 
 export default function ProfilePage({ onClose }: Props) {
   const { profile } = useAuthStore()
-  const { toast }   = useStore()
+  const { toast } = useStore()
 
   const um = useUserManagement()
   const { canManage, isSuperAdmin } = um
 
-  // Settings state (hanya di superadmin tab)
-  const [siteTitle,    setSiteTitle]    = useState('')
+  const [showAvatarMenu, setShowAvatarMenu] = useState(false)
+  const [showAvatarPreview, setShowAvatarPreview] = useState(false)
+
+  // Tutup avatar menu saat klik di luar
+  useEffect(() => {
+    if (!showAvatarMenu) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-avatar-area]')) setShowAvatarMenu(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showAvatarMenu])
+  const [siteTitle, setSiteTitle] = useState('')
   const [siteSubtitle, setSiteSubtitle] = useState('')
-  const [coffeeUrl,    setCoffeeUrl]    = useState('')
-  const [logoUrl,      setLogoUrl]      = useState('')
+  const [coffeeUrl, setCoffeeUrl] = useState('')
+  const [logoUrl, setLogoUrl] = useState('')
 
   const handleSaveSettings = async () => {
     // Simpan settings ke dashboard_config di Supabase
@@ -29,10 +41,10 @@ export default function ProfilePage({ onClose }: Props) {
     const CONFIG_ID = '00000000-0000-0000-0000-000000000001'
     const { data } = await supabase.from('dashboard_config').select('config').eq('id', CONFIG_ID).single()
     const cfg = (data?.config ?? {}) as Record<string, unknown>
-    cfg.title    = siteTitle
+    cfg.title = siteTitle
     cfg.subtitle = siteSubtitle
-    cfg.coffeeUrl= coffeeUrl
-    cfg.logoUrl  = logoUrl
+    cfg.coffeeUrl = coffeeUrl
+    cfg.logoUrl = logoUrl
     await supabase.from('dashboard_config').update({ config: cfg }).eq('id', CONFIG_ID)
     toast('Settings disimpan.', 'success')
   }
@@ -47,14 +59,14 @@ export default function ProfilePage({ onClose }: Props) {
 
   // Edit nama lengkap
   const [editingName, setEditingName] = useState(false)
-  const [nameValue,   setNameValue]   = useState(profile?.full_name || '')
-  const [nameSaving,  setNameSaving]  = useState(false)
+  const [nameValue, setNameValue] = useState(profile?.full_name || '')
+  const [nameSaving, setNameSaving] = useState(false)
 
   const handleSaveName = async () => {
     if (!profile || !nameValue.trim()) return
     setNameSaving(true)
     try {
-      const parts    = nameValue.trim().split(' ').filter(Boolean)
+      const parts = nameValue.trim().split(' ').filter(Boolean)
       const initials = parts.length >= 2
         ? (parts[0][0] + parts[1][0]).toUpperCase()
         : nameValue.slice(0, 2).toUpperCase()
@@ -140,48 +152,74 @@ export default function ProfilePage({ onClose }: Props) {
           {/* ── PROFILE TAB ── */}
           {tabState === 'profile' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
-              {/* Avatar + nama + ganti foto */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)', marginBottom: 'var(--sp-2)' }}>
+              {/* Avatar + nama + badge */}
+              <div data-avatar-area style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)', marginBottom: 'var(--sp-2)' }}>
                 <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <div style={{
-                    width: 64, height: 64, borderRadius: '50%',
-                    background: 'var(--mint-bg)', border: '2px solid var(--accent)',
-                    overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 22, color: 'var(--accent)',
-                  }}>
+                  <div
+                    onClick={() => setShowAvatarMenu(v => !v)}
+                    style={{
+                      width: 64, height: 64, borderRadius: '50%',
+                      background: 'var(--mint-bg)', border: '2px solid var(--accent)',
+                      overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 22, color: 'var(--accent)', cursor: 'pointer',
+                    }}>
                     {profile?.avatar_url
                       ? <img src={profile.avatar_url} alt={profile.full_name || profile.username || 'Avatar'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : ((profile?.full_name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') ?? profile?.username?.slice(0,2) ?? '?').toUpperCase())
+                      : ((profile?.full_name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('') ?? profile?.username?.slice(0, 2) ?? '?').toUpperCase())
                     }
                   </div>
-                  {/* Pencil ganti foto */}
-                  <label htmlFor="profile-tab-avatar" title="Ganti foto profil" style={{
-                    position: 'absolute', bottom: 0, right: 0,
-                    width: 22, height: 22, borderRadius: '50%',
-                    background: 'var(--accent)', color: 'white',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', fontSize: 11, boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                  }}>✏️
-                    <input id="profile-tab-avatar" type="file" accept="image/*" style={{ display: 'none' }}
-                      onChange={e => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        e.target.value = ''
-                        const reader = new FileReader()
-                        reader.onload = ev => {
-                          const dataUrl = ev.target?.result as string
-                          if (dataUrl) {
-                            window.dispatchEvent(new CustomEvent('avatar-upload', { detail: dataUrl }))
-                            onClose()
-                          }
-                        }
-                        reader.readAsDataURL(file)
-                      }} />
-                  </label>
+                  {/* Avatar menu — lihat atau ganti */}
+                  {showAvatarMenu && (
+                    <div style={{
+                      position: 'absolute', top: 68, left: 0, zIndex: 100,
+                      background: 'var(--bg3)', border: '1px solid var(--border2)',
+                      borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)',
+                      minWidth: 140, overflow: 'hidden',
+                    }}>
+                      {profile?.avatar_url && (
+                        <button onClick={() => { setShowAvatarMenu(false); setShowAvatarPreview(true) }} style={{
+                          width: '100%', padding: '10px 14px', background: 'none', border: 'none',
+                          borderBottom: '1px solid var(--border)', textAlign: 'left',
+                          fontSize: 12, color: 'var(--silver)', cursor: 'pointer', fontFamily: 'var(--font)',
+                        }}>👁 Lihat Foto</button>
+                      )}
+                      <label htmlFor="profile-tab-avatar" style={{
+                        display: 'block', padding: '10px 14px',
+                        fontSize: 12, color: 'var(--silver)', cursor: 'pointer', fontFamily: 'var(--font)',
+                      }}>✏️ Ganti Foto
+                        <input id="profile-tab-avatar" type="file" accept="image/*" style={{ display: 'none' }}
+                          onChange={e => {
+                            const file = e.target.files?.[0]
+                            if (!file) return
+                            e.target.value = ''
+                            setShowAvatarMenu(false)
+                            const reader = new FileReader()
+                            reader.onload = ev => {
+                              const dataUrl = ev.target?.result as string
+                              if (dataUrl) {
+                                window.dispatchEvent(new CustomEvent('avatar-upload', { detail: dataUrl }))
+                                onClose()
+                              }
+                            }
+                            reader.readAsDataURL(file)
+                          }} />
+                      </label>
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--silver)' }}>
-                    {profile?.full_name || profile?.username}
+                  {/* Nama + badge role di sebelahnya */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--silver)' }}>
+                      {profile?.full_name || profile?.username}
+                    </span>
+                    {badge && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99,
+                        background: badge.color, color: '#0A0A0A',
+                        fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.5px',
+                      }}>{badge.label}</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--silver3)', marginTop: 2 }}>@{profile?.username}</div>
                 </div>
@@ -228,7 +266,7 @@ export default function ProfilePage({ onClose }: Props) {
                 )}
               </div>
 
-              {/* Username + badge role */}
+              {/* Username */}
               <div style={{
                 padding: 'var(--sp-3) var(--sp-4)', background: 'var(--bg2)',
                 border: '1px solid var(--border)', borderRadius: 'var(--radius)',
@@ -236,16 +274,7 @@ export default function ProfilePage({ onClose }: Props) {
               }}>
                 <div>
                   <div style={{ fontSize: 10, color: 'var(--silver3)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Username</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                    <span style={{ fontSize: 14, color: 'var(--silver)', fontWeight: 500 }}>@{profile?.username}</span>
-                    {badge && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99,
-                        background: badge.color, color: '#0A0A0A',
-                        fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.5px',
-                      }}>{badge.label}</span>
-                    )}
-                  </div>
+                  <span style={{ fontSize: 14, color: 'var(--silver)', fontWeight: 500 }}>@{profile?.username}</span>
                 </div>
                 <span style={{ fontSize: 11, color: 'var(--silver3)' }}>🔒</span>
               </div>
@@ -287,6 +316,27 @@ export default function ProfilePage({ onClose }: Props) {
               }}>
                 🔒 Wilayah, unit, dan username tidak dapat diubah. Hubungi Admin untuk perubahan.
               </div>
+
+              {/* Preview foto fullscreen */}
+              {showAvatarPreview && profile?.avatar_url && (
+                <div
+                  onClick={() => setShowAvatarPreview(false)}
+                  style={{
+                    position: 'fixed', inset: 0, zIndex: 9999,
+                    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'zoom-out',
+                  }}>
+                  <img src={profile.avatar_url} alt="Foto profil"
+                    style={{ maxWidth: '85vw', maxHeight: '85vh', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+                  <button onClick={() => setShowAvatarPreview(false)} style={{
+                    position: 'absolute', top: 20, right: 20,
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)',
+                    color: 'white', fontSize: 18, cursor: 'pointer',
+                  }}>✕</button>
+                </div>
+              )}
             </div>
           )}
 
@@ -303,7 +353,7 @@ export default function ProfilePage({ onClose }: Props) {
                 </select>
                 <select value={um.filterUnit} onChange={e => { um.setFilterUnit(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Unit</option>
-                  {(UNITS as readonly {label: string; value: string}[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                  {(UNITS as readonly { label: string; value: string }[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                 </select>
                 <select value={um.filterRole} onChange={e => { um.setFilterRole(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Role</option>
@@ -412,15 +462,15 @@ export default function ProfilePage({ onClose }: Props) {
               {/* User list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {um.pagedUsers.map(u => {
-                  const b       = um.getBadge(u)
-                  const isMe    = u.id === profile?.id
+                  const b = um.getBadge(u)
+                  const isMe = u.id === profile?.id
                   // Pastikan field scope tersedia untuk permission check
                   const currentUser = { ...profile, region_scope: (profile as any).region_scope ?? 'global', unit_scope: (profile as any).unit_scope ?? 'general' }
-                  const targetUser  = { ...u,       region_scope: u.region_scope ?? 'global',                unit_scope: u.unit_scope ?? 'general'                }
+                  const targetUser = { ...u, region_scope: u.region_scope ?? 'global', unit_scope: u.unit_scope ?? 'general' }
                   const canEdit_ = canManageUser(currentUser as any, targetUser as any)
-                  const region  = REGION_LABELS[u.region_scope ?? 'global'] ?? u.region_scope
-                  const unit    = UNIT_LABELS[u.unit_scope ?? 'general'] ?? u.unit_scope
-                  const emoji_  = u.emoji || u.avatar_emoji || ''
+                  const region = REGION_LABELS[u.region_scope ?? 'global'] ?? u.region_scope
+                  const unit = UNIT_LABELS[u.unit_scope ?? 'general'] ?? u.unit_scope
+                  const emoji_ = u.emoji || u.avatar_emoji || ''
 
                   return (
                     <div key={u.id} style={{
@@ -485,10 +535,10 @@ export default function ProfilePage({ onClose }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: 11, color: 'var(--silver3)', marginBottom: 4 }}>Pengaturan global — hanya superadmin</div>
               {[
-                { label: 'Site Title',              val: siteTitle,    set: setSiteTitle,    ph: 'JateamHub' },
-                { label: 'Subtitle / Greeting',     val: siteSubtitle, set: setSiteSubtitle, ph: 'Selamat datang, {username}' },
-                { label: 'Logo URL',                val: logoUrl,      set: setLogoUrl,      ph: 'https://...' },
-                { label: 'Coffee / Donasi URL',     val: coffeeUrl,    set: setCoffeeUrl,    ph: 'https://trakteer.id/...' },
+                { label: 'Site Title', val: siteTitle, set: setSiteTitle, ph: 'JateamHub' },
+                { label: 'Subtitle / Greeting', val: siteSubtitle, set: setSiteSubtitle, ph: 'Selamat datang, {username}' },
+                { label: 'Logo URL', val: logoUrl, set: setLogoUrl, ph: 'https://...' },
+                { label: 'Coffee / Donasi URL', val: coffeeUrl, set: setCoffeeUrl, ph: 'https://trakteer.id/...' },
               ].map(f => (
                 <div key={f.label}>
                   <label style={{ ...labelStyle, fontWeight: 700 }}>{f.label}</label>

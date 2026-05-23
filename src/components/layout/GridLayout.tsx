@@ -218,8 +218,8 @@ export default function GridLayout({ onAddSection }: Props) {
       minH:        s.collapsed ? 1 : 2,
       maxH:        s.collapsed ? 1 : undefined,
       // Tidak bisa drag saat section sedang focused (focus mode dulu)
-      isDraggable: editMode && focusedId !== s.id,
-      isResizable: editMode && !s.collapsed && focusedId !== s.id,
+      isDraggable: editMode,
+      isResizable: editMode && !s.collapsed,
       resizeHandles: ['se', 'e', 'w'] as unknown as ['se'],
     }))
 

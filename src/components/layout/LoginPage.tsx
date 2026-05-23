@@ -1,23 +1,149 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { applyThemeToDOM } from '../../store/dashboardStore'
+import { supabase } from '../../utils/supabaseClient'
+
+// ── Forgot Password Modal ─────────────────────────────────
+function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
+  const [step,     setStep]     = useState<'username' | 'otp' | 'newpw' | 'done'>('username')
+  const [username, setUsername] = useState('')
+  const [email,    setEmail]    = useState('')
+  const [otp,      setOtp]      = useState('')
+  const [newPw,    setNewPw]    = useState('')
+  const [err,      setErr]      = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [countdown,setCountdown]= useState(0)
+
+  const startCountdown = () => {
+    setCountdown(60)
+    const t = setInterval(() => setCountdown(c => { if (c <= 1) { clearInterval(t); return 0 } return c - 1 }), 1000)
+  }
+
+  const sendOtp = async (uname?: string) => {
+    const target = uname ?? username
+    if (!target.trim()) return setErr('Masukkan username kamu.')
+    setLoading(true); setErr('')
+    try {
+      const { data: profile } = await supabase
+        .from('profiles').select('email, username').eq('username', target.trim().toLowerCase()).single()
+      if (!profile?.email) { setErr('Username tidak ditemukan atau email belum terdaftar.'); setLoading(false); return }
+      setEmail(profile.email)
+      const res = await supabase.functions.invoke('send-otp', { body: { email: profile.email, type: 'reset_password' } })
+      if (res.data?.error) { setErr(res.data.error); setLoading(false); return }
+      setStep('otp'); startCountdown()
+    } catch { setErr('Gagal mengirim OTP.') }
+    setLoading(false)
+  }
+
+  const verifyOtp = async () => {
+    if (otp.length !== 6) return setErr('Masukkan 6 digit OTP.')
+    setLoading(true); setErr('')
+    try {
+      const res = await supabase.functions.invoke('verify-otp', { body: { email, otp, type: 'reset_password' } })
+      if (!res.data?.verified) { setErr(res.data?.error ?? 'OTP tidak valid.'); setLoading(false); return }
+      setStep('newpw')
+    } catch { setErr('Gagal verifikasi.') }
+    setLoading(false)
+  }
+
+  const resetPassword = async () => {
+    if (!newPw || newPw.length < 6) return setErr('Password minimal 6 karakter.')
+    setLoading(true); setErr('')
+    try {
+      const res = await supabase.functions.invoke('update-user-password', { body: { username: username.trim().toLowerCase(), newPassword: newPw } })
+      if (res.data?.error) { setErr(res.data.error); setLoading(false); return }
+      setStep('done')
+    } catch { setErr('Gagal reset password.') }
+    setLoading(false)
+  }
+
+  const inputSt: React.CSSProperties = {
+    width: '100%', height: 44, background: 'var(--bg2)',
+    border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)',
+    padding: '0 14px', color: 'var(--silver)', fontSize: 14,
+    fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box',
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9000,
+      background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    }}>
+      <div style={{
+        background: 'var(--bg3)', border: '1px solid var(--border2)',
+        borderRadius: 16, padding: '32px 28px',
+        width: '100%', maxWidth: 380,
+        boxShadow: 'var(--shadow-lg)',
+      }}>
+        {step === 'done' ? (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--silver)', marginBottom: 8 }}>Password Direset!</h3>
+            <p style={{ fontSize: 13, color: 'var(--silver3)', marginBottom: 24 }}>Silakan login dengan password baru kamu.</p>
+            <button onClick={onClose} style={{ width: '100%', height: 44, background: 'var(--accent)', border: 'none', borderRadius: 8, color: 'white', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Login Sekarang</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--silver)', margin: 0 }}>
+                {step === 'username' ? 'Lupa Password' : step === 'otp' ? 'Verifikasi OTP' : 'Password Baru'}
+              </h3>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--silver3)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+
+            {step === 'username' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p style={{ fontSize: 12, color: 'var(--silver3)', margin: 0 }}>Masukkan username kamu. OTP akan dikirim ke email terdaftar.</p>
+                <input value={username} onChange={e => setUsername(e.target.value)} placeholder="username" autoFocus style={inputSt} />
+                {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
+                <button onClick={() => sendOtp()} disabled={loading} style={{ height: 44, background: 'var(--accent)', border: 'none', borderRadius: 8, color: 'white', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>{loading ? 'Mengirim...' : 'Kirim OTP ke Email'}</button>
+              </div>
+            )}
+
+            {step === 'otp' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p style={{ fontSize: 12, color: 'var(--silver3)', margin: 0 }}>OTP dikirim ke <strong style={{ color: 'var(--accent)' }}>{email}</strong></p>
+                <input value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" maxLength={6} inputMode="numeric" autoFocus style={{ ...inputSt, textAlign: 'center', fontSize: 24, fontWeight: 800, letterSpacing: 8, fontFamily: 'var(--mono)' }} />
+                {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
+                <button onClick={verifyOtp} disabled={loading || otp.length !== 6} style={{ height: 44, background: otp.length === 6 ? 'var(--accent)' : 'var(--border2)', border: 'none', borderRadius: 8, color: 'white', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>{loading ? 'Verifikasi...' : 'Verifikasi'}</button>
+                <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--silver3)' }}>
+                  {countdown > 0 ? `Kirim ulang dalam ${countdown}s` : <span onClick={() => sendOtp()} style={{ color: 'var(--accent)', cursor: 'pointer' }}>Kirim ulang OTP</span>}
+                </div>
+              </div>
+            )}
+
+            {step === 'newpw' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p style={{ fontSize: 12, color: 'var(--silver3)', margin: 0 }}>Masukkan password baru kamu.</p>
+                <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Minimal 6 karakter" autoFocus style={inputSt} />
+                {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
+                <button onClick={resetPassword} disabled={loading} style={{ height: 44, background: 'var(--accent)', border: 'none', borderRadius: 8, color: 'white', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>{loading ? 'Menyimpan...' : 'Simpan Password Baru'}</button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // ── Matrix Rain — hanya untuk Obsidian ───────────────────────
 function MatrixRain() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const canvas = canvasRef.current!
-    const ctx = canvas.getContext('2d')!
+    const ctx    = canvas.getContext('2d')!
     const resize = () => {
-      canvas.width = window.innerWidth
+      canvas.width  = window.innerWidth
       canvas.height = window.innerHeight
     }
     resize()
     window.addEventListener('resize', resize)
-    const cols = Math.floor(canvas.width / 14)
+    const cols  = Math.floor(canvas.width / 14)
     const drops = Array(cols).fill(1)
     const chars = 'アイウエオカキクケコ0123456789ABCDEF'.split('')
-    const draw = () => {
+    const draw  = () => {
       ctx.fillStyle = 'rgba(8,8,8,0.05)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       drops.forEach((y, i) => {
@@ -47,12 +173,24 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
   const { login } = useAuthStore()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [showPw, setShowPw] = useState(false)
-  const [err, setErr] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [shake, setShake] = useState(false)
+  const [showPw,   setShowPw]   = useState(false)
+  const [err,      setErr]      = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [shake,     setShake]     = useState(false)
   const [isObsidian, setIsObsidian] = useState(false)
-  const [cooldown, setCooldown] = useState(0)  // brute force protection
+  const [cooldown,  setCooldown]  = useState(0)  // brute force protection
+  const [failCount, setFailCount] = useState(0)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+
+  // Countdown cooldown
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setInterval(() => setCooldown(c => {
+      if (c <= 1) { clearInterval(t); return 0 }
+      return c - 1
+    }), 1000)
+    return () => clearInterval(t)
+  }, [cooldown])
 
   // Countdown cooldown
   useEffect(() => {
@@ -68,16 +206,14 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem('jateamhub-appearance')
-      const app = saved ? JSON.parse(saved) : null
-      const dark = app?.themeBase === 'obsidian'
+      const app   = saved ? JSON.parse(saved) : null
+      const dark  = app?.themeBase === 'obsidian'
       setIsObsidian(dark)
       applyThemeToDOM(dark ? 'obsidian' : 'ivory-light')
     } catch {
       applyThemeToDOM('ivory-light')
     }
   }, [])
-
-  const [failCount, setFailCount] = useState(0)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -268,11 +404,11 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
               }}
               onFocus={e => {
                 e.target.style.borderColor = 'var(--accent)'
-                e.target.style.background = 'var(--bg3)'
+                e.target.style.background  = 'var(--bg3)'
               }}
               onBlur={e => {
                 e.target.style.borderColor = err ? 'var(--color-error)' : 'var(--border2)'
-                e.target.style.background = 'var(--bg2)'
+                e.target.style.background  = 'var(--bg2)'
               }}
             />
           </div>
@@ -314,11 +450,11 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
                 }}
                 onFocus={e => {
                   e.target.style.borderColor = 'var(--accent)'
-                  e.target.style.background = 'var(--bg3)'
+                  e.target.style.background  = 'var(--bg3)'
                 }}
                 onBlur={e => {
                   e.target.style.borderColor = err ? 'var(--color-error)' : 'var(--border2)'
-                  e.target.style.background = 'var(--bg2)'
+                  e.target.style.background  = 'var(--bg2)'
                 }}
               />
               {/* Show/hide password */}
@@ -396,13 +532,25 @@ export default function LoginPage({ onRegister }: { onRegister?: () => void }) {
         <div style={{
           marginTop: 24, textAlign: 'center',
           fontSize: 12, color: 'var(--silver3)',
+          display: 'flex', flexDirection: 'column', gap: 8,
         }}>
-          Belum punya akun?{' '}
-          <span
-            onClick={onRegister}
-            style={{ color: 'var(--accent)', fontWeight: 600, cursor: 'pointer' }}
-          >Daftar di sini</span>
+          <div>
+            Belum punya akun?{' '}
+            <span onClick={onRegister}
+              style={{ color: 'var(--accent)', fontWeight: 600, cursor: 'pointer' }}
+            >Daftar di sini</span>
+          </div>
+          <div>
+            <span onClick={() => setShowForgotPassword(true)}
+              style={{ color: 'var(--silver3)', cursor: 'pointer', textDecoration: 'underline' }}
+            >Lupa password?</span>
+          </div>
         </div>
+
+        {/* Forgot Password Modal */}
+        {showForgotPassword && (
+          <ForgotPasswordModal onClose={() => setShowForgotPassword(false)} />
+        )}
       </div>
     </div>
   )
