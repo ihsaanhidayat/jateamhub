@@ -505,13 +505,14 @@ export default function GridLayout({ onAddSection }: Props) {
             <div
               key={section.id}
               style={{
+                height: '100%',
                 opacity: q && !visibleIds.has(section.id) ? 0.2 : 1,
                 transition: 'opacity .2s',
                 position: 'relative',
                 paddingTop: 10,
+                boxSizing: 'border-box',
               }}
               onClick={() => {
-                // Trigger focus saat edit mode — grid item wrapper level
                 if (editMode && !isShared) handleFocus(section.id)
               }}
             >

@@ -6,47 +6,49 @@ import { useAuthStore } from '../../store/authStore'
 import { useStore } from '../../store/dashboardStore'
 import {
   getPendingRegistrations, approveRegistration, rejectRegistration,
+  supabase, updateProfile,
 } from '../../utils/supabaseClient'
 import type { PendingRegistration } from '../../utils/supabaseClient'
 import { REGION_LABELS, UNIT_LABELS, canManageUser, getAllowedRoles, getAllowedRegions, getAllowedUnits, getDisplayBadge } from '../../utils/roles'
 import type { Role } from '../../types'
 import type { Profile } from '../../utils/supabaseClient'
 import { REGIONS, UNITS } from '../../types'
-import { updateProfile } from '../../utils/supabaseClient'
 
-const EMOJI_PRESETS = ['','🌸','🔥','⭐','🎯','💎','🚀','🌊','🦁','🐯','🌺','🎨','💡','🍀','🎭','🏆','🦋','🌙','☀️','🍉']
+const EMOJI_PRESETS = ['', '🌸', '🔥', '⭐', '🎯', '💎', '🚀', '🌊', '🦁', '🐯', '🌺', '🎨', '💡', '🍀', '🎭', '🏆', '🦋', '🌙', '☀️', '🍉']
 
 export default function SuperadminDashboard() {
   const { profile, logout, users, loadUsers, addUser, updateUser, removeUser } = useAuthStore()
   const { toast } = useStore()
 
   const [tab, setTab] = useState<'pending' | 'users'>('pending')
-  const [pending,     setPending]     = useState<PendingRegistration[]>([])
+  const [pending, setPending] = useState<PendingRegistration[]>([])
   const [pendingLoad, setPendingLoad] = useState(false)
-  const [rejectId,    setRejectId]    = useState<string | null>(null)
-  const [rejectNote,  setRejectNote]  = useState('')
+  const [rejectId, setRejectId] = useState<string | null>(null)
+  const [rejectNote, setRejectNote] = useState('')
 
   // Users management state
-  const [search,       setSearch]       = useState('')
+  const [search, setSearch] = useState('')
   const [filterRegion, setFilterRegion] = useState('')
-  const [filterUnit,   setFilterUnit]   = useState('')
-  const [page,         setPage]         = useState(0)
-  const [editTarget,   setEditTarget]   = useState<Profile | null>(null)
-  const [editRole,     setEditRole]     = useState<Role>('user')
-  const [editRegion,   setEditRegion]   = useState('global')
-  const [editUnit,     setEditUnit]     = useState('general')
-  const [editPass,     setEditPass]     = useState('')
-  const [editEmoji,    setEditEmoji]    = useState('')
+  const [filterUnit, setFilterUnit] = useState('')
+  const [page, setPage] = useState(0)
+  const [editTarget, setEditTarget] = useState<Profile | null>(null)
+  const [editRole, setEditRole] = useState<Role>('user')
+  const [editRegion, setEditRegion] = useState('global')
+  const [editUnit, setEditUnit] = useState('general')
+  const [editPass, setEditPass] = useState('')
+  const [editEmoji, setEditEmoji] = useState('')
   const [editFullName, setEditFullName] = useState('')
-  const [addMode,      setAddMode]      = useState(false)
-  const [newUser,      setNewUser]      = useState('')
-  const [newPass,      setNewPass]      = useState('')
-  const [newRole,      setNewRole]      = useState<Role>('user')
-  const [newRegion,    setNewRegion]    = useState('sby')
-  const [newUnit,      setNewUnit]      = useState('general')
-  const [newFullName,  setNewFullName]  = useState('')
-  const [err,          setErr]          = useState('')
-  const [saving,       setSaving]       = useState(false)
+  const [editEmail, setEditEmail] = useState('')
+  const [addMode, setAddMode] = useState(false)
+  const [newUser, setNewUser] = useState('')
+  const [newPass, setNewPass] = useState('')
+  const [newRole, setNewRole] = useState<Role>('user')
+  const [newRegion, setNewRegion] = useState('sby')
+  const [newUnit, setNewUnit] = useState('general')
+  const [newFullName, setNewFullName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [err, setErr] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const PER_PAGE = 50
   const pendingCount = pending.filter(p => p.status === 'pending').length
@@ -84,7 +86,7 @@ export default function SuperadminDashboard() {
       u.username.toLowerCase().includes(search.toLowerCase()) ||
       (u.full_name ?? '').toLowerCase().includes(search.toLowerCase())
     const matchRegion = !filterRegion || (u.region_scope ?? 'global') === filterRegion
-    const matchUnit   = !filterUnit   || (u.unit_scope   ?? 'general') === filterUnit
+    const matchUnit = !filterUnit || (u.unit_scope ?? 'general') === filterUnit
     return matchSearch && matchRegion && matchUnit
   })
   const pagedUsers = filteredUsers.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
@@ -94,13 +96,13 @@ export default function SuperadminDashboard() {
     setEditTarget(u); setEditRole(u.role as Role)
     setEditRegion(u.region_scope ?? 'global'); setEditUnit(u.unit_scope ?? 'general')
     setEditPass(''); setEditEmoji(u.emoji ?? u.avatar_emoji ?? '')
-    setEditFullName(u.full_name ?? ''); setErr(''); setAddMode(false)
+    setEditFullName(u.full_name ?? ''); setEditEmail((u as any).email ?? '')
+    setErr(''); setAddMode(false)
   }
 
   const handleSaveUser = async () => {
     if (!editTarget) return
     setErr(''); setSaving(true)
-    // Update initials otomatis dari full_name
     const nameParts = editFullName.trim().split(' ').filter(Boolean)
     const initials = nameParts.length >= 2
       ? (nameParts[0][0] + nameParts[1][0]).toUpperCase()
@@ -109,6 +111,10 @@ export default function SuperadminDashboard() {
     const error = await updateUser(editTarget.id, editRole, editUnit, editPass || undefined, editEmoji, editRegion, editUnit)
     if (!error) {
       await updateProfile(editTarget.id, { full_name: editFullName, initials } as any)
+      // Simpan email jika berubah
+      if (editEmail !== ((editTarget as any).email ?? '')) {
+        await supabase.from('profiles').update({ email: editEmail }).eq('id', editTarget.id)
+      }
     }
     setSaving(false)
     if (error) { setErr(error); return }
@@ -120,9 +126,14 @@ export default function SuperadminDashboard() {
     const error = await addUser(newUser.trim(), newPass, newRole, newUnit, newRegion, newUnit)
     setSaving(false)
     if (error) { setErr(error); return }
+    // Simpan email jika ada
+    if (newEmail) {
+      const { data: np } = await supabase.from('profiles').select('id').eq('username', newUser.trim().toLowerCase()).single()
+      if (np?.id) await supabase.from('profiles').update({ email: newEmail }).eq('id', np.id)
+    }
     toast(`"${newUser}" ditambahkan.`, 'success')
     setNewUser(''); setNewPass(''); setNewRole('user'); setNewRegion('sby'); setNewUnit('general')
-    setNewFullName(''); setAddMode(false); loadUsers()
+    setNewFullName(''); setNewEmail(''); setAddMode(false); loadUsers()
   }
 
   const inputSt: React.CSSProperties = {
@@ -166,7 +177,7 @@ export default function SuperadminDashboard() {
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg2)', flexShrink: 0 }}>
         {[
           { id: 'pending', label: `📋 Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
-          { id: 'users',   label: `👥 Users (${users.length})` },
+          { id: 'users', label: `👥 Users (${users.length})` },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)} style={{
             padding: '12px 24px', fontSize: 12, fontWeight: 700,
@@ -371,6 +382,18 @@ export default function SuperadminDashboard() {
                   </div>
                 )}
 
+                {/* Email — untuk OTP reset password */}
+                <div style={{ marginBottom: 10 }}>
+                  <label style={labelSt}>Email {addMode ? '*' : '(untuk reset password)'}</label>
+                  <input
+                    type="email"
+                    value={addMode ? newEmail : editEmail}
+                    onChange={e => addMode ? setNewEmail(e.target.value) : setEditEmail(e.target.value)}
+                    placeholder="user@email.com"
+                    style={inputSt}
+                  />
+                </div>
+
                 {!addMode && (
                   <div style={{ marginBottom: 10 }}>
                     <label style={labelSt}>Emoji (tampil di samping nama)</label>
@@ -403,10 +426,10 @@ export default function SuperadminDashboard() {
             {/* User list */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {pagedUsers.map(u => {
-                const b      = getDisplayBadge(u as any)
-                const isMe   = u.id === profile?.id
-                const canEd  = canManageUser(profile as any, u as any)
-                const inits  = (u as any).initials || (u.full_name?.slice(0, 2) || u.username.slice(0, 2)).toUpperCase()
+                const b = getDisplayBadge(u as any)
+                const isMe = u.id === profile?.id
+                const canEd = canManageUser(profile as any, u as any)
+                const inits = (u as any).initials || (u.full_name?.slice(0, 2) || u.username.slice(0, 2)).toUpperCase()
                 return (
                   <div key={u.id} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
@@ -462,14 +485,14 @@ export default function SuperadminDashboard() {
             {/* Pagination */}
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: 5, marginTop: 14 }}>
-                <button onClick={() => setPage(p => Math.max(0, p-1))} disabled={page===0}
-                  style={{ padding: '5px 12px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 5, color: page===0 ? 'var(--silver3)' : 'var(--silver)', cursor: page===0 ? 'not-allowed' : 'pointer', fontSize: 12 }}>← Prev</button>
-                {Array.from({length: Math.min(totalPages, 7)}, (_,i) => {
-                  const p = totalPages <= 7 ? i : Math.max(0, Math.min(page-3, totalPages-7))+i
-                  return <button key={p} onClick={() => setPage(p)} style={{ padding: '5px 10px', background: p===page ? 'var(--mint-bg2)' : 'var(--bg2)', border: `1px solid ${p===page ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 5, color: p===page ? 'var(--accent)' : 'var(--silver)', cursor: 'pointer', fontSize: 12 }}>{p+1}</button>
+                <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                  style={{ padding: '5px 12px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 5, color: page === 0 ? 'var(--silver3)' : 'var(--silver)', cursor: page === 0 ? 'not-allowed' : 'pointer', fontSize: 12 }}>← Prev</button>
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  const p = totalPages <= 7 ? i : Math.max(0, Math.min(page - 3, totalPages - 7)) + i
+                  return <button key={p} onClick={() => setPage(p)} style={{ padding: '5px 10px', background: p === page ? 'var(--mint-bg2)' : 'var(--bg2)', border: `1px solid ${p === page ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 5, color: p === page ? 'var(--accent)' : 'var(--silver)', cursor: 'pointer', fontSize: 12 }}>{p + 1}</button>
                 })}
-                <button onClick={() => setPage(p => Math.min(totalPages-1, p+1))} disabled={page>=totalPages-1}
-                  style={{ padding: '5px 12px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 5, color: page>=totalPages-1 ? 'var(--silver3)' : 'var(--silver)', cursor: page>=totalPages-1 ? 'not-allowed' : 'pointer', fontSize: 12 }}>Next →</button>
+                <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+                  style={{ padding: '5px 12px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 5, color: page >= totalPages - 1 ? 'var(--silver3)' : 'var(--silver)', cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer', fontSize: 12 }}>Next →</button>
               </div>
             )}
           </div>

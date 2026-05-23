@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useStore }     from '../store/dashboardStore'
+import { supabase }     from '../utils/supabaseClient'
 import { getAllowedRegions, getAllowedUnits, getAllowedRoles, getDisplayBadge } from '../utils/roles'
 import type { Role } from '../types'
 import type { Profile } from '../utils/supabaseClient'
@@ -35,6 +36,7 @@ export function useUserManagement() {
   const [editUnitScope,setEditUnitScope]= useState('general')
   const [editPass,     setEditPass]     = useState('')
   const [editEmoji,    setEditEmoji]    = useState('')
+  const [editEmail,    setEditEmail]    = useState('')
 
   // Add state
   const [addMode,      setAddMode]      = useState(false)
@@ -44,6 +46,7 @@ export function useUserManagement() {
   const [newRegion,    setNewRegion]    = useState('global')
   const [newUnitScope, setNewUnitScope] = useState('general')
   const [newUnitId,    setNewUnitId]    = useState('')
+  const [newEmail,     setNewEmail]     = useState('')
 
   const [saving, setSaving] = useState(false)
   const [err,    setErr]    = useState('')
@@ -84,6 +87,7 @@ export function useUserManagement() {
     setEditUnitScope(u.unit_scope ?? 'general')
     setEditPass('')
     setEditEmoji(u.emoji ?? u.avatar_emoji ?? '')
+    setEditEmail((u as any).email ?? '')
     setErr('')
     setAddMode(false)
   }
@@ -94,6 +98,7 @@ export function useUserManagement() {
     setNewUser(''); setNewUPass('')
     setNewRole('user'); setNewRegion('global')
     setNewUnitScope('general'); setNewUnitId('')
+    setNewEmail('')
     setErr('')
   }
 
@@ -105,6 +110,10 @@ export function useUserManagement() {
       editPass || undefined, editEmoji,
       editRegion, editUnitScope,
     )
+    // Update email terpisah jika berubah
+    if (!error && editEmail !== ((editTarget as any).email ?? '')) {
+      await supabase.from('profiles').update({ email: editEmail }).eq('id', editTarget.id)
+    }
     setSaving(false)
     if (error) { setErr(error); return }
     toast('User diperbarui.', 'success')
@@ -115,11 +124,18 @@ export function useUserManagement() {
   const handleAddUser = async () => {
     setErr(''); setSaving(true)
     const error = await addUser(newUser.trim(), newUPass, newRole, newUnitId, newRegion, newUnitScope)
+    // Simpan email jika ada
+    if (!error && newEmail) {
+      const { data: newProfile } = await supabase.from('profiles').select('id').eq('username', newUser.trim().toLowerCase()).single()
+      if (newProfile?.id) {
+        await supabase.from('profiles').update({ email: newEmail }).eq('id', newProfile.id)
+      }
+    }
     setSaving(false)
     if (error) { setErr(error); return }
     toast(`"${newUser}" ditambahkan.`, 'success')
     setNewUser(''); setNewUPass(''); setNewRole('user')
-    setNewRegion('global'); setNewUnitScope('general'); setNewUnitId('')
+    setNewRegion('global'); setNewUnitScope('general'); setNewUnitId(''); setNewEmail('')
     setAddMode(false)
     loadUsers(true)
   }
@@ -142,11 +158,13 @@ export function useUserManagement() {
     editTarget, editRole, setEditRole, editUnit, setEditUnit,
     editRegion, setEditRegion, editUnitScope, setEditUnitScope,
     editPass, setEditPass, editEmoji, setEditEmoji,
+    editEmail, setEditEmail,
     // Add
     addMode, setAddMode, openAdd,
     newUser, setNewUser, newUPass, setNewUPass,
     newRole, setNewRole, newRegion, setNewRegion,
     newUnitScope, setNewUnitScope, newUnitId, setNewUnitId,
+    newEmail, setNewEmail,
     // Actions
     openEdit, handleSaveUser, handleAddUser, handleDeleteUser,
     // Status
