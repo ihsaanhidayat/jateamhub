@@ -1,8 +1,93 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { useStore } from '../../store/dashboardStore'
+import { supabase } from '../../utils/supabaseClient'
 import { REGION_LABELS, UNIT_LABELS, canManageUser, getDisplayBadge } from '../../utils/roles'
 import type { Role } from '../../types'
+
+// ── Ganti Password Mandiri ────────────────────────────────────
+function ChangePasswordSection({ profileId, username }: { profileId?: string, username?: string }) {
+  const [open,      setOpen]      = useState(false)
+  const [oldPw,     setOldPw]     = useState('')
+  const [newPw,     setNewPw]     = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [showPw,    setShowPw]    = useState(false)
+  const [err,       setErr]       = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [done,      setDone]      = useState(false)
+
+  const handleChange = async () => {
+    if (!oldPw) return setErr('Masukkan password lama.')
+    if (!newPw || newPw.length < 6) return setErr('Password baru minimal 6 karakter.')
+    if (newPw !== confirmPw) return setErr('Konfirmasi password tidak cocok.')
+    if (oldPw === newPw) return setErr('Password baru harus berbeda dari password lama.')
+    setLoading(true); setErr('')
+    try {
+      // Verifikasi password lama
+      const email = `${username}@jateamhub.app`
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({ email, password: oldPw })
+      if (verifyErr) { setErr('Password lama salah.'); setLoading(false); return }
+
+      // Ganti password
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qsvrqdnyjywjzxkqwszl.supabase.co/functions/v1/update-user-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ userId: profileId, newPassword: newPw, forceChange: false })
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) { setErr(data.error ?? 'Gagal ganti password.'); setLoading(false); return }
+      setDone(true)
+      setTimeout(() => { setOpen(false); setDone(false); setOldPw(''); setNewPw(''); setConfirmPw('') }, 2000)
+    } catch { setErr('Koneksi gagal. Coba lagi.') }
+    setLoading(false)
+  }
+
+  const inputSt: React.CSSProperties = {
+    width: '100%', height: 40, background: 'var(--bg2)',
+    border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)',
+    padding: '0 14px', color: 'var(--silver)', fontSize: 13,
+    fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box',
+  }
+
+  return (
+    <div>
+      {!open ? (
+        <button onClick={() => setOpen(true)} style={{
+          width: '100%', padding: '10px 14px', background: 'none',
+          border: '1px solid var(--border2)', borderRadius: 'var(--radius)',
+          color: 'var(--silver3)', fontSize: 12, cursor: 'pointer',
+          fontFamily: 'var(--font)', textAlign: 'left',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>🔑 Ganti Password</button>
+      ) : (
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', padding: 'var(--sp-4)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--silver)', marginBottom: 12 }}>🔑 Ganti Password</div>
+          {done ? (
+            <div style={{ textAlign: 'center', padding: '12px 0', color: '#22C55E', fontSize: 13, fontWeight: 600 }}>✅ Password berhasil diganti!</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ position: 'relative' }}>
+                <input type={showPw ? 'text' : 'password'} value={oldPw} onChange={e => { setOldPw(e.target.value); setErr('') }} placeholder="Password lama" style={{ ...inputSt, paddingRight: 40 }} />
+                <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)', fontSize: 13 }}>{showPw ? '🙈' : '👁'}</button>
+              </div>
+              <input type={showPw ? 'text' : 'password'} value={newPw} onChange={e => { setNewPw(e.target.value); setErr('') }} placeholder="Password baru (min. 6 karakter)" style={inputSt} />
+              <input type={showPw ? 'text' : 'password'} value={confirmPw} onChange={e => { setConfirmPw(e.target.value); setErr('') }} placeholder="Konfirmasi password baru" style={inputSt} />
+              {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setOpen(false); setOldPw(''); setNewPw(''); setConfirmPw(''); setErr('') }} style={{ flex: 1, height: 36, background: 'none', border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)', color: 'var(--silver3)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
+                <button onClick={handleChange} disabled={loading} style={{ flex: 2, height: 36, background: 'var(--accent)', border: 'none', borderRadius: 'var(--radius-sm)', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', opacity: loading ? 0.6 : 1 }}>{loading ? 'Menyimpan...' : 'Simpan'}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 import { UNITS } from '../../types'
 import { updateProfile } from '../../utils/supabaseClient'
 import type { Profile } from '../../utils/supabaseClient'
@@ -316,6 +401,9 @@ export default function ProfilePage({ onClose }: Props) {
               }}>
                 🔒 Wilayah, unit, dan username tidak dapat diubah. Hubungi Admin untuk perubahan.
               </div>
+
+              {/* Ganti Password Mandiri */}
+              <ChangePasswordSection profileId={profile?.id} username={profile?.username} />
 
               {/* Preview foto fullscreen */}
               {showAvatarPreview && profile?.avatar_url && (

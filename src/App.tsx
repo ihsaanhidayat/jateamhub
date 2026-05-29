@@ -15,9 +15,10 @@ const OptionsPanel        = lazy(() => import('./components/layout/OptionsPanel'
 const ProfilePage         = lazy(() => import('./components/layout/ProfilePage'))
 const PanduanFAB          = lazy(() => import('./components/layout/PanduanFAB'))
 const CoffeeModal         = lazy(() => import('./components/ui/CoffeeModal'))
-const AddSectionModal     = lazy(() => import('./components/layout/AddSectionModal'))
-const ImportLinksModal    = lazy(() => import('./components/ui/ImportLinksModal'))
-const OnboardingOverlay   = lazy(() => import('./components/ui/OnboardingOverlay'))
+const AddSectionModal          = lazy(() => import('./components/layout/AddSectionModal'))
+const ImportLinksModal         = lazy(() => import('./components/ui/ImportLinksModal'))
+const ForceChangePasswordModal = lazy(() => import('./components/ui/ForceChangePasswordModal'))
+const OnboardingOverlay        = lazy(() => import('./components/ui/OnboardingOverlay'))
 
 import './styles/global.css'
 import 'react-grid-layout/css/styles.css'
@@ -235,6 +236,14 @@ export default function App() {
 
   if (!profile && showRegister) return <RegisterPage onBack={() => setShowRegister(false)} />
   if (!profile) return <LoginPage onRegister={() => setShowRegister(true)} />
+
+  // Force password change jika admin sudah reset password user
+  if ((profile as any).force_password_change) return (
+    <Suspense fallback={null}>
+      <ForceChangePasswordModal />
+      <ToastContainer />
+    </Suspense>
+  )
 
   if (profile.role === 'superadmin') return (
     <Suspense fallback={null}>

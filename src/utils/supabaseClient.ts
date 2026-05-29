@@ -299,11 +299,15 @@ export const createUser = (
   role:         Profile['role'],
   unit_id:      string,
   region_scope?: string,
-  unit_scope?:   string
+  unit_scope?:   string,
+  full_name?:    string,
+  phone?:        string,
 ) => edgeFetch('create-user', {
   username, password, role, unit_id,
   region_scope: region_scope ?? 'global',
   unit_scope:   unit_scope   ?? 'general',
+  full_name:    full_name    ?? '',
+  phone:        phone        ?? '',
 })
 
 // Reset password user via Edge Function
@@ -356,11 +360,11 @@ export const approveRegistration = async (
 ) => {
   const result = await createUser(
     reg.username, reg.temp_password, 'user',
-    reg.unit_scope, reg.region_scope, reg.unit_scope
+    reg.unit_scope, reg.region_scope, reg.unit_scope,
+    reg.full_name, reg.phone,
   )
   if ((result as any).error) return result
 
-  // Update status jadi approved
   await supabase.from('pending_registrations').update({
     status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: reviewerId,
   }).eq('id', regId)
