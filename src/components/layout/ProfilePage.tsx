@@ -4,17 +4,62 @@ import { useStore } from '../../store/dashboardStore'
 import { supabase } from '../../utils/supabaseClient'
 import { REGION_LABELS, UNIT_LABELS, canManageUser, getDisplayBadge } from '../../utils/roles'
 import type { Role } from '../../types'
+import { REGIONS, UNITS } from '../../types'
+import { updateProfile } from '../../utils/supabaseClient'
+import type { Profile } from '../../utils/supabaseClient'
+import { useUserManagement, EMOJI_PRESETS } from '../../hooks/useUserManagement'
+
+// ── Detail Info — collapsible ─────────────────────────────────
+function DetailInfo({ profile }: { profile: any }) {
+  const [open, setOpen] = useState(false)
+  const rows = [
+    { label: 'Username', value: `@${profile?.username}` },
+    { label: 'Wilayah', value: REGION_LABELS[profile?.region_scope] ?? profile?.region_scope ?? '—' },
+    { label: 'Unit', value: UNIT_LABELS[profile?.unit_scope] ?? profile?.unit_scope ?? '—' },
+    { label: 'Role', value: profile?.role ?? '—' },
+  ]
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+      <button onClick={() => setOpen(v => !v)} style={{
+        width: '100%', padding: '11px 14px', background: 'var(--bg4)',
+        border: 'none', cursor: 'pointer', display: 'flex',
+        alignItems: 'center', justifyContent: 'space-between',
+        fontFamily: 'var(--font)',
+      }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--silver2)' }}>Detail Akun</span>
+        <span style={{ fontSize: 11, color: 'var(--silver4)', transition: 'transform 150ms', transform: open ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>▾</span>
+      </button>
+      {open && (
+        <div style={{ borderTop: '1px solid var(--border)' }}>
+          {rows.map((r, i) => (
+            <div key={r.label} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '9px 14px', background: i % 2 === 0 ? 'var(--bg4)' : 'var(--bg2)',
+              fontSize: 13,
+            }}>
+              <span style={{ color: 'var(--silver3)', fontSize: 11, fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{r.label}</span>
+              <span style={{ color: 'var(--silver)', fontWeight: 500 }}>{r.value}</span>
+            </div>
+          ))}
+          <div style={{ padding: '8px 14px', background: 'var(--bg4)', borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--silver4)' }}>
+            🔒 Username, wilayah, dan unit tidak dapat diubah. Hubungi Admin.
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Ganti Password Mandiri ────────────────────────────────────
 function ChangePasswordSection({ profileId, username }: { profileId?: string, username?: string }) {
-  const [open,      setOpen]      = useState(false)
-  const [oldPw,     setOldPw]     = useState('')
-  const [newPw,     setNewPw]     = useState('')
+  const [open, setOpen] = useState(false)
+  const [oldPw, setOldPw] = useState('')
+  const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
-  const [showPw,    setShowPw]    = useState(false)
-  const [err,       setErr]       = useState('')
-  const [loading,   setLoading]   = useState(false)
-  const [done,      setDone]      = useState(false)
+  const [showPw, setShowPw] = useState(false)
+  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [done, setDone] = useState(false)
 
   const handleChange = async () => {
     if (!oldPw) return setErr('Masukkan password lama.')
@@ -67,7 +112,7 @@ function ChangePasswordSection({ profileId, username }: { profileId?: string, us
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', padding: 'var(--sp-4)' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--silver)', marginBottom: 12 }}>🔑 Ganti Password</div>
           {done ? (
-            <div style={{ textAlign: 'center', padding: '12px 0', color: '#22C55E', fontSize: 13, fontWeight: 600 }}>✅ Password berhasil diganti!</div>
+            <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--green, #16A34A)', fontSize: 13, fontWeight: 600 }}>✅ Password berhasil diganti!</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ position: 'relative' }}>
@@ -88,21 +133,17 @@ function ChangePasswordSection({ profileId, username }: { profileId?: string, us
     </div>
   )
 }
-import { UNITS } from '../../types'
-import { updateProfile } from '../../utils/supabaseClient'
-import type { Profile } from '../../utils/supabaseClient'
-import { useUserManagement, EMOJI_PRESETS } from '../../hooks/useUserManagement'
 
 interface Props { onClose: () => void }
 
 export default function ProfilePage({ onClose }: Props) {
   const { profile } = useAuthStore()
-  const { toast }   = useStore()
+  const { toast } = useStore()
 
   const um = useUserManagement()
   const { canManage, isSuperAdmin } = um
 
-  const [showAvatarMenu,    setShowAvatarMenu]    = useState(false)
+  const [showAvatarMenu, setShowAvatarMenu] = useState(false)
   const [showAvatarPreview, setShowAvatarPreview] = useState(false)
 
   // Tutup avatar menu saat klik di luar
@@ -115,10 +156,10 @@ export default function ProfilePage({ onClose }: Props) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showAvatarMenu])
-  const [siteTitle,    setSiteTitle]    = useState('')
+  const [siteTitle, setSiteTitle] = useState('')
   const [siteSubtitle, setSiteSubtitle] = useState('')
-  const [coffeeUrl,    setCoffeeUrl]    = useState('')
-  const [logoUrl,      setLogoUrl]      = useState('')
+  const [coffeeUrl, setCoffeeUrl] = useState('')
+  const [logoUrl, setLogoUrl] = useState('')
 
   const handleSaveSettings = async () => {
     // Simpan settings ke dashboard_config di Supabase
@@ -126,10 +167,10 @@ export default function ProfilePage({ onClose }: Props) {
     const CONFIG_ID = '00000000-0000-0000-0000-000000000001'
     const { data } = await supabase.from('dashboard_config').select('config').eq('id', CONFIG_ID).single()
     const cfg = (data?.config ?? {}) as Record<string, unknown>
-    cfg.title    = siteTitle
+    cfg.title = siteTitle
     cfg.subtitle = siteSubtitle
-    cfg.coffeeUrl= coffeeUrl
-    cfg.logoUrl  = logoUrl
+    cfg.coffeeUrl = coffeeUrl
+    cfg.logoUrl = logoUrl
     await supabase.from('dashboard_config').update({ config: cfg }).eq('id', CONFIG_ID)
     toast('Settings disimpan.', 'success')
   }
@@ -144,14 +185,14 @@ export default function ProfilePage({ onClose }: Props) {
 
   // Edit nama lengkap
   const [editingName, setEditingName] = useState(false)
-  const [nameValue,   setNameValue]   = useState(profile?.full_name || '')
-  const [nameSaving,  setNameSaving]  = useState(false)
+  const [nameValue, setNameValue] = useState(profile?.full_name || '')
+  const [nameSaving, setNameSaving] = useState(false)
 
   const handleSaveName = async () => {
     if (!profile || !nameValue.trim()) return
     setNameSaving(true)
     try {
-      const parts    = nameValue.trim().split(' ').filter(Boolean)
+      const parts = nameValue.trim().split(' ').filter(Boolean)
       const initials = parts.length >= 2
         ? (parts[0][0] + parts[1][0]).toUpperCase()
         : nameValue.slice(0, 2).toUpperCase()
@@ -222,7 +263,7 @@ export default function ProfilePage({ onClose }: Props) {
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTabState(t.id as any)} style={{
               flex: 1, height: 44, fontSize: 11, fontWeight: 600,
-              background: tabState === t.id ? 'var(--mint-bg)' : 'none',
+              background: 'none',
               border: 'none', borderBottom: `2px solid ${tabState === t.id ? 'var(--accent)' : 'transparent'}`,
               color: tabState === t.id ? 'var(--accent)' : 'var(--silver3)',
               cursor: 'pointer', transition: 'all 150ms var(--ease)', fontFamily: 'var(--font)',
@@ -236,193 +277,104 @@ export default function ProfilePage({ onClose }: Props) {
 
           {/* ── PROFILE TAB ── */}
           {tabState === 'profile' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
-              {/* Avatar + nama + badge */}
-              <div data-avatar-area style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)', marginBottom: 'var(--sp-2)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* ── Avatar + identitas utama ── */}
+              <div data-avatar-area style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <div
-                    onClick={() => setShowAvatarMenu(v => !v)}
-                    style={{
-                      width: 64, height: 64, borderRadius: '50%',
-                      background: 'var(--mint-bg)', border: '2px solid var(--accent)',
-                      overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 22, color: 'var(--accent)', cursor: 'pointer',
-                    }}>
+                  <div onClick={() => setShowAvatarMenu(v => !v)} style={{
+                    width: 60, height: 60, borderRadius: '50%', cursor: 'pointer',
+                    background: 'var(--accent-light)', border: '2px solid var(--border2)',
+                    overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 20, color: 'var(--accent)', fontWeight: 700,
+                    transition: 'border-color 150ms',
+                  }}>
                     {profile?.avatar_url
-                      ? <img src={profile.avatar_url} alt={profile.full_name || profile.username || 'Avatar'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : ((profile?.full_name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') ?? profile?.username?.slice(0,2) ?? '?').toUpperCase())
+                      ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : (profile?.full_name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('') ?? profile?.username?.slice(0, 2) ?? '?').toUpperCase()
                     }
                   </div>
-                  {/* Avatar menu — lihat atau ganti */}
                   {showAvatarMenu && (
                     <div style={{
                       position: 'absolute', top: 68, left: 0, zIndex: 100,
-                      background: 'var(--bg3)', border: '1px solid var(--border2)',
-                      borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)',
+                      background: 'var(--bg2)', border: '1px solid var(--border2)',
+                      borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
                       minWidth: 140, overflow: 'hidden',
                     }}>
                       {profile?.avatar_url && (
-                        <button onClick={() => { setShowAvatarMenu(false); setShowAvatarPreview(true) }} style={{
-                          width: '100%', padding: '10px 14px', background: 'none', border: 'none',
-                          borderBottom: '1px solid var(--border)', textAlign: 'left',
-                          fontSize: 12, color: 'var(--silver)', cursor: 'pointer', fontFamily: 'var(--font)',
-                        }}>👁 Lihat Foto</button>
+                        <button onClick={() => { setShowAvatarMenu(false); setShowAvatarPreview(true) }}
+                          style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 12, color: 'var(--silver2)', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                          👁 Lihat Foto
+                        </button>
                       )}
-                      <label htmlFor="profile-tab-avatar" style={{
-                        display: 'block', padding: '10px 14px',
-                        fontSize: 12, color: 'var(--silver)', cursor: 'pointer', fontFamily: 'var(--font)',
-                      }}>✏️ Ganti Foto
+                      <label htmlFor="profile-tab-avatar" style={{ display: 'block', padding: '10px 14px', fontSize: 12, color: 'var(--silver2)', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        ✏️ Ganti Foto
                         <input id="profile-tab-avatar" type="file" accept="image/*" style={{ display: 'none' }}
                           onChange={e => {
-                            const file = e.target.files?.[0]
-                            if (!file) return
-                            e.target.value = ''
+                            const file = e.target.files?.[0]; if (!file) return; e.target.value = ''
                             setShowAvatarMenu(false)
                             const reader = new FileReader()
-                            reader.onload = ev => {
-                              const dataUrl = ev.target?.result as string
-                              if (dataUrl) {
-                                window.dispatchEvent(new CustomEvent('avatar-upload', { detail: dataUrl }))
-                                onClose()
-                              }
-                            }
+                            reader.onload = ev => { const d = ev.target?.result as string; if (d) { window.dispatchEvent(new CustomEvent('avatar-upload', { detail: d })); onClose() } }
                             reader.readAsDataURL(file)
                           }} />
                       </label>
                     </div>
                   )}
                 </div>
-                <div>
-                  {/* Nama + badge role di sebelahnya */}
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--silver)' }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--silver)' }}>
                       {profile?.full_name || profile?.username}
                     </span>
                     {badge && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99,
-                        background: badge.color, color: '#0A0A0A',
-                        fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.5px',
-                      }}>{badge.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 99, background: badge.color, color: '#0A0A0A', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {badge.label}
+                      </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--silver3)', marginTop: 2 }}>@{profile?.username}</div>
+                  <div style={{ fontSize: 12, color: 'var(--silver3)', marginTop: 3 }}>@{profile?.username}</div>
                 </div>
               </div>
 
-              {/* Nama Lengkap — editable */}
-              <div style={{
-                padding: 'var(--sp-3) var(--sp-4)', background: 'var(--bg2)',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-              }}>
-                <div style={{ fontSize: 10, color: 'var(--silver3)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 6 }}>
+              {/* ── Nama Lengkap — editable ── */}
+              <div style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>
                   Nama Lengkap
                 </div>
                 {editingName ? (
-                  <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
-                    <input
-                      value={nameValue}
-                      onChange={e => setNameValue(e.target.value)}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input value={nameValue} onChange={e => setNameValue(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false) }}
-                      autoFocus
-                      style={{ ...inputStyle, flex: 1 }}
-                    />
-                    <button onClick={handleSaveName} disabled={nameSaving} style={{
-                      height: 36, padding: '0 var(--sp-3)', background: 'var(--accent)',
-                      border: 'none', borderRadius: 'var(--radius-sm)', color: 'white',
-                      fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
-                    }}>{nameSaving ? '...' : 'Simpan'}</button>
-                    <button onClick={() => setEditingName(false)} style={{
-                      height: 36, padding: '0 var(--sp-2)', background: 'none',
-                      border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)',
-                      color: 'var(--silver3)', cursor: 'pointer', fontFamily: 'var(--font)',
-                    }}>✕</button>
+                      autoFocus style={{ ...inputStyle, flex: 1 }} />
+                    <button onClick={handleSaveName} disabled={nameSaving} style={{ height: 36, padding: '0 14px', background: 'var(--accent)', border: 'none', borderRadius: 8, color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      {nameSaving ? '...' : 'Simpan'}
+                    </button>
+                    <button onClick={() => setEditingName(false)} style={{ height: 36, padding: '0 10px', background: 'none', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--silver3)', cursor: 'pointer' }}>✕</button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 14, color: 'var(--silver)', fontWeight: 500 }}>
-                      {profile?.full_name || '—'}
+                      {profile?.full_name || <span style={{ color: 'var(--silver4)', fontStyle: 'italic' }}>Belum diisi</span>}
                     </span>
-                    <button onClick={() => { setNameValue(profile?.full_name || ''); setEditingName(true) }} style={{
-                      background: 'none', border: 'none', color: 'var(--accent)',
-                      fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600,
-                    }}>✏️ Edit</button>
+                    <button onClick={() => { setNameValue(profile?.full_name || ''); setEditingName(true) }}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: 'var(--font)' }}>
+                      Edit
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Username */}
-              <div style={{
-                padding: 'var(--sp-3) var(--sp-4)', background: 'var(--bg2)',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <div>
-                  <div style={{ fontSize: 10, color: 'var(--silver3)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Username</div>
-                  <span style={{ fontSize: 14, color: 'var(--silver)', fontWeight: 500 }}>@{profile?.username}</span>
-                </div>
-                <span style={{ fontSize: 11, color: 'var(--silver3)' }}>🔒</span>
-              </div>
-
-              {/* Wilayah */}
-              <div style={{
-                padding: 'var(--sp-3) var(--sp-4)', background: 'var(--bg2)',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <div>
-                  <div style={{ fontSize: 10, color: 'var(--silver3)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Wilayah</div>
-                  <span style={{ fontSize: 14, color: 'var(--silver)', fontWeight: 500 }}>
-                    {REGION_LABELS[(profile as any)?.region_scope] ?? (profile as any)?.region_scope ?? '—'}
-                  </span>
-                </div>
-                <span style={{ fontSize: 11, color: 'var(--silver3)' }}>🔒</span>
-              </div>
-
-              {/* Unit */}
-              <div style={{
-                padding: 'var(--sp-3) var(--sp-4)', background: 'var(--bg2)',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <div>
-                  <div style={{ fontSize: 10, color: 'var(--silver3)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Unit</div>
-                  <span style={{ fontSize: 14, color: 'var(--silver)', fontWeight: 500 }}>
-                    {UNIT_LABELS[(profile as any)?.unit_scope] ?? (profile as any)?.unit_scope ?? '—'}
-                  </span>
-                </div>
-                <span style={{ fontSize: 11, color: 'var(--silver3)' }}>🔒</span>
-              </div>
-
-              <div style={{
-                padding: 'var(--sp-3) var(--sp-4)',
-                background: 'var(--mint-bg)', border: '1px solid var(--border2)',
-                borderRadius: 'var(--radius)', fontSize: 12, color: 'var(--silver3)', lineHeight: 1.6,
-              }}>
-                🔒 Wilayah, unit, dan username tidak dapat diubah. Hubungi Admin untuk perubahan.
-              </div>
-
-              {/* Ganti Password Mandiri */}
+              {/* ── Ganti Password — langsung terlihat ── */}
               <ChangePasswordSection profileId={profile?.id} username={profile?.username} />
+
+              {/* ── Detail info — collapsible ── */}
+              <DetailInfo profile={profile} />
 
               {/* Preview foto fullscreen */}
               {showAvatarPreview && profile?.avatar_url && (
-                <div
-                  onClick={() => setShowAvatarPreview(false)}
-                  style={{
-                    position: 'fixed', inset: 0, zIndex: 9999,
-                    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'zoom-out',
-                  }}>
-                  <img src={profile.avatar_url} alt="Foto profil"
-                    style={{ maxWidth: '85vw', maxHeight: '85vh', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
-                  <button onClick={() => setShowAvatarPreview(false)} style={{
-                    position: 'absolute', top: 20, right: 20,
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)',
-                    color: 'white', fontSize: 18, cursor: 'pointer',
-                  }}>✕</button>
+                <div onClick={() => setShowAvatarPreview(false)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
+                  <img src={profile.avatar_url} alt="Foto profil" style={{ maxWidth: '85vw', maxHeight: '85vh', borderRadius: 16 }} />
+                  <button onClick={() => setShowAvatarPreview(false)} style={{ position: 'absolute', top: 20, right: 20, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: 18, cursor: 'pointer' }}>✕</button>
                 </div>
               )}
             </div>
@@ -441,7 +393,7 @@ export default function ProfilePage({ onClose }: Props) {
                 </select>
                 <select value={um.filterUnit} onChange={e => { um.setFilterUnit(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Unit</option>
-                  {(UNITS as readonly {label: string; value: string}[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                  {(UNITS as readonly { label: string; value: string }[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                 </select>
                 <select value={um.filterRole} onChange={e => { um.setFilterRole(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Role</option>
@@ -450,7 +402,7 @@ export default function ProfilePage({ onClose }: Props) {
                   {isSuperAdmin && <option value="superadmin">Superadmin</option>}
                 </select>
                 <button onClick={() => { um.openAdd() }} style={{
-                  padding: '7px 14px', background: 'var(--mint-bg)', border: '1px solid var(--accent-glow)',
+                  padding: '7px 14px', background: 'var(--accent-light)', border: '1px solid var(--accent-glow)',
                   borderRadius: 6, color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap',
                 }}>＋ Tambah</button>
               </div>
@@ -539,7 +491,7 @@ export default function ProfilePage({ onClose }: Props) {
                             width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: e ? 14 : 9, cursor: 'pointer', borderRadius: 5,
                             border: `1px solid ${um.editEmoji === e ? 'var(--accent)' : 'var(--border2)'}`,
-                            background: um.editEmoji === e ? 'var(--mint-bg2)' : 'var(--bg4)',
+                            background: um.editEmoji === e ? 'var(--accent-soft)' : 'var(--bg4)',
                             transition: 'all .12s', color: e ? 'inherit' : 'var(--silver3)',
                           }}>{e || '✕'}</div>
                         ))}
@@ -552,7 +504,7 @@ export default function ProfilePage({ onClose }: Props) {
                     <button onClick={() => { um.setAddMode(false); um.setErr('') }}
                       style={{ flex: 1, padding: '8px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12 }}>Batal</button>
                     <button onClick={um.addMode ? um.handleAddUser : um.handleSaveUser} disabled={um.saving}
-                      style={{ flex: 2, padding: '8px', background: 'var(--mint-bg)', border: '1px solid var(--accent)', borderRadius: 6, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700 }}>
+                      style={{ flex: 2, padding: '8px', background: 'var(--accent-light)', border: '1px solid var(--accent)', borderRadius: 6, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700 }}>
                       {um.saving ? 'Menyimpan...' : 'Simpan'}
                     </button>
                   </div>
@@ -562,15 +514,15 @@ export default function ProfilePage({ onClose }: Props) {
               {/* User list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {um.pagedUsers.map(u => {
-                  const b       = um.getBadge(u)
-                  const isMe    = u.id === profile?.id
+                  const b = um.getBadge(u)
+                  const isMe = u.id === profile?.id
                   // Pastikan field scope tersedia untuk permission check
                   const currentUser = { ...profile, region_scope: (profile as any).region_scope ?? 'global', unit_scope: (profile as any).unit_scope ?? 'general' }
-                  const targetUser  = { ...u,       region_scope: u.region_scope ?? 'global',                unit_scope: u.unit_scope ?? 'general'                }
+                  const targetUser = { ...u, region_scope: u.region_scope ?? 'global', unit_scope: u.unit_scope ?? 'general' }
                   const canEdit_ = canManageUser(currentUser as any, targetUser as any)
-                  const region  = REGION_LABELS[u.region_scope ?? 'global'] ?? u.region_scope
-                  const unit    = UNIT_LABELS[u.unit_scope ?? 'general'] ?? u.unit_scope
-                  const emoji_  = u.emoji || u.avatar_emoji || ''
+                  const region = REGION_LABELS[u.region_scope ?? 'global'] ?? u.region_scope
+                  const unit = UNIT_LABELS[u.unit_scope ?? 'general'] ?? u.unit_scope
+                  const emoji_ = u.emoji || u.avatar_emoji || ''
 
                   return (
                     <div key={u.id} style={{
@@ -621,7 +573,7 @@ export default function ProfilePage({ onClose }: Props) {
                     style={{ padding: '5px 12px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 5, color: um.page === 0 ? 'var(--silver3)' : 'var(--silver)', cursor: um.page === 0 ? 'not-allowed' : 'pointer', fontSize: 12 }}>← Prev</button>
                   {Array.from({ length: Math.min(um.totalPages, 7) }, (_, i) => {
                     const p = um.totalPages <= 7 ? i : Math.max(0, Math.min(um.page - 3, um.totalPages - 7)) + i
-                    return <button key={p} onClick={() => um.setPage(p)} style={{ padding: '5px 10px', background: p === um.page ? 'var(--mint-bg2)' : 'var(--bg3)', border: `1px solid ${p === um.page ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 5, color: p === um.page ? 'var(--accent)' : 'var(--silver)', cursor: 'pointer', fontSize: 12 }}>{p + 1}</button>
+                    return <button key={p} onClick={() => um.setPage(p)} style={{ padding: '5px 10px', background: p === um.page ? 'var(--accent-soft)' : 'var(--bg3)', border: `1px solid ${p === um.page ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 5, color: p === um.page ? 'var(--accent)' : 'var(--silver)', cursor: 'pointer', fontSize: 12 }}>{p + 1}</button>
                   })}
                   <button onClick={() => um.setPage(p => Math.min(um.totalPages - 1, p + 1))} disabled={um.page >= um.totalPages - 1}
                     style={{ padding: '5px 12px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 5, color: um.page >= um.totalPages - 1 ? 'var(--silver3)' : 'var(--silver)', cursor: um.page >= um.totalPages - 1 ? 'not-allowed' : 'pointer', fontSize: 12 }}>Next →</button>
@@ -630,15 +582,16 @@ export default function ProfilePage({ onClose }: Props) {
             </div>
           )}
 
+          {/* ── TAMPILAN TAB ── */}
           {/* ── SETTINGS TAB ── */}
           {tabState === 'settings' && isSuperAdmin && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: 11, color: 'var(--silver3)', marginBottom: 4 }}>Pengaturan global — hanya superadmin</div>
               {[
-                { label: 'Site Title',              val: siteTitle,    set: setSiteTitle,    ph: 'JateamHub' },
-                { label: 'Subtitle / Greeting',     val: siteSubtitle, set: setSiteSubtitle, ph: 'Selamat datang, {username}' },
-                { label: 'Logo URL',                val: logoUrl,      set: setLogoUrl,      ph: 'https://...' },
-                { label: 'Coffee / Donasi URL',     val: coffeeUrl,    set: setCoffeeUrl,    ph: 'https://trakteer.id/...' },
+                { label: 'Site Title', val: siteTitle, set: setSiteTitle, ph: 'JateamHub' },
+                { label: 'Subtitle / Greeting', val: siteSubtitle, set: setSiteSubtitle, ph: 'Selamat datang, {username}' },
+                { label: 'Logo URL', val: logoUrl, set: setLogoUrl, ph: 'https://...' },
+                { label: 'Coffee / Donasi URL', val: coffeeUrl, set: setCoffeeUrl, ph: 'https://trakteer.id/...' },
               ].map(f => (
                 <div key={f.label}>
                   <label style={{ ...labelStyle, fontWeight: 700 }}>{f.label}</label>
@@ -646,7 +599,7 @@ export default function ProfilePage({ onClose }: Props) {
                 </div>
               ))}
               <button onClick={handleSaveSettings} style={{
-                padding: '10px', background: 'var(--mint-bg)', border: '1px solid var(--accent)',
+                padding: '10px', background: 'var(--accent-light)', border: '1px solid var(--accent)',
                 borderRadius: 8, color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
               }}>💾 Simpan Settings</button>
             </div>

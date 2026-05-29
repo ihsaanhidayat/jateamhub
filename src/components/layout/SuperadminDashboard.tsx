@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// SUPERADMIN DASHBOARD — User Management + Pending Registrations
+// SUPERADMIN DASHBOARD — Clean, Elegant, Minimalist
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../store/authStore'
@@ -14,83 +14,71 @@ import type { Role } from '../../types'
 import type { Profile } from '../../utils/supabaseClient'
 import { REGIONS, UNITS } from '../../types'
 
-const EMOJI_PRESETS = ['', '🌸', '🔥', '⭐', '🎯', '💎', '🚀', '🌊', '🦁', '🐯', '🌺', '🎨', '💡', '🍀', '🎭', '🏆', '🦋', '🌙', '☀️', '🍉']
+const EMOJI_PRESETS = ['','🌸','🔥','⭐','🎯','💎','🚀','🌊','🦁','🐯','🌺','🎨','💡','🍀','🏆','🦋','🌙','☀️','🍉']
+
+const inputSt: React.CSSProperties = {
+  width: '100%', height: 38, background: 'var(--bg4)',
+  border: '1px solid var(--border2)', borderRadius: 8,
+  padding: '0 12px', color: 'var(--silver)', fontSize: 13,
+  fontFamily: 'var(--font)', outline: 'none',
+}
+const labelSt: React.CSSProperties = {
+  fontSize: 10, fontWeight: 700, color: 'var(--silver3)',
+  textTransform: 'uppercase', letterSpacing: '0.8px',
+  display: 'block', marginBottom: 5, fontFamily: 'var(--mono)',
+}
 
 export default function SuperadminDashboard() {
   const { profile, logout, users, loadUsers, addUser, updateUser, removeUser } = useAuthStore()
   const { toast } = useStore()
 
   const [tab, setTab] = useState<'pending' | 'users'>('pending')
-  const [pending, setPending] = useState<PendingRegistration[]>([])
+  const [pending,     setPending]     = useState<PendingRegistration[]>([])
   const [pendingLoad, setPendingLoad] = useState(false)
-  const [rejectId, setRejectId] = useState<string | null>(null)
-  const [rejectNote, setRejectNote] = useState('')
+  const [rejectId,    setRejectId]    = useState<string | null>(null)
+  const [rejectNote,  setRejectNote]  = useState('')
 
-  // Users management state
-  const [search, setSearch] = useState('')
+  const [search,       setSearch]       = useState('')
   const [filterRegion, setFilterRegion] = useState('')
-  const [filterUnit, setFilterUnit] = useState('')
-  const [page, setPage] = useState(0)
-  const [editTarget, setEditTarget] = useState<Profile | null>(null)
-  const [editRole, setEditRole] = useState<Role>('user')
-  const [editRegion, setEditRegion] = useState('global')
-  const [editUnit, setEditUnit] = useState('general')
-  const [editPass, setEditPass] = useState('')
-  const [editEmoji, setEditEmoji] = useState('')
+  const [filterUnit,   setFilterUnit]   = useState('')
+  const [page,         setPage]         = useState(0)
+  const [editTarget,   setEditTarget]   = useState<Profile | null>(null)
+  const [editRole,     setEditRole]     = useState<Role>('user')
+  const [editRegion,   setEditRegion]   = useState('global')
+  const [editUnit,     setEditUnit]     = useState('general')
+  const [editPass,     setEditPass]     = useState('')
+  const [editEmoji,    setEditEmoji]    = useState('')
   const [editFullName, setEditFullName] = useState('')
-  const [editEmail, setEditEmail] = useState('')
-  const [addMode, setAddMode] = useState(false)
-  const [newUser, setNewUser] = useState('')
-  const [newPass, setNewPass] = useState('')
-  const [newRole, setNewRole] = useState<Role>('user')
-  const [newRegion, setNewRegion] = useState('sby')
-  const [newUnit, setNewUnit] = useState('general')
-  const [newFullName, setNewFullName] = useState('')
-  const [newEmail, setNewEmail] = useState('')
-  const [err, setErr] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [editEmail,    setEditEmail]    = useState('')
+  const [addMode,      setAddMode]      = useState(false)
+  const [newUser,      setNewUser]      = useState('')
+  const [newPass,      setNewPass]      = useState('')
+  const [newRole,      setNewRole]      = useState<Role>('user')
+  const [newRegion,    setNewRegion]    = useState('sby')
+  const [newUnit,      setNewUnit]      = useState('general')
+  const [newFullName,  setNewFullName]  = useState('')
+  const [newEmail,     setNewEmail]     = useState('')
+  const [err,          setErr]          = useState('')
+  const [saving,       setSaving]       = useState(false)
 
-  const PER_PAGE = 50
-  const pendingCount = pending.filter(p => p.status === 'pending').length
+  const PAGE_SIZE = 10
 
+  useEffect(() => { loadUsers() }, [])
   useEffect(() => {
-    loadPending()
-    loadUsers()
+    setPendingLoad(true)
+    getPendingRegistrations().then(d => { setPending(d); setPendingLoad(false) })
   }, [])
 
-  const loadPending = async () => {
-    setPendingLoad(true)
-    const data = await getPendingRegistrations()
-    setPending(data)
-    setPendingLoad(false)
-  }
-
-  const handleApprove = async (reg: PendingRegistration) => {
-    if (!profile) return
-    const result = await approveRegistration(reg.id, reg, profile.id)
-    if ((result as any).error) { toast('Gagal approve: ' + (result as any).error.message, 'error'); return }
-    toast(`✅ Akun "${reg.username}" berhasil dibuat.`, 'success')
-    loadPending(); loadUsers()
-  }
-
-  const handleReject = async () => {
-    if (!rejectId || !profile) return
-    await rejectRegistration(rejectId, profile.id, rejectNote || undefined)
-    toast('Pendaftaran ditolak.', 'warn')
-    setRejectId(null); setRejectNote('')
-    loadPending()
-  }
+  const pendingCount = pending.filter(r => r.status === 'pending').length
 
   const filteredUsers = users.filter(u => {
-    const matchSearch = !search ||
-      u.username.toLowerCase().includes(search.toLowerCase()) ||
-      (u.full_name ?? '').toLowerCase().includes(search.toLowerCase())
+    const matchSearch = !search || u.username.toLowerCase().includes(search.toLowerCase()) || (u.full_name?.toLowerCase() ?? '').includes(search.toLowerCase())
     const matchRegion = !filterRegion || (u.region_scope ?? 'global') === filterRegion
-    const matchUnit = !filterUnit || (u.unit_scope ?? 'general') === filterUnit
+    const matchUnit   = !filterUnit   || (u.unit_scope ?? 'general') === filterUnit
     return matchSearch && matchRegion && matchUnit
   })
-  const pagedUsers = filteredUsers.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
-  const totalPages = Math.ceil(filteredUsers.length / PER_PAGE)
+  const pagedUsers = filteredUsers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const totalPages = Math.ceil(filteredUsers.length / PAGE_SIZE)
 
   const openEdit = (u: Profile) => {
     setEditTarget(u); setEditRole(u.role as Role)
@@ -107,15 +95,11 @@ export default function SuperadminDashboard() {
     const initials = nameParts.length >= 2
       ? (nameParts[0][0] + nameParts[1][0]).toUpperCase()
       : editFullName.slice(0, 2).toUpperCase()
-
-    // unit_id = nilai asli dari DB (pro/cro/klaim/''), editUnit = unit_scope (general/pro/dll)
-    const unitId = editTarget.unit_id ?? ''
-    const error = await updateUser(editTarget.id, editRole, unitId, editPass || undefined, editEmoji, editRegion, editUnit)
+    const error = await updateUser(editTarget.id, editRole, editTarget.unit_id ?? '', editPass || undefined, editEmoji, editRegion, editUnit)
     if (!error) {
       await updateProfile(editTarget.id, { full_name: editFullName, initials } as any)
-      if (editEmail !== ((editTarget as any).email ?? '')) {
+      if (editEmail !== ((editTarget as any).email ?? ''))
         await supabase.from('profiles').update({ email: editEmail }).eq('id', editTarget.id)
-      }
     }
     setSaving(false)
     if (error) { setErr(error); return }
@@ -124,162 +108,114 @@ export default function SuperadminDashboard() {
 
   const handleAddUser = async () => {
     setErr(''); setSaving(true)
-    // unit_id untuk user baru = newUnit (bisa 'pro','cro','klaim','')
-    // unit_scope = newUnit juga (scope akses)
     const error = await addUser(newUser.trim(), newPass, newRole, newUnit, newRegion, newUnit)
     setSaving(false)
     if (error) { setErr(error); return }
-    // Simpan email jika ada
     if (newEmail) {
       const { data: np } = await supabase.from('profiles').select('id').eq('username', newUser.trim().toLowerCase()).single()
       if (np?.id) await supabase.from('profiles').update({ email: newEmail }).eq('id', np.id)
     }
     toast(`"${newUser}" ditambahkan.`, 'success')
-    setNewUser(''); setNewPass(''); setNewRole('user'); setNewRegion('sby'); setNewUnit('general')
-    setNewFullName(''); setNewEmail(''); setAddMode(false); loadUsers()
+    setNewUser(''); setNewPass(''); setNewRole('user'); setNewRegion('sby')
+    setNewUnit('general'); setNewFullName(''); setNewEmail(''); setAddMode(false)
+    loadUsers()
   }
 
-  const inputSt: React.CSSProperties = {
-    width: '100%', background: 'var(--bg2)', border: '1px solid var(--border2)',
-    borderRadius: 6, padding: '8px 10px', color: 'var(--silver)', fontSize: 12,
-    fontFamily: 'var(--font)', boxSizing: 'border-box',
+  const handleApprove = async (reg: PendingRegistration) => {
+    const result = await approveRegistration(reg.id, reg, profile!.id)
+    if ((result as any).error) { toast('Gagal approve: ' + (result as any).error.message, 'error'); return }
+    toast(`${reg.full_name} disetujui.`, 'success')
+    setPending(p => p.map(r => r.id === reg.id ? { ...r, status: 'approved' } : r))
   }
-  const labelSt: React.CSSProperties = {
-    fontSize: 10, color: 'var(--silver3)', display: 'block', marginBottom: 4,
-    textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--mono)',
+  const handleReject = async () => {
+    if (!rejectId) return
+    await rejectRegistration(rejectId, rejectNote, profile!.id)
+    toast('Pendaftaran ditolak.', 'warn')
+    setPending(p => p.map(r => r.id === rejectId ? { ...r, status: 'rejected' } : r))
+    setRejectId(null); setRejectNote('')
   }
+
+  const badge = getDisplayBadge(profile as any)
 
   return (
-    <div style={{
-      minHeight: '100dvh', background: 'var(--bg)',
-      display: 'flex', flexDirection: 'column', fontFamily: 'var(--font)',
-    }}>
+    <div className="admin-page">
       {/* Header */}
-      <div style={{
-        padding: '0 24px', height: 60,
-        background: 'var(--header-bg)', backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid var(--border2)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        position: 'sticky', top: 0, zIndex: 100,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>JateamHub</span>
-          <span style={{ fontSize: 11, color: 'var(--silver3)', fontFamily: 'var(--mono)' }}>Admin Panel</span>
+      <header className="admin-header">
+        <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--silver)', letterSpacing: -0.5 }}>JateamHub</span>
+        <span style={{ fontSize: 12, color: 'var(--silver3)', background: 'var(--bg4)', padding: '2px 8px', borderRadius: 99, border: '1px solid var(--border2)' }}>Admin Panel</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 13, color: 'var(--silver3)' }}>{profile?.username}</span>
+          <button onClick={logout} style={{ height: 32, padding: '0 14px', background: 'var(--red-bg)', border: '1px solid var(--red)', borderRadius: 8, color: 'var(--red)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            ⏻ Logout
+          </button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 12, color: 'var(--silver3)' }}>{profile?.username}</span>
-          <button onClick={() => logout()} style={{
-            padding: '6px 14px', background: 'rgba(239,68,68,0.08)',
-            border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6,
-            color: 'var(--red)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
-          }}>⏻ Logout</button>
-        </div>
-      </div>
+      </header>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg2)', flexShrink: 0 }}>
-        {[
-          { id: 'pending', label: `📋 Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
-          { id: 'users', label: `👥 Users (${users.length})` },
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as any)} style={{
-            padding: '12px 24px', fontSize: 12, fontWeight: 700,
-            background: tab === t.id ? 'var(--mint-bg)' : 'none',
-            border: 'none', borderBottom: `2px solid ${tab === t.id ? 'var(--accent)' : 'transparent'}`,
-            color: tab === t.id ? 'var(--accent)' : 'var(--silver3)',
-            cursor: 'pointer', fontFamily: 'var(--font)', letterSpacing: '.5px',
-          }}>{t.label}</button>
-        ))}
+      <div className="admin-tabs">
+        <button className={`admin-tab${tab === 'pending' ? ' active' : ''}`} onClick={() => setTab('pending')}>
+          📋 Pending {pendingCount > 0 && <span style={{ background: 'var(--accent)', color: 'white', borderRadius: 99, padding: '1px 6px', fontSize: 10, marginLeft: 4 }}>{pendingCount}</span>}
+        </button>
+        <button className={`admin-tab${tab === 'users' ? ' active' : ''}`} onClick={() => setTab('users')}>
+          👥 Users ({users.length})
+        </button>
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+      <div className="admin-content">
 
         {/* ── PENDING TAB ── */}
         {tab === 'pending' && (
-          <div style={{ maxWidth: 720, margin: '0 auto' }}>
-            <div style={{ fontSize: 13, color: 'var(--silver3)', marginBottom: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <p style={{ fontSize: 13, color: 'var(--silver3)', marginBottom: 4 }}>
               Pendaftaran baru yang menunggu persetujuan.
-            </div>
-
+            </p>
             {pendingLoad ? (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--silver3)' }}>Memuat...</div>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--silver3)', fontSize: 13 }}>Memuat...</div>
             ) : pending.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 60, color: 'var(--silver3)' }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
-                <div>Tidak ada pendaftaran.</div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {pending.map(reg => (
-                  <div key={reg.id} style={{
-                    background: 'var(--card-bg)', backdropFilter: 'blur(12px)',
-                    border: `1px solid ${reg.status === 'pending' ? 'var(--border2)' : 'var(--border)'}`,
-                    borderRadius: 10, padding: '16px 18px',
-                    opacity: reg.status !== 'pending' ? 0.5 : 1,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, minWidth: 200 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>{reg.full_name}</span>
-                          <span style={{
-                            fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 8,
-                            background: reg.status === 'pending' ? 'var(--accent)' : reg.status === 'approved' ? '#22C55E' : '#EF4444',
-                            color: '#0A0A0A', fontFamily: 'var(--mono)', textTransform: 'uppercase',
-                          }}>{reg.status}</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--silver3)', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                          <span>👤 {reg.username}</span>
-                          <span>📱 {reg.phone}</span>
-                          <span>🌍 {REGION_LABELS[reg.region_scope] ?? reg.region_scope}</span>
-                          <span>🏢 {UNIT_LABELS[reg.unit_scope] ?? reg.unit_scope}</span>
-                          <span>🕐 {new Date(reg.created_at).toLocaleDateString('id-ID')}</span>
-                        </div>
-                        {reg.notes && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Catatan: {reg.notes}</div>}
-                      </div>
-                      {reg.status === 'pending' && (
-                        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                          <button onClick={() => handleApprove(reg)} style={{
-                            padding: '7px 16px', background: 'rgba(34,197,94,0.1)',
-                            border: '1px solid rgba(34,197,94,0.3)', borderRadius: 6,
-                            color: '#22C55E', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
-                          }}>✓ Setujui</button>
-                          <button onClick={() => setRejectId(reg.id)} style={{
-                            padding: '7px 16px', background: 'rgba(239,68,68,0.08)',
-                            border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6,
-                            color: 'var(--red)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
-                          }}>✕ Tolak</button>
-                        </div>
-                      )}
-                    </div>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--silver3)', fontSize: 13 }}>Tidak ada pendaftaran.</div>
+            ) : pending.map(reg => (
+              <div key={reg.id} className="pending-card">
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span className="pending-name">{reg.full_name}</span>
+                    <span className={`user-badge ${reg.status === 'pending' ? 'badge-pending' : reg.status === 'approved' ? 'badge-approved' : 'badge-rejected'}`}>
+                      {reg.status}
+                    </span>
                   </div>
-                ))}
+                  <div className="pending-meta">
+                    <span>👤 {reg.username}</span>
+                    <span>📱 {reg.phone}</span>
+                    <span>🌏 {REGION_LABELS[reg.region_scope ?? ''] ?? reg.region_scope}</span>
+                    <span>🏢 {reg.unit_scope?.toUpperCase()}</span>
+                    <span>🗓 {new Date(reg.created_at).toLocaleDateString('id-ID')}</span>
+                  </div>
+                </div>
+                {reg.status === 'pending' && (
+                  <div className="pending-actions">
+                    <button className="btn btn-primary" style={{ height: 32, fontSize: 12 }} onClick={() => handleApprove(reg)}>✓ Setujui</button>
+                    <button className="btn btn-danger" style={{ height: 32, fontSize: 12 }} onClick={() => setRejectId(reg.id)}>✕ Tolak</button>
+                  </div>
+                )}
               </div>
-            )}
+            ))}
 
             {/* Reject modal */}
             {rejectId && (
-              <div style={{
-                position: 'fixed', inset: 0, zIndex: 9000 /* overlay */,
-                background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-              }}>
-                <div style={{
-                  background: 'var(--bg3)', border: '1px solid var(--border2)',
-                  borderRadius: 12, padding: 24, maxWidth: 400, width: '100%',
-                  boxShadow: 'var(--shadow-lg)',
-                }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)', marginBottom: 14 }}>
-                    Tolak Pendaftaran
+              <div className="modal-overlay" onClick={() => setRejectId(null)}>
+                <div className="modal-box" onClick={e => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <span className="modal-title">Tolak Pendaftaran</span>
+                    <button className="modal-close" onClick={() => setRejectId(null)}>✕</button>
                   </div>
-                  <textarea
-                    value={rejectNote} onChange={e => setRejectNote(e.target.value)}
-                    placeholder="Alasan penolakan (opsional)..."
-                    style={{ ...inputSt, height: 80, resize: 'vertical', marginBottom: 14 }}
-                  />
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setRejectId(null)} style={{ flex: 1, padding: '9px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12 }}>Batal</button>
-                    <button onClick={handleReject} style={{ flex: 2, padding: '9px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700 }}>Tolak Pendaftaran</button>
+                  <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <label style={labelSt}>Alasan penolakan (opsional)</label>
+                    <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)} rows={3}
+                      placeholder="Masukkan alasan..." style={{ ...inputSt, height: 'auto', padding: '10px 12px', resize: 'vertical' }} />
+                  </div>
+                  <div className="modal-footer">
+                    <button className="btn btn-secondary" onClick={() => setRejectId(null)}>Batal</button>
+                    <button className="btn btn-danger" onClick={handleReject}>Tolak Pendaftaran</button>
                   </div>
                 </div>
               </div>
@@ -289,196 +225,151 @@ export default function SuperadminDashboard() {
 
         {/* ── USERS TAB ── */}
         {tab === 'users' && (
-          <div style={{ maxWidth: 900, margin: '0 auto' }}>
-            {/* Filters */}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Filter bar */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
-                placeholder="🔍 Cari username / nama..." style={{ ...inputSt, flex: 1, minWidth: 160 }} />
+                placeholder="Cari username / nama..." style={{ ...inputSt, width: 220 }} />
               <select value={filterRegion} onChange={e => { setFilterRegion(e.target.value); setPage(0) }}
-                style={{ ...inputSt, width: 'auto' }}>
+                style={{ ...inputSt, width: 140, appearance: 'auto' }}>
                 <option value="">Semua Wilayah</option>
                 {REGIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
               <select value={filterUnit} onChange={e => { setFilterUnit(e.target.value); setPage(0) }}
-                style={{ ...inputSt, width: 'auto' }}>
+                style={{ ...inputSt, width: 130, appearance: 'auto' }}>
                 <option value="">Semua Unit</option>
                 {UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
               </select>
-              <button onClick={() => { setAddMode(true); setEditTarget(null); setErr('') }} style={{
-                padding: '8px 16px', background: 'var(--mint-bg)', border: '1px solid rgba(110,231,183,0.3)',
-                borderRadius: 6, color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                fontFamily: 'var(--font)', whiteSpace: 'nowrap',
-              }}>＋ Tambah</button>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--silver3)', alignSelf: 'center' }}>{filteredUsers.length} user</span>
+                <button className="btn btn-primary" style={{ height: 36, fontSize: 12 }}
+                  onClick={() => { setAddMode(true); setEditTarget(null); setNewUser(''); setNewPass(''); setNewRole('user'); setNewRegion('sby'); setNewUnit('general'); setNewFullName(''); setNewEmail(''); setErr('') }}>
+                  + Tambah User
+                </button>
+              </div>
             </div>
 
-            <div style={{ fontSize: 11, color: 'var(--silver3)', marginBottom: 10 }}>
-              {filteredUsers.length} dari {users.length} user
-              {totalPages > 1 && ` · Hal. ${page + 1}/${totalPages}`}
-            </div>
-
-            {/* Add / Edit form */}
-            {(addMode || editTarget) && (
-              <div style={{
-                background: 'var(--card-bg)', backdropFilter: 'blur(12px)',
-                border: '1px solid var(--border2)', borderRadius: 10, padding: 18, marginBottom: 14,
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 14 }}>
-                  {addMode ? '＋ Tambah User Baru' : `✏️ Edit: ${editTarget?.username}${editEmoji ? ' ' + editEmoji : ''}`}
-                </div>
-
-                {addMode && (
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={labelSt}>Nama Lengkap</label>
-                      <input value={newFullName} onChange={e => setNewFullName(e.target.value)} placeholder="Nama lengkap" style={inputSt} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={labelSt}>Username</label>
-                      <input value={newUser} onChange={e => setNewUser(e.target.value)} placeholder="username" style={inputSt} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={labelSt}>Password</label>
-                      <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="min. 6 karakter" style={inputSt} />
-                    </div>
-                  </div>
-                )}
-
-                {!addMode && (
-                  <div style={{ marginBottom: 10 }}>
-                    <label style={labelSt}>Nama Lengkap</label>
-                    <input value={editFullName} onChange={e => setEditFullName(e.target.value)} placeholder="Nama lengkap" style={inputSt} />
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: 100 }}>
-                    <label style={labelSt}>Role</label>
-                    <select value={addMode ? newRole : editRole}
-                      onChange={e => addMode ? setNewRole(e.target.value as Role) : setEditRole(e.target.value as Role)}
-                      disabled={!addMode && editTarget?.id === profile?.id}
-                      style={inputSt}>
+            {/* Add form */}
+            {addMode && (
+              <div className="edit-form">
+                <div className="edit-form-title">＋ Tambah User Baru</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div><label style={labelSt}>Nama Lengkap</label><input value={newFullName} onChange={e => setNewFullName(e.target.value)} placeholder="Nama lengkap" style={inputSt} /></div>
+                  <div><label style={labelSt}>Username *</label><input value={newUser} onChange={e => setNewUser(e.target.value)} placeholder="username" style={inputSt} /></div>
+                  <div><label style={labelSt}>Password *</label><input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="min. 6 karakter" style={inputSt} /></div>
+                  <div><label style={labelSt}>Email</label><input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="user@email.com" style={inputSt} /></div>
+                  <div><label style={labelSt}>Role</label>
+                    <select value={newRole} onChange={e => setNewRole(e.target.value as Role)} style={{ ...inputSt, appearance: 'auto' }}>
                       {getAllowedRoles(profile as any).map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </div>
-                  <div style={{ flex: 1, minWidth: 100 }}>
-                    <label style={labelSt}>Wilayah</label>
-                    <select value={addMode ? newRegion : editRegion}
-                      onChange={e => addMode ? setNewRegion(e.target.value) : setEditRegion(e.target.value)}
-                      style={inputSt}>
+                  <div><label style={labelSt}>Wilayah</label>
+                    <select value={newRegion} onChange={e => setNewRegion(e.target.value)} style={{ ...inputSt, appearance: 'auto' }}>
                       {getAllowedRegions(profile as any).map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                     </select>
                   </div>
-                  <div style={{ flex: 1, minWidth: 100 }}>
-                    <label style={labelSt}>Unit</label>
-                    <select value={addMode ? newUnit : editUnit}
-                      onChange={e => addMode ? setNewUnit(e.target.value) : setEditUnit(e.target.value)}
-                      style={inputSt}>
+                  <div><label style={labelSt}>Unit</label>
+                    <select value={newUnit} onChange={e => setNewUnit(e.target.value)} style={{ ...inputSt, appearance: 'auto' }}>
                       {getAllowedUnits(profile as any).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                     </select>
                   </div>
                 </div>
-
-                {!addMode && (
-                  <div style={{ marginBottom: 10 }}>
-                    <label style={labelSt}>Reset Password (kosong = tidak berubah)</label>
-                    <input type="password" value={editPass} onChange={e => setEditPass(e.target.value)} placeholder="Password baru min. 6 karakter" style={inputSt} />
-                  </div>
-                )}
-
-                {/* Email — untuk OTP reset password */}
-                <div style={{ marginBottom: 10 }}>
-                  <label style={labelSt}>Email {addMode ? '*' : '(untuk reset password)'}</label>
-                  <input
-                    type="email"
-                    value={addMode ? newEmail : editEmail}
-                    onChange={e => addMode ? setNewEmail(e.target.value) : setEditEmail(e.target.value)}
-                    placeholder="user@email.com"
-                    style={inputSt}
-                  />
-                </div>
-
-                {!addMode && (
-                  <div style={{ marginBottom: 10 }}>
-                    <label style={labelSt}>Emoji (tampil di samping nama)</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {EMOJI_PRESETS.map(e => (
-                        <div key={e} onClick={() => setEditEmoji(e)} style={{
-                          width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: e ? 14 : 9, cursor: 'pointer', borderRadius: 5,
-                          border: `1px solid ${editEmoji === e ? 'var(--accent)' : 'var(--border2)'}`,
-                          background: editEmoji === e ? 'var(--mint-bg2)' : 'var(--bg4)',
-                          color: e ? 'inherit' : 'var(--silver3)',
-                        }}>{e || '✕'}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {err && <div style={{ color: 'var(--red)', fontSize: 12, marginBottom: 8 }}>{err}</div>}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => { setAddMode(false); setEditTarget(null); setErr('') }}
-                    style={{ flex: 1, padding: '8px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12 }}>Batal</button>
-                  <button onClick={addMode ? handleAddUser : handleSaveUser} disabled={saving}
-                    style={{ flex: 2, padding: '8px', background: 'var(--mint-bg)', border: '1px solid var(--accent)', borderRadius: 6, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700 }}>
-                    {saving ? 'Menyimpan...' : 'Simpan'}
-                  </button>
+                {err && <div style={{ color: 'var(--red)', fontSize: 12, padding: '8px 12px', background: 'var(--red-bg)', borderRadius: 8 }}>{err}</div>}
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn btn-secondary" onClick={() => { setAddMode(false); setErr('') }}>Batal</button>
+                  <button className="btn btn-primary" disabled={saving} onClick={handleAddUser}>{saving ? 'Menyimpan...' : 'Tambah User'}</button>
                 </div>
               </div>
             )}
 
             {/* User list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {pagedUsers.map(u => {
-                const b = getDisplayBadge(u as any)
-                const isMe = u.id === profile?.id
-                const canEd = canManageUser(profile as any, u as any)
-                const inits = (u as any).initials || (u.full_name?.slice(0, 2) || u.username.slice(0, 2)).toUpperCase()
+                const isEditing = editTarget?.id === u.id
+                const ubadge = getDisplayBadge(u as any)
                 return (
-                  <div key={u.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
-                    background: 'var(--card-bg)', backdropFilter: 'blur(8px)',
-                    border: `1px solid ${isMe ? 'rgba(110,231,183,0.2)' : 'var(--border)'}`,
-                    borderRadius: 8, transition: 'border-color .15s',
-                  }}>
-                    {/* Inisial avatar */}
-                    <div style={{
-                      width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-                      background: u.avatar_url ? 'transparent' : 'var(--mint-bg2)',
-                      border: '1.5px solid var(--border2)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      overflow: 'hidden', fontSize: 12, fontWeight: 800, color: 'var(--accent)',
-                    }}>
-                      {u.avatar_url
-                        ? <img src={u.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : inits}
-                    </div>
-                    {/* Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: isMe ? 'var(--accent)' : 'var(--silver)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {u.username}{(u as any).emoji ? ` ${(u as any).emoji}` : ''}{isMe && <span style={{ fontSize: 10, color: 'var(--silver3)', marginLeft: 5 }}>(kamu)</span>}
+                  <div key={u.id}>
+                    <div className="user-card">
+                      <div className="user-avatar">
+                        {u.avatar_url ? <img src={u.avatar_url} alt="" /> : ((u as any).emoji || (u as any).avatar_emoji || ((u as any).initials ?? u.username?.slice(0,2).toUpperCase() ?? '?'))}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--silver3)', marginTop: 2 }}>
-                        {u.full_name && <span style={{ marginRight: 8 }}>{u.full_name}</span>}
-                        <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 6px', borderRadius: 8, background: b.color, color: '#0A0A0A', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginRight: 4 }}>{b.label}</span>
-                        {(u.region_scope && u.region_scope !== 'global') && <span style={{ fontSize: 10, color: 'var(--silver3)', fontFamily: 'var(--mono)' }}>{REGION_LABELS[u.region_scope] ?? u.region_scope}</span>}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span className="user-name">{u.full_name || u.username}</span>
+                          {u.id === profile?.id && <span style={{ fontSize: 10, color: 'var(--silver4)' }}>(kamu)</span>}
+                          {ubadge && <span className="user-badge" style={{ background: ubadge.color, color: '#0a0a0a' }}>{ubadge.label}</span>}
+                        </div>
+                        <div className="user-meta">
+                          <span>@{u.username}</span>
+                          {(u as any).phone && <span>📱 {(u as any).phone}</span>}
+                          {u.region_scope && u.region_scope !== 'global' && <span>🌏 {REGION_LABELS[u.region_scope] ?? u.region_scope}</span>}
+                          {u.unit_scope && u.unit_scope !== 'general' && <span>🏢 {UNIT_LABELS[u.unit_scope] ?? u.unit_scope}</span>}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        {canManageUser(profile as any, u as any) && (
+                          <>
+                            <button className="btn btn-secondary" style={{ height: 30, fontSize: 11, padding: '0 10px' }}
+                              onClick={() => isEditing ? setEditTarget(null) : openEdit(u)}>
+                              {isEditing ? 'Tutup' : 'Edit'}
+                            </button>
+                            {u.id !== profile?.id && u.role !== 'superadmin' && (
+                              <button className="btn btn-danger" style={{ height: 30, fontSize: 11, padding: '0 10px' }}
+                                onClick={async () => { if (confirm(`Hapus ${u.username}?`)) { await removeUser(u.id); loadUsers() } }}>
+                                Hapus
+                              </button>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
-                    {/* Actions */}
-                    {canEd && (
-                      <button onClick={() => openEdit(u)}
-                        style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 5, color: 'var(--silver3)', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}
-                        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
-                        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border2)')}>Edit</button>
-                    )}
-                    {canEd && !isMe && (
-                      <button onClick={async () => {
-                        if (!confirm(`Hapus user "${u.username}"?`)) return
-                        const err = await removeUser(u.id)
-                        if (err) toast(err, 'error')
-                        else { toast(`"${u.username}" dihapus.`, 'success'); loadUsers() }
-                      }} style={{ background: 'none', border: 'none', color: 'var(--silver3)', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>🗑</button>
+
+                    {/* Edit form inline */}
+                    {isEditing && (
+                      <div className="edit-form" style={{ marginTop: 8, marginLeft: 16 }}>
+                        <div className="edit-form-title">✏️ Edit: {u.username}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <div><label style={labelSt}>Nama Lengkap</label><input value={editFullName} onChange={e => setEditFullName(e.target.value)} style={inputSt} /></div>
+                          <div><label style={labelSt}>Email</label><input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="user@email.com" style={inputSt} /></div>
+                          <div><label style={labelSt}>Role</label>
+                            <select value={editRole} onChange={e => setEditRole(e.target.value as Role)} style={{ ...inputSt, appearance: 'auto' }}>
+                              {getAllowedRoles(profile as any).map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                          </div>
+                          <div><label style={labelSt}>Wilayah</label>
+                            <select value={editRegion} onChange={e => setEditRegion(e.target.value)} style={{ ...inputSt, appearance: 'auto' }}>
+                              {getAllowedRegions(profile as any).map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                            </select>
+                          </div>
+                          <div><label style={labelSt}>Unit</label>
+                            <select value={editUnit} onChange={e => setEditUnit(e.target.value)} style={{ ...inputSt, appearance: 'auto' }}>
+                              {getAllowedUnits(profile as any).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                            </select>
+                          </div>
+                          <div><label style={labelSt}>Reset Password (kosong = tidak berubah)</label>
+                            <input type="password" value={editPass} onChange={e => setEditPass(e.target.value)} placeholder="Password baru min. 6 karakter" style={inputSt} />
+                          </div>
+                        </div>
+                        {/* Emoji */}
+                        <div>
+                          <label style={labelSt}>Emoji</label>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {EMOJI_PRESETS.map(e => (
+                              <button key={e} onClick={() => setEditEmoji(e)} style={{
+                                width: 32, height: 32, borderRadius: 6, fontSize: 16,
+                                border: `1px solid ${editEmoji === e ? 'var(--accent)' : 'var(--border2)'}`,
+                                background: editEmoji === e ? 'var(--accent-light)' : 'var(--bg4)',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>{e || '✕'}</button>
+                            ))}
+                          </div>
+                        </div>
+                        {err && <div style={{ color: 'var(--red)', fontSize: 12, padding: '8px 12px', background: 'var(--red-bg)', borderRadius: 8 }}>{err}</div>}
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <button className="btn btn-secondary" onClick={() => { setEditTarget(null); setErr('') }}>Batal</button>
+                          <button className="btn btn-primary" disabled={saving} onClick={handleSaveUser}>{saving ? 'Menyimpan...' : 'Simpan'}</button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )
@@ -487,15 +378,15 @@ export default function SuperadminDashboard() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 5, marginTop: 14 }}>
-                <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                  style={{ padding: '5px 12px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 5, color: page === 0 ? 'var(--silver3)' : 'var(--silver)', cursor: page === 0 ? 'not-allowed' : 'pointer', fontSize: 12 }}>← Prev</button>
-                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                  const p = totalPages <= 7 ? i : Math.max(0, Math.min(page - 3, totalPages - 7)) + i
-                  return <button key={p} onClick={() => setPage(p)} style={{ padding: '5px 10px', background: p === page ? 'var(--mint-bg2)' : 'var(--bg2)', border: `1px solid ${p === page ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 5, color: p === page ? 'var(--accent)' : 'var(--silver)', cursor: 'pointer', fontSize: 12 }}>{p + 1}</button>
-                })}
-                <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-                  style={{ padding: '5px 12px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 5, color: page >= totalPages - 1 ? 'var(--silver3)' : 'var(--silver)', cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer', fontSize: 12 }}>Next →</button>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 8 }}>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button key={i} onClick={() => setPage(i)} style={{
+                    width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border2)',
+                    background: page === i ? 'var(--accent)' : 'var(--bg4)',
+                    color: page === i ? 'white' : 'var(--silver2)',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  }}>{i + 1}</button>
+                ))}
               </div>
             )}
           </div>

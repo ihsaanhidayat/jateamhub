@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useAuthStore } from './store/authStore'
-import { useStore, applyThemeToDOM } from './store/dashboardStore'
+import { useStore } from './store/dashboardStore'
 import { supabase } from './utils/supabaseClient'
 import LoginPage    from './components/layout/LoginPage'
 import RegisterPage from './components/layout/RegisterPage'
@@ -9,9 +9,16 @@ import GridLayout   from './components/layout/GridLayout'
 import OfflineBar   from './components/ui/OfflineBar'
 import ToastContainer from './components/ui/Toast'
 
+// Apply tema sebelum render — prevent flash
+;(function initTheme() {
+  const saved = localStorage.getItem('jateamhub-theme')
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const theme = saved ?? (prefersDark ? 'slate' : 'pearl')
+  document.documentElement.setAttribute('data-theme', theme)
+})()
+
 // Lazy load komponen berat
 const SuperadminDashboard = lazy(() => import('./components/layout/SuperadminDashboard'))
-const OptionsPanel        = lazy(() => import('./components/layout/OptionsPanel'))
 const ProfilePage         = lazy(() => import('./components/layout/ProfilePage'))
 const PanduanFAB          = lazy(() => import('./components/layout/PanduanFAB'))
 const CoffeeModal         = lazy(() => import('./components/ui/CoffeeModal'))
@@ -19,10 +26,10 @@ const AddSectionModal          = lazy(() => import('./components/layout/AddSecti
 const ImportLinksModal         = lazy(() => import('./components/ui/ImportLinksModal'))
 const ForceChangePasswordModal = lazy(() => import('./components/ui/ForceChangePasswordModal'))
 const OnboardingOverlay        = lazy(() => import('./components/ui/OnboardingOverlay'))
+const ItemModal                = lazy(() => import('./components/item/ItemModal'))
+const SectionEditModal         = lazy(() => import('./components/layout/SectionEditModal'))
 
 import './styles/global.css'
-import 'react-grid-layout/css/styles.css'
-import 'react-resizable/css/styles.css'
 
 export default function App() {
   const { profile, initialized, init } = useAuthStore()
@@ -31,13 +38,16 @@ export default function App() {
   const isDirty      = useStore(s => s.isDirty)
   const isSyncing    = useStore(s => s.isSyncing)
   const { toggleEditMode, initUser, toast, setCurrentUserId, syncPersonalToDb } = useStore()
-
-  const [optionsOpen,    setOptionsOpen]    = useState(false)
   const [showRegister,   setShowRegister]   = useState(false)
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [addSectionOpen, setAddSectionOpen] = useState(false)
   const [importLinksOpen, setImportLinksOpen] = useState(false)
   const [coffeeOpen,     setCoffeeOpen]     = useState(false)
+
+  // Edit state dari store
+  const editingSection    = useStore(s => s.editingSection)
+  const editingItem       = useStore(s => s.editingItem)
+  const addingItemSectionId = useStore(s => s.addingItemSectionId)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   // Onboarding — tampilkan untuk user baru (dashboard kosong + belum pernah lihat)
@@ -52,7 +62,7 @@ export default function App() {
       const saved = localStorage.getItem('jateamhub-appearance')
       if (saved) {
         const app = JSON.parse(saved)
-        if (app?.themeBase) applyThemeToDOM(app.themeBase === 'obsidian' ? 'obsidian' : 'ivory-light')
+        // tema ditangani oleh Header theme toggle
       }
     } catch { /* ignore */ }
   }
@@ -208,7 +218,7 @@ export default function App() {
   }, [profile])
 
   // Sync theme ke DOM
-  useEffect(() => { if (globalTheme) applyThemeToDOM(globalTheme) }, [globalTheme])
+  // tema ditangani oleh Header theme toggle
 
   // Edit mode body class
   useEffect(() => {
@@ -262,8 +272,8 @@ export default function App() {
       transition: 'box-shadow 200ms var(--ease)',
     }}>
       <Header
-        onToggleOptions={() => setOptionsOpen((v: boolean) => !v)}
-        optionsOpen={optionsOpen}
+        onToggleOptions={() => setProfileOpen(true)}
+        optionsOpen={false}
         onOpenAdvanced={() => setProfileOpen(true)}
         onAddSection={() => setAddSectionOpen(true)}
         onImportLinks={() => setImportLinksOpen(true)}
@@ -305,7 +315,6 @@ export default function App() {
       )}
 
       <Suspense fallback={null}>
-        <OptionsPanel open={optionsOpen} onClose={() => setOptionsOpen(false)} />
       </Suspense>
 
       <OfflineBar />
@@ -332,6 +341,26 @@ export default function App() {
           />
         )}
         <PanduanFAB />
+        {/* Item Modal — tambah/edit link */}
+        {(editingItem || addingItemSectionId) && (
+          <ItemModal
+            open={true}
+            sectionId={editingItem?.sectionId ?? addingItemSectionId ?? ''}
+            item={editingItem?.item ?? null}
+            onClose={() => {
+              useStore.getState().setEditingItem(null)
+              useStore.getState().setAddingItem(null)
+            }}
+          />
+        )}
+        {/* Section Edit Modal */}
+        {editingSection && (
+          <SectionEditModal
+            open={true}
+            section={editingSection}
+            onClose={() => useStore.getState().setEditingSection(null)}
+          />
+        )}
       </Suspense>
       <ToastContainer />
     </div>

@@ -1,706 +1,343 @@
 // ─────────────────────────────────────────────────────────────
-// GRIDLAYOUT — Render dashboard utama
-// Shared sections (dari admin) di row pertama, terkunci
-// Personal sections (milik user) di bawahnya, bebas drag/resize
+// GRIDLAYOUT v4.0 — CSS Grid + @dnd-kit/sortable
+// Personal sections: draggable untuk reorder
+// Shared sections: locked, tidak bisa drag
 // ─────────────────────────────────────────────────────────────
-import { useMemo, useCallback, useState, useEffect, useRef } from 'react'
-import RGL, { WidthProvider } from 'react-grid-layout'
-import type { Layout } from 'react-grid-layout'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import {
+  DndContext, closestCenter, PointerSensor, TouchSensor,
+  useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay,
+} from '@dnd-kit/core'
+import {
+  SortableContext, useSortable, rectSortingStrategy, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
-import SectionCard   from '../section/SectionCard'
-import SectionModal  from '../section/SectionModal'
-import ItemModal     from '../item/ItemModal'
-import ConfirmDialog from '../ui/ConfirmDialog'
-import { SkeletonDashboard } from '../ui/SkeletonLoader'
-import ClockWidget   from '../widgets/ClockWidget'
-import NotesWidget   from '../widgets/NotesWidget'
-import type { Section, LinkItem } from '../../types'
-import { GRID_ROW_HEIGHT, SECTION_DEFAULT_W, SECTION_DEFAULT_H } from '../../types'
-import type { SharedSection } from '../../utils/supabaseClient'
-import { canEdit } from '../../utils/roles'
+import SectionCard from '../section/SectionCard'
+import type { Section } from '../../types'
+import NotesWidget from '../widgets/NotesWidget'
+import ClockWidget from '../widgets/ClockWidget'
 
-// WidthProvider membuat RGL otomatis mengikuti lebar container
-const ReactGridLayout = WidthProvider(RGL)
-
-// Key khusus untuk ghost + section
-
-// ── Deteksi mobile berdasarkan lebar layar ────────────────────
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
-  return isMobile
+// ── Skeleton dashboard ───────────────────────────────────────
+function SkeletonDashboard() {
+  return (
+    <div className="dashboard-grid">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="section-card" style={{ height: 220 }}>
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="skeleton" style={{ height: 16, width: '60%' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+              {[...Array(8)].map((_, j) => (
+                <div key={j} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                  <div className="skeleton" style={{ width: 44, height: 44, borderRadius: 10 }} />
+                  <div className="skeleton" style={{ height: 10, width: 36 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
-// ── Konversi SharedSection ke format Section untuk render ─────
-const sharedToSection = (s: SharedSection, x: number, y: number): Section => ({
-  id:          `shared_${s.id}`,
-  title:       s.title,
-  icon:        s.icon,
-  subtitle:    s.subtitle,
-  items:       (s.items as LinkItem[]) ?? [],
-  layout:      { x, y, w: s.layout_hint?.w ?? SECTION_DEFAULT_W, h: s.layout_hint?.h ?? SECTION_DEFAULT_H },
-  visibility:  'all',
-  targetUnits: [],
-  pageId:      'beranda',
-  accentColor: s.accent_color,
-  type:        'section',
-  collapsed:   false,
-})
-
-interface Props { onAddSection: () => void }
-
-export default function GridLayout({ onAddSection }: Props) {
-  // Granular subscriptions — mencegah re-render saat state lain berubah
-  const personalSections    = useStore(s => s.personalSections)
-  const sharedSections      = useStore(s => s.sharedSections)
-  const editMode            = useStore(s => s.editMode)
-  const searchQuery         = useStore(s => s.searchQuery)
-  const isDataInitialized   = useStore(s => s.isDataInitialized)
-  const folderGridCols      = useStore(s => s.appearance.folderGridCols)
-  const itemDisplayMode     = useStore(s => s.appearance.itemDisplayMode)
-
-  // Actions — stabil, tidak berubah
-  const {
-    toggleEditMode, batchUpdateLayouts, toggleCollapse,
-    addItem, updateItem, deleteItem, moveItem,
-    deletePersonalSection, updatePersonalSection, toast,
-    addPersonalSectionAuto, syncPersonalToDb, isSyncing,
-  } = useStore()
-  const { profile: session } = useAuthStore()
-  const isMobile = useIsMobile()
-
-  const isAdminLevel = session?.role === 'admin' || session?.role === 'superadmin'
-
-  const [sectionModal, setSectionModal] = useState<{ open: boolean; section: Section | null }>({ open: false, section: null })
-  const [itemModal,    setItemModal]    = useState<{ open: boolean; sectionId: string; item: LinkItem | null }>({ open: false, sectionId: '', item: null })
-
-  const [focusedId, setFocusedId] = useState<string | null>(null)
-
-  const makeSnapshot = (s: Section) => ({
-    title:       s.title,
-    subtitle:    s.subtitle,
-    icon:        s.icon,
-    accentColor: s.accentColor,
-    items:       structuredClone(s.items),
-  })
-
-  const [snapshots,     setSnapshots]     = useState<Record<string, ReturnType<typeof makeSnapshot>>>({})
-  const [confirmSwitch, setConfirmSwitch] = useState<{ open: boolean; nextId: string | null }>({ open: false, nextId: null })
-
-  // Keluar dari edit mode → reset focus
-  const prevEditMode = useRef(editMode)
-  if (prevEditMode.current !== editMode) {
-    prevEditMode.current = editMode
-    if (!editMode && focusedId) setFocusedId(null)
+// ── Sortable wrapper untuk personal section ──────────────────
+function SortableSectionCard({
+  section, editMode, isMobile, searchQuery, focusedId, onFocus,
+  onEditSection, onEditItem, onAddItem, onDeleteSection, onSave, onCancel,
+}: {
+  section: Section, editMode: boolean, isMobile: boolean, searchQuery: string,
+  focusedId: string | null, onFocus: (id: string | null) => void,
+  onEditSection: (s: Section) => void, onEditItem: (sid: string, item: any) => void,
+  onAddItem: (sid: string) => void, onDeleteSection: (id: string) => void,
+  onSave: () => void, onCancel: () => void,
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id })
+  const isFocused = focusedId === section.id
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
   }
 
-  // ── Keyboard shortcuts ────────────────────────────────────
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
-
-      // E — toggle edit mode
-      if (e.key === 'e' || e.key === 'E') {
-        if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); toggleEditMode() }
-      }
-      // Escape — unfocus section atau close edit mode
-      if (e.key === 'Escape') {
-        if (focusedId) setFocusedId(null)
-        else if (editMode) toggleEditMode()
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [editMode, focusedId, toggleEditMode])
-
-  // Handle klik focus section
-  const focusSection = (id: string) => {
-    const section = personalSections.find(s => s.id === id)
-    if (section) setSnapshots(prev => ({ ...prev, [id]: makeSnapshot(section) }))
-    setFocusedId(id)
-  }
-
-  const handleFocus = (id: string) => {
-    if (!editMode) return
-    if (id === focusedId) return  // sudah focused, tidak perlu apa-apa
-
-    const current  = personalSections.find(s => s.id === focusedId)
-    const snapshot = focusedId ? snapshots[focusedId] : null
-
-    // Cek perubahan konten saja (bukan layout/posisi)
-    const hasChanges = focusedId && current && snapshot &&
-      JSON.stringify(makeSnapshot(current)) !== JSON.stringify(snapshot)
-
-    if (hasChanges) {
-      setConfirmSwitch({ open: true, nextId: id })
-    } else {
-      focusSection(id)
-    }
-  }
-
-
-  const handleSave = () => {
-    toast('✓ Tersimpan', 'success')
-    setFocusedId(null)
-  }
-
-  const handleCancel = () => {
-    // Rollback field konten ke snapshot (bukan layout/posisi)
-    if (focusedId && snapshots[focusedId]) {
-      const snap = snapshots[focusedId]
-      const current = personalSections.find(s => s.id === focusedId)
-      if (current) {
-        useStore.getState().updatePersonalSection(focusedId, {
-          ...current,
-          title:       snap.title,
-          subtitle:    snap.subtitle,
-          icon:        snap.icon,
-          accentColor: snap.accentColor,
-          items:       snap.items,
-        })
-      }
-    }
-    setFocusedId(null)
-  }
-
-  // Filter query pencarian
-  const q = searchQuery.toLowerCase()
-
-  // ── Bangun layout RGL untuk shared sections (baris pertama, terkunci) ──
-  const sharedLayouts = useMemo((): Layout[] => {
-    const COLS = 12
-    const layouts: Layout[] = []
-    let col = 0, row = 0, rowH = 0
-
-    sharedSections.forEach((s, i) => {
-      const w = Math.min(s.layout_hint?.w ?? SECTION_DEFAULT_W, COLS)
-      const h = s.layout_hint?.h ?? SECTION_DEFAULT_H
-      if (col + w > COLS) { row += rowH; col = 0; rowH = 0 }
-      layouts.push({
-        i:           `shared_${s.id}`,
-        x: col, y: row, w, h,
-        isDraggable: false,  // shared section TIDAK bisa di-drag
-        isResizable: false,  // shared section TIDAK bisa di-resize
-        resizeHandles: [] as unknown as ['se'],
-        minW: 1, minH: 1, maxH: undefined,
-      })
-      col += w; rowH = Math.max(rowH, h)
-    })
-    return layouts
-  }, [sharedSections])
-
-  // Tinggi total yang dipakai shared sections (untuk offset personal sections)
-  const sharedRowsHeight = useMemo(() => {
-    if (sharedLayouts.length === 0) return 0
-    return sharedLayouts.reduce((max, l) => Math.max(max, l.y + l.h), 0)
-  }, [sharedLayouts])
-
-  // ── Bangun layout RGL — semua section dalam 1 grid berurutan ──
-  const personalLayouts = useMemo((): Layout[] => {
-    const COLS = 12
-    const OFFSET_Y = 0 // semua section dalam 1 grid, tidak ada offset
-
-    // Hitung posisi Y personal section (setelah semua shared sections)
-    const sharedH = sharedRowsHeight
-    const layouts: Layout[] = personalSections.map(s => ({
-      i:           s.id,
-      x:           s.layout.x,
-      y:           s.layout.y + sharedH,
-      w:           s.layout.w,
-      h:           s.collapsed ? 1 : s.layout.h,
-      minW:        1,
-      minH:        s.collapsed ? 1 : 2,
-      maxH:        s.collapsed ? 1 : undefined,
-      // Tidak bisa drag saat section sedang focused (focus mode dulu)
-      isDraggable: editMode,
-      isResizable: editMode && !s.collapsed,
-      resizeHandles: ['se', 'e', 'w'] as unknown as ['se'],
-    }))
-
-    return layouts
-  }, [personalSections, sharedRowsHeight, sharedLayouts, editMode, focusedId])
-
-  // Gabungkan layout shared + personal untuk RGL
-  // Filter ghost jika bukan edit mode
-  const allLayouts = useMemo(() => {
-    return [...sharedLayouts, ...personalLayouts]
-  }, [sharedLayouts, personalLayouts])
-
-  // ── Handler saat user drag/resize personal section ────────────
-  const handleLayoutChange = useCallback((newLayout: Layout[]) => {
-    if (!editMode) return
-    const personalIds = new Set(personalSections.map(s => s.id))
-    const updates = newLayout
-      .filter(item => personalIds.has(item.i))
-      .map(item => ({
-        id:     item.i,
-        layout: {
-          x: item.x,
-          y: item.y - sharedRowsHeight,
-          w: item.w,
-          h: item.h,
-        }
-      }))
-    if (updates.length > 0) batchUpdateLayouts(updates)
-  }, [editMode, personalSections, sharedRowsHeight, batchUpdateLayouts])
-
-  // Stable callbacks — dibungkus useCallback agar SectionCard memo efektif
-  const handleEditSection = useCallback((s: Section) =>
-    setSectionModal({ open: true, section: s }), [])
-
-  const handleEditItem = useCallback((sId: string, item: LinkItem) =>
-    setItemModal({ open: true, sectionId: sId, item }), [])
-
-  const handleAddItem = useCallback((sId: string) =>
-    setItemModal({ open: true, sectionId: sId, item: null }), [])
-
-  const handleDeleteSection = useCallback((id: string) => {
-    deletePersonalSection(id)
-    toast('Section dihapus.', 'success')
-    setFocusedId(null)
-  }, [deletePersonalSection, toast])
-
-  // ── Render satu section (shared atau personal) ────────────────
-  const renderSection = useCallback((section: Section, isShared: boolean) => {
-    if (section.type === 'widget') {
-      return (
-        <WidgetWrapper
-          section={section}
-          editMode={!isShared && editMode}
-          onEdit={handleEditSection}
-        />
-      )
-    }
+  // Widget rendering (Notes, Clock)
+  if (section.type === 'widget') {
     return (
+      <div ref={setNodeRef} style={style}>
+        <SectionCard
+          section={section}
+          isShared={false}
+          canEdit={editMode}
+          isFocused={isFocused}
+          isMobileView={isMobile}
+          dragHandleProps={editMode ? { ...attributes, ...listeners } : undefined}
+          onFocus={onFocus}
+          onEditSection={onEditSection}
+          onEditItem={onEditItem}
+          onAddItem={onAddItem}
+          onDeleteSection={onDeleteSection}
+          onSave={onSave}
+          onCancel={onCancel}
+          widgetContent={
+            (section as any).widgetType === 'notes'
+              ? <NotesWidget sectionId={section.id} />
+              : (section as any).widgetType === 'clock'
+              ? <ClockWidget />
+              : null
+          }
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
       <SectionCard
         section={section}
-        isShared={isShared}
-        canEdit={!isShared && editMode}
-        isFocused={!isShared && focusedId === section.id}
+        isShared={false}
+        canEdit={editMode}
+        isFocused={isFocused}
         isMobileView={isMobile}
-        onFocus={handleFocus}
-        onEditSection={handleEditSection}
-        onEditItem={handleEditItem}
-        onAddItem={handleAddItem}
-        onDeleteSection={handleDeleteSection}
-        onSave={handleSave}
-        onCancel={handleCancel}
+        dragHandleProps={editMode ? { ...attributes, ...listeners } : undefined}
+        onFocus={onFocus}
+        onEditSection={onEditSection}
+        onEditItem={onEditItem}
+        onAddItem={onAddItem}
+        onDeleteSection={onDeleteSection}
+        onSave={onSave}
+        onCancel={onCancel}
       />
-    )
-  }, [editMode, focusedId, isMobile, handleFocus, handleEditSection, handleEditItem,
-      handleAddItem, handleDeleteSection, handleSave, handleCancel])
+    </div>
+  )
+}
 
-  // ── Semua section diurutkan: ADM REG → ADM UNIT → OWN (favorit pertama) ────
-  const allSections: Array<{
-    section: Section;
-    isShared: boolean;
-    sharedSource?: import('../../utils/supabaseClient').SharedSection
-  }> = useMemo(() => {
-    // Shared sections diurutkan: region dulu, unit kedua
-    const sharedRegion = sharedSections.filter(s => s.visibility === 'region')
-    const sharedUnit   = sharedSections.filter(s => s.visibility === 'unit')
-    const sortedShared = [...sharedRegion, ...sharedUnit]
+// ── Detect mobile ────────────────────────────────────────────
+const useIsMobile = () => {
+  const [v, setV] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const h = () => setV(window.innerWidth < 768)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+  return v
+}
 
-    const shared = sortedShared.map((s) => ({
-      section:      sharedToSection(s, 0, 0),
-      isShared:     true,
-      sharedSource: s,
-    }))
+// ── Main component ───────────────────────────────────────────
+export default function GridLayout({ onAddSection }: { onAddSection?: () => void }) {
+  const {
+    personalSections, sharedSections,
+    editMode, searchQuery, isDataInitialized,
+    reorderPersonalSections,
+    addItem, deletePersonalSection,
+    syncPersonalToDb, syncPersonalToDbNow,
+    toggleCollapse,
+    updateItem, deleteItem,
+  } = useStore()
+  const { profile } = useAuthStore()
+  const isMobile = useIsMobile()
 
-    const personal = personalSections.map(s => ({ section: s, isShared: false }))
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [isDraggingActive, setIsDraggingActive] = useState(false)
+  const [focusedId, setFocusedId] = useState<string | null>(null)
 
-    return [...shared, ...personal]
-  }, [sharedSections, personalSections])
+  // Tutup focus saat edit mode mati
+  useEffect(() => { if (!editMode) setFocusedId(null) }, [editMode])
 
-  // ── Filter section berdasarkan search query ───────────────────
-  const visibleIds = useMemo(() => {
-    if (!q) return new Set(allSections.map(({ section }) => section.id))
-    return new Set(
-      allSections
-        .filter(({ section: s }) =>
-          s.title.toLowerCase().includes(q) ||
-          (s.subtitle ?? '').toLowerCase().includes(q) ||
-          s.items.some(i =>
-            i.title.toLowerCase().includes(q) ||
-            (i.desc ?? '').toLowerCase().includes(q)
-          )
-        )
-        .map(({ section }) => section.id)
-    )
-  }, [allSections, q])
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin'
 
-  // ── MOBILE LAYOUT — stack vertikal, tidak ada drag ────────────
-  // Loading state — tampilkan skeleton HANYA saat data belum di-load dari DB
-  const isLoading = !isDataInitialized
+  // dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  )
 
-  // ── Pull to refresh ──────────────────────────────────────
-  const [pullY,        setPullY]        = useState(0)
-  const [isPulling,    setIsPulling]    = useState(false)
+  const handleDragStart = useCallback((e: DragStartEvent) => {
+    setActiveId(e.active.id as string)
+    setIsDraggingActive(true)
+  }, [])
+
+  const handleDragEnd = useCallback((e: DragEndEvent) => {
+    setActiveId(null)
+    setIsDraggingActive(false)
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const oldIdx = personalSections.findIndex(s => s.id === active.id)
+    const newIdx = personalSections.findIndex(s => s.id === over.id)
+    if (oldIdx === -1 || newIdx === -1) return
+    const reordered = arrayMove(personalSections, oldIdx, newIdx)
+    reorderPersonalSections(reordered)
+  }, [personalSections, reorderPersonalSections])
+
+  // Handlers
+  const handleEditSection = useCallback((s: Section) => {
+    useStore.getState().setEditingSection(s)
+  }, [])
+  const handleEditItem = useCallback((sectionId: string, item: any) => {
+    useStore.getState().setEditingItem({ sectionId, item })
+  }, [])
+  const handleAddItem = useCallback((sectionId: string) => {
+    useStore.getState().setAddingItem(sectionId)
+  }, [])
+  const handleDeleteSection = useCallback((id: string) => {
+    deletePersonalSection(id)
+    syncPersonalToDb()
+  }, [deletePersonalSection, syncPersonalToDb])
+  const handleSave = useCallback(() => {
+    syncPersonalToDb()
+  }, [syncPersonalToDb])
+  const handleCancel = useCallback(() => {
+    useStore.getState().setEditingSection(null)
+    useStore.getState().setEditingItem(null)
+  }, [])
+
+  // Pull-to-refresh
+  const [pullY, setPullY] = useState(0)
+  const [isPulling, setIsPulling] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const touchStartY = useRef(0)
   const PULL_THRESHOLD = 72
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    // Hanya aktif saat di top of page
-    if (window.scrollY === 0) {
-      touchStartY.current = e.touches[0].clientY
-      setIsPulling(true)
-    }
+    if (window.scrollY === 0) { touchStartY.current = e.touches[0].clientY; setIsPulling(true) }
   }
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isPulling) return
     const delta = e.touches[0].clientY - touchStartY.current
-    if (delta > 0 && window.scrollY === 0) {
-      setPullY(Math.min(delta * 0.5, PULL_THRESHOLD + 20))
-    }
+    if (delta > 0 && window.scrollY === 0) setPullY(Math.min(delta * 0.5, PULL_THRESHOLD + 20))
   }
   const handleTouchEnd = async () => {
     setIsPulling(false)
     if (pullY >= PULL_THRESHOLD) {
-      setIsRefreshing(true)
-      setPullY(PULL_THRESHOLD)
-      // Safety timeout — jika 5 detik tidak selesai, paksa reset
+      setIsRefreshing(true); setPullY(PULL_THRESHOLD)
       const safety = setTimeout(() => { setIsRefreshing(false); setPullY(0) }, 5000)
       try {
-        await useStore.getState().syncPersonalToDbNow()
-        if (useStore.getState().loadSharedSections) {
-          await useStore.getState().loadSharedSections()
-        }
-      } catch {} finally {
-        clearTimeout(safety)
-        setIsRefreshing(false)
-        setPullY(0)
-      }
-    } else {
-      setPullY(0)
-    }
+        await syncPersonalToDbNow()
+        if (useStore.getState().loadSharedSections) await useStore.getState().loadSharedSections()
+      } catch {} finally { clearTimeout(safety); setIsRefreshing(false); setPullY(0) }
+    } else { setPullY(0) }
   }
 
-  if (isMobile) {
-    return (
-      <>
-        <div
-          className="mobile-grid"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          style={{ paddingTop: pullY > 0 ? pullY : undefined, transition: isPulling ? 'none' : 'padding-top 300ms ease' }}
-        >
-          {/* Pull to refresh indicator */}
-          {pullY > 0 && (
-            <div style={{
-              position: 'fixed', top: 60, left: 0, right: 0, zIndex: 50,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              pointerEvents: 'none',
-            }}>
-              <div style={{
-                background: 'var(--bg3)', border: '1px solid var(--border)',
-                borderRadius: 20, padding: '6px 16px',
-                display: 'flex', alignItems: 'center', gap: 8,
-                fontSize: 12, color: 'var(--silver2)',
-                boxShadow: 'var(--shadow)',
-                opacity: Math.min(pullY / PULL_THRESHOLD, 1),
-              }}>
-                <span style={{
-                  display: 'inline-block',
-                  transform: isRefreshing ? 'none' : `rotate(${Math.min(pullY / PULL_THRESHOLD, 1) * 180}deg)`,
-                  animation: isRefreshing ? 'loginSpin 0.8s linear infinite' : 'none',
-                  transition: 'transform 100ms',
-                }}>↓</span>
-                {isRefreshing ? 'Memperbarui...' : pullY >= PULL_THRESHOLD ? 'Lepas untuk refresh' : 'Tarik untuk refresh'}
-              </div>
-            </div>
-          )}
-          {isLoading && <SkeletonDashboard />}
-          {/* Shared sections dulu */}
-          {sharedSections.map((s, i) => {
-            const section = sharedToSection(s, 0, i)
-            return (
-              <div key={`shared_${s.id}`} className="mobile-section" style={{ position: 'relative', paddingTop: 10 }}>
-                <SectionBadge sharedSection={s} />
-                {renderSection(section, true)}
-              </div>
-            )
-          })}
-          {/* Personal sections */}
-          {personalSections.map(section => (
-            <div key={section.id} className="mobile-section"
-              style={{ opacity: q && !visibleIds.has(section.id) ? 0.2 : 1, position: 'relative', paddingTop: 14 }}>
-              <SectionBadge personalSection={section} />
-              {renderSection(section, false)}
-            </div>
-          ))}
-          {/* Tombol tambah section di mobile */}
-          {editMode && (
-            <button className="mobile-add-section" onClick={onAddSection}>
-              ＋ Tambah Section / Widget
-            </button>
-          )}
-        </div>
+  const activeSection = personalSections.find(s => s.id === activeId)
+  const q = searchQuery.toLowerCase()
 
-        <SectionModal open={sectionModal.open} section={sectionModal.section} onClose={() => setSectionModal({ open: false, section: null })} />
-        <ItemModal open={itemModal.open} sectionId={itemModal.sectionId} item={itemModal.item} onClose={() => setItemModal({ open: false, sectionId: '', item: null })} />
-        <ConfirmDialog
-          open={confirmSwitch.open}
-          title="Ada Perubahan Belum Disimpan"
-          message="Section ini memiliki perubahan yang belum disimpan. Simpan sekarang sebelum pindah?"
-          confirmLabel="Simpan & Pindah"
-          cancelLabel="Batal"
-          danger={false}
-          onConfirm={async () => {
-            await useStore.getState().syncPersonalToDb()
-            toast('✓ Tersimpan', 'success')
-            setConfirmSwitch({ open: false, nextId: null })
-            if (confirmSwitch.nextId) focusSection(confirmSwitch.nextId)
-          }}
-          onCancel={() => setConfirmSwitch({ open: false, nextId: null })}
-        />
-      </>
-    )
-  }
+  if (!isDataInitialized) return <SkeletonDashboard />
 
-  // ── DESKTOP LAYOUT — RGL dengan drag/resize ────────────────────
-  return (
-    <>
-      {/* Poin 5: klik area kosong → unfocus section */}
-      {editMode && focusedId && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 0, cursor: 'default' }}
-          onClick={() => setFocusedId(null)}
-        />
-      )}
-      {allSections.length === 0 && !editMode ? (
-        <div className="empty-state">
-          <div style={{ fontSize: 40, opacity: .3 }}>📄</div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Dashboard kosong</div>
-          <div style={{ fontSize: 12, color: 'var(--silver3)' }}>
-            Aktifkan Edit Mode untuk mulai menambah section.
-          </div>
-        </div>
-      ) : (
-        <ReactGridLayout
-          className="rgl-grid"
-          layout={allLayouts}
-          cols={12}
-          rowHeight={GRID_ROW_HEIGHT}
-          margin={[16, 16]}
-          containerPadding={[16, 16]}
-          onLayoutChange={handleLayoutChange}
-          onDragStart={() => { /* unfocus saat mulai drag */ if (focusedId) setFocusedId(null) }}
-          isDraggable={editMode}
-          isResizable={editMode}
-          draggableHandle=".drag-handle"
-          resizeHandles={['se', 'e', 'w']}
-          useCSSTransforms={false}
-          compactType="vertical"
-          preventCollision={false}
-          style={{ width: '100%' }}
-        >
-          {allSections.map(({ section, isShared, sharedSource }) => (
-            <div
-              key={section.id}
-              onClick={e => {
-                // Hanya trigger focus jika bukan dari drag handle
-                const target = e.target as HTMLElement
-                if (target.closest('.drag-handle')) return
-                if (editMode && !isShared) handleFocus(section.id)
-              }}
-            >
-              <SectionBadge
-                sharedSection={isShared ? (sharedSource ?? null) : null}
-                personalSection={!isShared ? section : null}
-              />
-              {renderSection(section, isShared)}
-            </div>
-          ))}
-
-        </ReactGridLayout>
-      )}
-
-      {/* Modal section */}
-      <SectionModal
-        open={sectionModal.open}
-        section={sectionModal.section}
-        onClose={() => setSectionModal({ open: false, section: null })}
-      />
-      {/* Modal item */}
-      <ItemModal
-        open={itemModal.open}
-        sectionId={itemModal.sectionId}
-        item={itemModal.item}
-        onClose={() => setItemModal({ open: false, sectionId: '', item: null })}
-      />
-      {/* Konfirmasi pindah section saat ada perubahan */}
-      <ConfirmDialog
-        open={confirmSwitch.open}
-        title="Ada Perubahan Belum Disimpan"
-        message="Section ini memiliki perubahan yang belum disimpan. Simpan sekarang sebelum pindah?"
-        confirmLabel="Simpan & Pindah"
-        cancelLabel="Batal (tetap di sini)"
-        danger={false}
-        onConfirm={async () => {
-          await useStore.getState().syncPersonalToDb()
-          toast('✓ Tersimpan', 'success')
-          setConfirmSwitch({ open: false, nextId: null })
-          if (confirmSwitch.nextId) focusSection(confirmSwitch.nextId)
-        }}
-        onCancel={() => setConfirmSwitch({ open: false, nextId: null })}
-      />
-    </>
-  )
-}
-
-// ── Touch Resize Handle — pojok kanan bawah section ─────────
-// Drag handle ini untuk resize section di mobile via touch
-function TouchResizeHandle({ sectionId, onResize }: {
-  sectionId: string
-  onResize:  (id: string, deltaH: number) => void
-}) {
-  const startY  = useRef(0)
-  const startH  = useRef(0)
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    e.stopPropagation()
-    startY.current = e.touches[0].clientY
-    startH.current = 0
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    e.stopPropagation()
-    const deltaY   = e.touches[0].clientY - startY.current
-    const deltaRows = Math.round(deltaY / 70) // GRID_ROW_HEIGHT = 70
-    if (deltaRows !== startH.current) {
-      startH.current = deltaRows
-      onResize(sectionId, deltaRows)
-    }
-  }
+  // Konversi shared sections ke Section format
+  const sharedAsSections = sharedSections.map(s => ({
+    id: `shared_${s.id}`,
+    title: s.title,
+    subtitle: s.subtitle ?? '',
+    icon: s.icon ?? '📋',
+    items: (s.items ?? []) as any,
+    collapsed: false,
+    layout: { x: 0, y: 0, w: 3, h: 5 },
+    visibility: 'all' as const,
+    targetUnits: [],
+    pageId: 'beranda',
+    type: 'section' as const,
+  }))
 
   return (
     <div
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
-      style={{
-        position: 'absolute', bottom: 4, right: 4,
-        width: 24, height: 24, borderRadius: 6, zIndex: 20,
-        background: 'var(--mint-bg2)', border: '1px solid var(--accent)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'se-resize', touchAction: 'none',
-        color: 'var(--accent)', fontSize: 12,
-        boxShadow: '0 2px 8px var(--accent-glow)',
-      }}
-    >⤡</div>
-  )
-}
-
-// ── Ghost tambah section — kecil, dashed border ───────────────
-function GhostAddSection({ onClick }: { onClick: () => void }) {
-  const [hov, setHov] = useState(false)
-  return (
-    <div
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        width: '100%', height: '100%',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: `1.5px dashed ${hov ? 'var(--accent)' : 'var(--accent-glow)'}`,
-        borderRadius: 'var(--radius)',
-        background: hov ? 'var(--mint-bg)' : 'var(--mint-bg)',
-        cursor: 'pointer', transition: 'all .2s',
-        color: hov ? 'var(--accent)' : 'var(--accent-glow)',
-      }}
+      onTouchEnd={handleTouchEnd}
+      style={{ paddingTop: pullY > 0 ? pullY : undefined, transition: isPulling ? 'none' : 'padding-top 300ms ease' }}
     >
-      <div style={{
-        width: 28, height: 28, borderRadius: '50%',
-        border: `1.5px dashed ${hov ? 'var(--accent)' : 'var(--mint-bg2)'}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 18, transition: 'all .2s',
-      }}>＋</div>
-    </div>
-  )
-}
-
-// ── Badge section ─────────────────────────────────────────────
-// Tampil untuk semua user — ADM REG/UNIT untuk shared, OWN untuk personal
-// Admin melihat badge tambahan: inisial pembuat + role + wilayah/unit
-function SectionBadge({ sharedSection, personalSection, isAdmin }: {
-  sharedSection?:  import('../../utils/supabaseClient').SharedSection | null
-  personalSection?: Section | null
-  isAdmin?:        boolean
-}) {
-  const badgeBase: React.CSSProperties = {
-    fontSize: 8, fontWeight: 800, padding: '2px 7px', borderRadius: 10,
-    letterSpacing: '1px', textTransform: 'uppercase',
-    fontFamily: 'var(--mono)', lineHeight: 1.5, pointerEvents: 'none' as const,
-    border: '1px solid transparent',
-  }
-
-  // Badge untuk shared section
-  if (sharedSection) {
-    const isRegion = sharedSection.visibility === 'region'
-    const bg       = isRegion ? '#FF8C42' : '#C77DFF'
-    const glow     = isRegion ? 'rgba(255,140,66,0.4)' : 'rgba(199,125,255,0.4)'
-    const label    = isRegion ? 'ADM REG' : 'ADM UNIT'
-
-    return (
-      <div style={{
-        position: 'absolute', top: 0, left: 12, zIndex: 10,
-        display: 'flex', alignItems: 'center', gap: 3, pointerEvents: 'none',
-      }}>
-        <span style={{ ...badgeBase, background: bg, color: '#0A0A0A', borderColor: bg,
-          boxShadow: `0 0 8px ${glow}` }}>{label}</span>
-      </div>
-    )
-  }
-
-  // Badge OWN tidak ditampilkan — sudah jelas milik user
-  if (personalSection) return null
-  return null
-}
-
-// ── Widget wrapper (jam/catatan) ──────────────────────────────
-function WidgetWrapper({ section, editMode, onEdit }: {
-  section: Section; editMode: boolean; onEdit: (s: Section) => void
-}) {
-  const { toggleCollapse } = useStore()
-  return (
-    <div className="section-card" style={{
-      '--section-accent': section.accentColor || 'var(--accent)',
-      height: '100%', display: 'flex', flexDirection: 'column',
-    } as React.CSSProperties}>
-      <div className="section-header" style={{ cursor: editMode ? 'grab' : 'default' }}>
-        <span className="section-icon">{section.icon || '🧩'}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="section-title">{section.title}</div>
+      {/* Pull to refresh indicator */}
+      {pullY > 0 && (
+        <div style={{ position: 'fixed', top: 68, left: 0, right: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 20, padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--silver3)', boxShadow: 'var(--card-shadow)', opacity: Math.min(pullY / PULL_THRESHOLD, 1) }}>
+            <span style={{ display: 'inline-block', transform: isRefreshing ? 'none' : `rotate(${Math.min(pullY / PULL_THRESHOLD, 1) * 180}deg)`, animation: isRefreshing ? 'spin 0.8s linear infinite' : 'none', transition: 'transform 100ms' }}>↓</span>
+            {isRefreshing ? 'Memperbarui...' : pullY >= PULL_THRESHOLD ? 'Lepas untuk refresh' : 'Tarik untuk refresh'}
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
-          {editMode && (
-            <button className="sec-action-btn-lg"
-              onMouseDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); onEdit(section) }}>✏️</button>
-          )}
-          <button
-            className={`sec-collapse-btn${section.collapsed ? '' : ' open'}`}
-            onMouseDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); toggleCollapse(section.id) }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M3 5L7 9L11 5" stroke="currentColor" strokeWidth="1.8"
-                strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
+      )}
+
+      {/* Grid overlay saat dragging */}
+      <div className={`drag-grid-overlay${isDraggingActive ? ' visible' : ''}`} />
+
+      {/* Shared sections */}
+      {sharedAsSections.length > 0 && (
+        <div className="shared-sections-row">
+          {sharedAsSections.map(section => (
+            <div key={section.id} style={{ opacity: q && !section.title.toLowerCase().includes(q) && !section.items.some((i: any) => i.title.toLowerCase().includes(q)) ? 0.25 : 1, transition: 'opacity 200ms' }}>
+              <SectionCard
+                section={section}
+                isShared={true}
+                canEdit={false}
+                isMobileView={isMobile}
+                onFocus={() => {}}
+                onEditSection={() => {}}
+                onEditItem={() => {}}
+                onAddItem={() => {}}
+                onDeleteSection={() => {}}
+                onSave={() => {}}
+                onCancel={() => {}}
+              />
+            </div>
+          ))}
         </div>
-      </div>
-      <div className={`section-body${section.collapsed ? ' collapsed' : ''}`}
-        style={{ flex: 1, overflow: 'hidden' }}>
-        {section.widgetType === 'clock' && <ClockWidget />}
-        {section.widgetType === 'notes' && <NotesWidget sectionId={section.id} />}
-      </div>
+      )}
+
+      {/* Personal sections — draggable */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={personalSections.map(s => s.id)} strategy={rectSortingStrategy}>
+          <div className="dashboard-grid">
+            {personalSections.map(section => (
+              <div
+                key={section.id}
+                style={{
+                  opacity: q && !section.title.toLowerCase().includes(q) && !section.items.some((i: any) => i.title.toLowerCase().includes(q)) ? 0.25 : 1,
+                  transition: 'opacity 200ms',
+                }}
+              >
+                <SortableSectionCard
+                  section={section}
+                  editMode={editMode}
+                  isMobile={isMobile}
+                  searchQuery={searchQuery}
+                  focusedId={focusedId}
+                  onFocus={(id) => setFocusedId(prev => prev === id ? null : id)}
+                  onEditSection={handleEditSection}
+                  onEditItem={handleEditItem}
+                  onAddItem={handleAddItem}
+                  onDeleteSection={handleDeleteSection}
+                  onSave={handleSave}
+                  onCancel={() => { setFocusedId(null); handleCancel() }}
+                />
+              </div>
+            ))}
+          </div>
+        </SortableContext>
+
+        {/* Drag overlay — ghost card saat drag */}
+        <DragOverlay>
+          {activeSection ? (
+            <div style={{ opacity: 0.9, transform: 'rotate(2deg) scale(1.02)', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', borderRadius: 16, overflow: 'hidden' }}>
+              <SectionCard
+                section={activeSection}
+                isShared={false}
+                canEdit={false}
+                isMobileView={isMobile}
+                onFocus={() => {}}
+                onEditSection={() => {}}
+                onEditItem={() => {}}
+                onAddItem={() => {}}
+                onDeleteSection={() => {}}
+                onSave={() => {}}
+                onCancel={() => {}}
+              />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   )
 }

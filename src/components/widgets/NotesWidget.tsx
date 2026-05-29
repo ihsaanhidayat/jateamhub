@@ -11,15 +11,15 @@ type LockMode = 'manual' | 'auto'
 
 export default function NotesWidget({ sectionId }: Props) {
   const { personalSections, updateItem, addItem, syncPersonalToDb } = useStore()
-  const section  = personalSections.find(s => s.id === sectionId)
+  const section = personalSections.find(s => s.id === sectionId)
   const noteItem = section?.items?.[0]
 
-  const [text,     setText]     = useState(noteItem?.desc ?? '')
-  const [saved,    setSaved]    = useState(true)
-  const [locked,   setLocked]   = useState(false)
+  const [text, setText] = useState(noteItem?.desc ?? '')
+  const [saved, setSaved] = useState(true)
+  const [locked, setLocked] = useState(false)
   const [showLock, setShowLock] = useState(false)
-  const [pwInput,  setPwInput]  = useState('')
-  const [pwError,  setPwError]  = useState('')
+  const [pwInput, setPwInput] = useState('')
+  const [pwError, setPwError] = useState('')
   const [checking, setChecking] = useState(false)
   const [lockMode, setLockMode] = useState<LockMode>(() => {
     // Baca preferensi dari localStorage
@@ -109,11 +109,21 @@ export default function NotesWidget({ sectionId }: Props) {
           </div>
 
           {/* Lock/unlock button */}
-          <button onClick={() => { locked ? setShowLock(true) : setLocked(lockMode === 'auto') }}
-            title={locked ? 'Buka catatan' : lockMode === 'auto' ? 'Kunci sekarang' : 'Catatan tidak terkunci'}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12,
-              color: locked ? 'var(--accent)' : 'var(--silver3)', padding: '1px 3px' }}>
-            {locked ? '🔒' : lockMode === 'auto' ? '🔐' : '👁'}
+          <button
+            onClick={() => {
+              if (locked) {
+                setShowLock(true) // buka — minta password
+              } else {
+                setLocked(true)   // kunci — selalu bisa dikunci, baik manual maupun auto
+                setShowLock(false)
+              }
+            }}
+            title={locked ? 'Buka catatan' : 'Kunci catatan'}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', fontSize: 12,
+              color: locked ? 'var(--accent)' : 'var(--silver3)', padding: '1px 3px'
+            }}>
+            {locked ? '🔒' : lockMode === 'auto' ? '🔐' : '🔓'}
           </button>
         </div>
       </div>
@@ -144,21 +154,22 @@ export default function NotesWidget({ sectionId }: Props) {
       {showLock && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 10,
-          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)',
+          background: 'var(--bg3)',
+          borderRadius: 'inherit',
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', gap: 10, padding: 20,
         }}>
           <span style={{ fontSize: 22 }}>🔐</span>
-          <span style={{ fontSize: 12, color: 'white', fontWeight: 600 }}>Masukkan password</span>
+          <span style={{ fontSize: 12, color: 'var(--silver)', fontWeight: 600 }}>Masukkan password</span>
           <input type="password" value={pwInput}
             onChange={e => { setPwInput(e.target.value); setPwError('') }}
             onKeyDown={e => e.key === 'Enter' && handleUnlock()}
             autoFocus placeholder="Password akun kamu"
-            style={{ width: '100%', height: 36, borderRadius: 6, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontSize: 13, padding: '0 10px', fontFamily: 'var(--font)', outline: 'none' }} />
-          {pwError && <span style={{ fontSize: 11, color: '#FCA5A5' }}>{pwError}</span>}
+            style={{ width: '100%', height: 36, borderRadius: 6, background: 'var(--bg4)', border: '1px solid var(--border2)', color: 'var(--silver)', fontSize: 13, padding: '0 10px', fontFamily: 'var(--font)', outline: 'none' }} />
+          {pwError && <span style={{ fontSize: 11, color: 'var(--red)' }}>{pwError}</span>}
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-            <button onClick={() => { setShowLock(false); setPwInput(''); setPwError('') }} style={{ flex: 1, height: 32, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'white', fontSize: 12, cursor: 'pointer' }}>Batal</button>
-            <button onClick={handleUnlock} disabled={checking || !pwInput} style={{ flex: 2, height: 32, background: 'var(--accent)', border: 'none', borderRadius: 6, color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{checking ? '...' : 'Buka'}</button>
+            <button onClick={() => { setShowLock(false); setPwInput(''); setPwError('') }} style={{ flex: 1, height: 32, background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
+            <button onClick={handleUnlock} disabled={checking || !pwInput} style={{ flex: 2, height: 32, background: 'var(--accent)', border: 'none', borderRadius: 6, color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>{checking ? '...' : 'Buka'}</button>
           </div>
         </div>
       )}

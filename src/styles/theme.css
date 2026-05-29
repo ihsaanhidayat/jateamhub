@@ -1,0 +1,94 @@
+/* ═══════════════════════════════════════════════════════════════
+   JATEAMHUB THEME SYSTEM v4.0
+   Pearl (Light) + Slate (Dark)
+   Clean · Modern · Elegant
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Pearl — Light Theme ─────────────────────────────────── */
+:root, [data-theme="pearl"] {
+  --bg:          #F5F6FA;
+  --bg2:         #FFFFFF;
+  --bg3:         #FFFFFF;
+  --bg4:         #F0F1F5;
+
+  --card-bg:     #FFFFFF;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04);
+  --card-shadow-hover: 0 4px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+
+  --border:      #E8E9EE;
+  --border2:     #D8DAE2;
+
+  --silver:      #0F1117;
+  --silver2:     #3A3D4A;
+  --silver3:     #6B7280;
+  --silver4:     #9CA3AF;
+
+  --accent:      #2563EB;
+  --accent-hover:#1D4ED8;
+  --accent-light:#EFF6FF;
+  --accent-soft: #DBEAFE;
+
+  --green:       #16A34A;
+  --green-bg:    #F0FDF4;
+  --mint-bg:     #F0FDF4;
+  --mint-bg2:    #DCFCE7;
+
+  --red:         #DC2626;
+  --red-bg:      #FEF2F2;
+
+  --font:        'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --mono:        'JetBrains Mono', 'Fira Code', monospace;
+
+  --radius:      12px;
+  --radius-sm:   8px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
+
+  --dur-fast:    120ms;
+  --dur-med:     220ms;
+  --ease:        cubic-bezier(0.16, 1, 0.3, 1);
+
+  --shadow:      0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04);
+  --shadow-lg:   0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+  --header-h: 56px;
+
+  color-scheme: light;
+}
+
+/* ── Slate — Dark Theme ──────────────────────────────────── */
+[data-theme="slate"] {
+  --bg:          #0F1117;
+  --bg2:         #1A1D27;
+  --bg3:         #1E2130;
+  --bg4:         #252836;
+
+  --card-bg:     #1A1D27;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+  --card-shadow-hover: 0 4px 20px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
+
+  --border:      #2A2D3E;
+  --border2:     #343748;
+
+  --silver:      #F1F5F9;
+  --silver2:     #CBD5E1;
+  --silver3:     #94A3B8;
+  --silver4:     #64748B;
+
+  --accent:      #3B82F6;
+  --accent-hover:#2563EB;
+  --accent-light:#1E3A5F;
+  --accent-soft: #1E3A5F;
+
+  --green:       #4ADE80;
+  --green-bg:    #0F2A1A;
+  --mint-bg:     #0F2A1A;
+  --mint-bg2:    #14532D;
+
+  --red:         #F87171;
+  --red-bg:      #2D1515;
+
+  color-scheme: dark;
+}

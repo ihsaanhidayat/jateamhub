@@ -8,10 +8,10 @@ import AvatarCropModal from '../ui/AvatarCropModal'
 
 interface Props {
   onToggleOptions: () => void
-  optionsOpen:     boolean
-  onOpenAdvanced:  () => void
-  onAddSection:    () => void
-  onImportLinks:   () => void
+  optionsOpen: boolean
+  onOpenAdvanced: () => void
+  onAddSection: () => void
+  onImportLinks: () => void
 }
 
 export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks }: Props) {
@@ -22,14 +22,25 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const { profile: session } = useAuthStore()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
-  const [cropDataUrl,     setCropDataUrl]     = useState<string | null>(null)
+  const [cropDataUrl, setCropDataUrl] = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
 
-  const isEditable   = canEdit(session as any)
-  const showOptions  = canSeeOptions(session as any)
+  // Theme toggle — Pearl (light) / Slate (dark)
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('jateamhub-theme')
+    if (saved) return saved === 'slate'
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'slate' : 'pearl')
+    localStorage.setItem('jateamhub-theme', isDark ? 'slate' : 'pearl')
+  }, [isDark])
+
+  const isEditable = canEdit(session as any)
+  const showOptions = canSeeOptions(session as any)
   const isAdminLevel = isAdmin(session as any)
-  const badge        = getDisplayBadge(session as any)
-  const emoji        = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
+  const badge = getDisplayBadge(session as any)
+  const emoji = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
 
 
 
@@ -84,12 +95,12 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   }
 
   const PREVIEW_OPTS = [
-    { value: null,    label: 'Admin View' },
-    { value: '',      label: 'User Umum'  },
-    { value: 'pro',   label: 'PRO'        },
-    { value: 'cro',   label: 'CRO'        },
-    { value: 'klaim', label: 'Klaim'      },
-    { value: 'ae',    label: 'AE'         },
+    { value: null, label: 'Admin View' },
+    { value: '', label: 'User Umum' },
+    { value: 'pro', label: 'PRO' },
+    { value: 'cro', label: 'CRO' },
+    { value: 'klaim', label: 'Klaim' },
+    { value: 'ae', label: 'AE' },
   ]
 
 
@@ -120,8 +131,6 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                 <span className="search-icon">⌕</span>
               </div>
               <button className="icon-btn desktop-only" onClick={toggleEditMode} title="Edit Mode" aria-label="Edit Mode">✏️</button>
-              <button id="options-btn" className={`icon-btn desktop-only${optionsOpen ? ' active' : ''}`}
-                onClick={onToggleOptions} title="Options" aria-label="Options">⚙️</button>
             </>
           ) : (
             <>
@@ -161,8 +170,18 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             )}
           </div>
 
+          {/* Theme Toggle — ☀️/🌙 */}
+          <button
+            className="theme-toggle"
+            onClick={() => setIsDark(v => !v)}
+            title={isDark ? 'Switch ke Pearl (Light)' : 'Switch ke Slate (Dark)'}
+            aria-label="Toggle tema"
+          >
+            {isDark ? '☀️' : '🌙'}
+          </button>
+
           {/* Profile dropdown — lebih besar dari tombol lain */}
-          <div className="preview-dropdown" ref={profileRef} style={{ marginLeft: 16 }}>
+          <div className="preview-dropdown" ref={profileRef} style={{ marginLeft: 4 }}>
             <button className="profile-btn" onClick={() => setProfileDropdown(v => !v)} title="Profil"
               style={{ width: 46, height: 46, borderRadius: '50%' }}>
               {(session as any)?.avatar_url ? (
@@ -175,29 +194,26 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             </button>
 
             {profileDropdown && (
-              <div className="preview-menu" style={{ right: 0, minWidth: 200, padding: '4px 0' }}>
+              <div className="preview-dropdown-menu">
                 {/* User info */}
-                <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ padding: '12px 16px 10px', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)' }}>{session?.username}</div>
-                  <span style={{
-                    fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 10,
-                    background: badge.color, color: '#0A0A0A',
-                    textTransform: 'uppercase', fontFamily: 'var(--mono)',
-                    display: 'inline-block', marginTop: 4,
-                  }}>{badge.label}</span>
+                  {badge && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 99,
+                      background: badge.color, color: '#0A0A0A',
+                      textTransform: 'uppercase', fontFamily: 'var(--mono)',
+                      display: 'inline-block', marginTop: 4, letterSpacing: '0.5px',
+                    }}>{badge.label}</span>
+                  )}
                 </div>
-                {/* Lihat Profil — semua role */}
-                <button onClick={() => { onOpenAdvanced(); setProfileDropdown(false) }}
-                  style={{ display: 'block', width: '100%', padding: '9px 14px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--silver2)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--mint-bg)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                <button className="preview-dropdown-item"
+                  onClick={() => { onOpenAdvanced(); setProfileDropdown(false) }}>
                   👤 Lihat Profil Saya
                 </button>
-                <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-                <button onClick={() => useAuthStore.getState().logout()}
-                  style={{ display: 'block', width: '100%', padding: '9px 14px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--red)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(224,85,85,0.08)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                <div className="preview-dropdown-divider" />
+                <button className="preview-dropdown-item danger"
+                  onClick={() => useAuthStore.getState().logout()}>
                   ⏻ Sign Out
                 </button>
               </div>
