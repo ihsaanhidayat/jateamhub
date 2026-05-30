@@ -80,7 +80,7 @@ export default function ConfirmDialog({
             style={{
               height: 40, padding: '0 var(--sp-4)',
               fontSize: 'var(--text-sm)', fontWeight: 700,
-              background: danger ? 'rgba(239,68,68,0.1)' : 'var(--mint-bg2)',
+              background: danger ? 'rgba(239,68,68,0.1)' : 'var(--accent-soft)',
               border: `1px solid ${danger ? 'var(--red)' : 'var(--accent)'}`,
               borderRadius: 'var(--radius-sm)',
               color: danger ? 'var(--red)' : 'var(--accent)',

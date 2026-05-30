@@ -105,6 +105,7 @@ interface DashboardStore {
   appearance:       AppearanceSettings
   editMode:         boolean
   searchQuery:      string
+  notesLockActive:  boolean
   currentUserId:    string | null
   currentUserRole:  string
   currentRegion:    string
@@ -191,6 +192,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   editingItem:      null,
   addingItemSectionId: null,
   searchQuery:      '',
+  notesLockActive:  false,
   currentUserId:    null,
   currentUserRole:  'user',
   currentRegion:    'global',
@@ -595,6 +597,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   // ── Set query filter pencarian section ────────────────────
   setSearch: (q) => set({ searchQuery: q }),
+  setNotesLockActive: (v: boolean) => set({ notesLockActive: v }),
 
   // ── Set filter preview untuk admin (role + region + unit) ─
 

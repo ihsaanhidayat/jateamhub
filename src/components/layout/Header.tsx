@@ -24,6 +24,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const [profileDropdown, setProfileDropdown] = useState(false)
   const [cropDataUrl, setCropDataUrl] = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
+  const hideSearch = useStore(s => (s as any).notesLockActive ?? false)
 
   // Theme toggle — Pearl (light) / Slate (dark)
   const [isDark, setIsDark] = useState(() => {
@@ -126,8 +127,8 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
           {/* Desktop buttons */}
           {!editMode ? (
             <>
-              <div className="search-wrap desktop-only">
-                <input className="search-input" placeholder="Filter..." value={searchQuery} onChange={e => setSearch(e.target.value)} />
+              <div className="search-wrap desktop-only" style={{ display: hideSearch ? 'none' : undefined }}>
+                <input className="search-input" placeholder="Filter..." value={searchQuery} onChange={e => setSearch(e.target.value)} autoComplete="off" />
                 <span className="search-icon">⌕</span>
               </div>
               <button className="icon-btn desktop-only" onClick={toggleEditMode} title="Edit Mode" aria-label="Edit Mode">✏️</button>
@@ -155,10 +156,10 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
 
           {/* ── MOBILE: hanya search ── */}
           <div className="mobile-only">
-            {!editMode && (
+            {!editMode && !hideSearch && (
               <div className="search-wrap" style={{ marginRight: 4 }}>
                 <input className="search-input" placeholder="Cari..." value={searchQuery}
-                  onChange={e => setSearch(e.target.value)} style={{ width: 90 }} />
+                  onChange={e => setSearch(e.target.value)} style={{ width: 90 }} autoComplete="off" />
                 <span className="search-icon">⌕</span>
               </div>
             )}
@@ -177,7 +178,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             title={isDark ? 'Switch ke Pearl (Light)' : 'Switch ke Slate (Dark)'}
             aria-label="Toggle tema"
           >
-            {isDark ? '☀️' : '🌙'}
+            {isDark ? '🌙' : '☀️'}
           </button>
 
           {/* Profile dropdown — lebih besar dari tombol lain */}

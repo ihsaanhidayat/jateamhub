@@ -4,37 +4,19 @@
   "description": "Portal dashboard internal tim",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A0A0A",
-  "theme_color": "#6EE7B7",
+  "background_color": "#F5F6FA",
+  "theme_color": "#2563EB",
   "orientation": "any",
   "icons": [
-    {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
-  "categories": [
-    "productivity",
-    "business"
-  ],
+  "categories": ["productivity", "business"],
   "dir": "ltr",
   "lang": "id-ID",
   "scope": "/",
   "prefer_related_applications": false,
   "shortcuts": [
-    {
-      "name": "Dashboard",
-      "short_name": "Home",
-      "url": "/",
-      "description": "Buka dashboard utama"
-    }
+    { "name": "Dashboard", "short_name": "Home", "url": "/", "description": "Buka dashboard utama" }
   ]
 }

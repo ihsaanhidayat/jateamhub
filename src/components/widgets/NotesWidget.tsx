@@ -11,16 +11,31 @@ type LockMode = 'manual' | 'auto'
 
 export default function NotesWidget({ sectionId }: Props) {
   const { personalSections, updateItem, addItem, syncPersonalToDb } = useStore()
+  const setNotesLockActive = useStore(s => (s as any).setNotesLockActive)
   const section = personalSections.find(s => s.id === sectionId)
   const noteItem = section?.items?.[0]
 
   const [text, setText] = useState(noteItem?.desc ?? '')
   const [saved, setSaved] = useState(true)
-  const [locked, setLocked] = useState(false)
+  // Baca locked state dari localStorage — persist antar session
+  const [locked, setLockedState] = useState<boolean>(() => {
+    const saved = localStorage.getItem(`notes-locked-${sectionId}`)
+    return saved === 'true'
+  })
+  const setLocked = (val: boolean) => {
+    setLockedState(val)
+    localStorage.setItem(`notes-locked-${sectionId}`, String(val))
+  }
   const [showLock, setShowLock] = useState(false)
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState('')
   const [checking, setChecking] = useState(false)
+
+  // Sembunyikan search bar di Header saat input password aktif
+  useEffect(() => {
+    setNotesLockActive?.(showLock)
+    return () => { setNotesLockActive?.(false) }
+  }, [showLock])
   const [lockMode, setLockMode] = useState<LockMode>(() => {
     // Baca preferensi dari localStorage
     return (localStorage.getItem(`notes-lockmode-${sectionId}`) as LockMode) ?? 'manual'
@@ -34,17 +49,17 @@ export default function NotesWidget({ sectionId }: Props) {
     setText(s?.items?.[0]?.desc ?? '')
   }, [sectionId])
 
-  // Auto-lock saat mode auto dan tidak ada aktivitas 60 detik
+  // Auto-lock saat mode auto dan sedang tidak terkunci — setelah 60 detik idle
   useEffect(() => {
     if (lockMode !== 'auto' || locked) return
     const t = setTimeout(() => setLocked(true), 60 * 1000)
     return () => clearTimeout(t)
-  }, [lockMode, locked, text])
+  }, [lockMode, locked, text]) // text sebagai dependency = reset timer saat ada aktivitas
 
   const saveLockMode = (mode: LockMode) => {
     setLockMode(mode)
     localStorage.setItem(`notes-lockmode-${sectionId}`, mode)
-    if (mode === 'auto') setLocked(false) // reset lock state
+    // Jangan reset locked — user yang menentukan kapan buka
   }
 
   const handleChange = (val: string) => {

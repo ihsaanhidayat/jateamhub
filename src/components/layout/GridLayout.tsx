@@ -83,8 +83,8 @@ function SortableSectionCard({
             (section as any).widgetType === 'notes'
               ? <NotesWidget sectionId={section.id} />
               : (section as any).widgetType === 'clock'
-              ? <ClockWidget />
-              : null
+                ? <ClockWidget />
+                : null
           }
         />
       </div>
@@ -214,12 +214,31 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
       try {
         await syncPersonalToDbNow()
         if (useStore.getState().loadSharedSections) await useStore.getState().loadSharedSections()
-      } catch {} finally { clearTimeout(safety); setIsRefreshing(false); setPullY(0) }
+      } catch { } finally { clearTimeout(safety); setIsRefreshing(false); setPullY(0) }
     } else { setPullY(0) }
   }
 
   const activeSection = personalSections.find(s => s.id === activeId)
   const q = searchQuery.toLowerCase()
+
+  const sectionMatches = (section: Section) => {
+    if (!q) return true
+    return section.title.toLowerCase().includes(q) ||
+      section.items.some((i: any) =>
+        i.title.toLowerCase().includes(q) ||
+        (i.url && i.url.toLowerCase().includes(q)) ||
+        (i.desc && i.desc.toLowerCase().includes(q))
+      )
+  }
+
+  const totalMatchItems = [...sharedSections, ...personalSections].reduce((acc, s: any) => {
+    if (!q) return acc
+    return acc + (s.items ?? []).filter((i: any) =>
+      i.title.toLowerCase().includes(q) ||
+      (i.url && i.url.toLowerCase().includes(q)) ||
+      (i.desc && i.desc.toLowerCase().includes(q))
+    ).length
+  }, 0)
 
   if (!isDataInitialized) return <SkeletonDashboard />
 
@@ -258,23 +277,35 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
       {/* Grid overlay saat dragging */}
       <div className={`drag-grid-overlay${isDraggingActive ? ' visible' : ''}`} />
 
+      {/* Result count saat search aktif */}
+      {q && (
+        <div style={{
+          padding: '6px 20px', fontSize: 11, color: 'var(--accent)',
+          fontWeight: 600, fontFamily: 'var(--mono)',
+          background: 'var(--accent-light)',
+          borderBottom: '1px solid var(--accent-soft)',
+        }}>
+          🔍 {totalMatchItems} link ditemukan
+        </div>
+      )}
+
       {/* Shared sections */}
       {sharedAsSections.length > 0 && (
         <div className="shared-sections-row">
           {sharedAsSections.map(section => (
-            <div key={section.id} style={{ opacity: q && !section.title.toLowerCase().includes(q) && !section.items.some((i: any) => i.title.toLowerCase().includes(q)) ? 0.25 : 1, transition: 'opacity 200ms' }}>
+            <div key={section.id} style={{ opacity: sectionMatches(section as any) ? 1 : 0.2, transition: 'opacity 200ms' }}>
               <SectionCard
                 section={section}
                 isShared={true}
                 canEdit={false}
                 isMobileView={isMobile}
-                onFocus={() => {}}
-                onEditSection={() => {}}
-                onEditItem={() => {}}
-                onAddItem={() => {}}
-                onDeleteSection={() => {}}
-                onSave={() => {}}
-                onCancel={() => {}}
+                onFocus={() => { }}
+                onEditSection={() => { }}
+                onEditItem={() => { }}
+                onAddItem={() => { }}
+                onDeleteSection={() => { }}
+                onSave={() => { }}
+                onCancel={() => { }}
               />
             </div>
           ))}
@@ -294,7 +325,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
               <div
                 key={section.id}
                 style={{
-                  opacity: q && !section.title.toLowerCase().includes(q) && !section.items.some((i: any) => i.title.toLowerCase().includes(q)) ? 0.25 : 1,
+                  opacity: sectionMatches(section) ? 1 : 0.2,
                   transition: 'opacity 200ms',
                 }}
               >
@@ -326,13 +357,13 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                 isShared={false}
                 canEdit={false}
                 isMobileView={isMobile}
-                onFocus={() => {}}
-                onEditSection={() => {}}
-                onEditItem={() => {}}
-                onAddItem={() => {}}
-                onDeleteSection={() => {}}
-                onSave={() => {}}
-                onCancel={() => {}}
+                onFocus={() => { }}
+                onEditSection={() => { }}
+                onEditItem={() => { }}
+                onAddItem={() => { }}
+                onDeleteSection={() => { }}
+                onSave={() => { }}
+                onCancel={() => { }}
               />
             </div>
           ) : null}

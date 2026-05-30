@@ -20,7 +20,6 @@ import ToastContainer from './components/ui/Toast'
 // Lazy load komponen berat
 const SuperadminDashboard = lazy(() => import('./components/layout/SuperadminDashboard'))
 const ProfilePage         = lazy(() => import('./components/layout/ProfilePage'))
-const PanduanFAB          = lazy(() => import('./components/layout/PanduanFAB'))
 const CoffeeModal         = lazy(() => import('./components/ui/CoffeeModal'))
 const AddSectionModal          = lazy(() => import('./components/layout/AddSectionModal'))
 const ImportLinksModal         = lazy(() => import('./components/ui/ImportLinksModal'))
@@ -340,7 +339,6 @@ export default function App() {
             }}
           />
         )}
-        <PanduanFAB />
         {/* Item Modal — tambah/edit link */}
         {(editingItem || addingItemSectionId) && (
           <ItemModal

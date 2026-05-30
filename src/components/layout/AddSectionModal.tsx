@@ -79,7 +79,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
         <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
           {/* Section */}
           <div style={cardBase}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.background = 'var(--mint-bg)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.background = 'var(--accent-light)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'; (e.currentTarget as HTMLElement).style.background = 'var(--bg2)' }}
             onClick={() => { addPersonalSectionAuto(); onClose() }}>
             <span style={{ fontSize: 36 }}>📁</span>
@@ -93,7 +93,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
 
           {/* Widget */}
           <div style={cardBase}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.background = 'var(--mint-bg)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.background = 'var(--accent-light)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'; (e.currentTarget as HTMLElement).style.background = 'var(--bg2)' }}>
             <span style={{ fontSize: 36 }}>🧩</span>
             <div>
@@ -110,7 +110,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
                 onClick={e => { e.stopPropagation(); if (!hasClockWidget) addWidget('clock') }}
                 style={{
                   flex: 1, padding: '8px 6px', borderRadius: 8,
-                  background: hasClockWidget ? 'var(--bg4)' : 'var(--mint-bg)',
+                  background: hasClockWidget ? 'var(--bg4)' : 'var(--accent-light)',
                   border: `1px solid ${hasClockWidget ? 'var(--border)' : 'var(--accent)'}`,
                   color: hasClockWidget ? 'var(--silver3)' : 'var(--accent)',
                   fontSize: 11, fontWeight: 700, cursor: hasClockWidget ? 'not-allowed' : 'pointer',
@@ -123,7 +123,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
                 onClick={e => { e.stopPropagation(); addWidget('notes') }}
                 style={{
                   flex: 1, padding: '8px 6px', borderRadius: 8,
-                  background: 'var(--mint-bg)', border: '1px solid var(--accent)',
+                  background: 'var(--accent-light)', border: '1px solid var(--accent)',
                   color: 'var(--accent)', fontSize: 11, fontWeight: 700,
                   cursor: 'pointer', fontFamily: 'var(--font)',
                 }}>

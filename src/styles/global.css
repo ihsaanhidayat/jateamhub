@@ -153,16 +153,25 @@ input, textarea, select { font-family: var(--font); }
   border-radius: 14px;
   box-shadow: var(--card-shadow);
   overflow: hidden;
-  transition: box-shadow 200ms, border-color 200ms;
+  transition: box-shadow 200ms, border-color 200ms, transform 150ms;
+  align-self: start;
+  position: relative;
 }
-.section-card:hover { box-shadow: var(--card-shadow-hover); }
-.section-card.is-shared { border-left: 3px solid var(--accent-soft); }
+.section-card:hover {
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-1px);
+}
+.section-card.is-shared {
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 3%, var(--card-bg)) 0%, var(--card-bg) 60%);
+}
 .section-card.is-focused {
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 3px var(--accent-soft), var(--card-shadow-hover) !important;
+  transform: translateY(-1px);
 }
-.section-card.is-blurred { opacity: 0.55; }
-.section-card.is-dragging { opacity: 0.35; box-shadow: none; }
+.section-card.is-blurred { opacity: 0.45; filter: blur(0.5px); transform: none; }
+.section-card.is-dragging { opacity: 0.3; box-shadow: none; transform: none; }
 
 /* Section Header */
 .section-header {
@@ -170,22 +179,30 @@ input, textarea, select { font-family: var(--font); }
   padding: 10px 14px; cursor: pointer; user-select: none;
   border-bottom: 1px solid transparent;
   transition: background 120ms;
+  min-height: 42px;
 }
 .section-header:hover { background: var(--bg4); }
 .section-header.has-content { border-bottom-color: var(--border); }
-.section-icon { font-size: 16px; flex-shrink: 0; }
-.section-title { font-size: 13px; font-weight: 700; color: var(--silver); letter-spacing: -0.1px; }
-.section-subtitle { font-size: 10px; color: var(--silver3); margin-top: 1px; }
+.section-icon { font-size: 16px; flex-shrink: 0; line-height: 1; }
+.section-title {
+  font-size: 13px; font-weight: 700; color: var(--silver);
+  letter-spacing: -0.2px; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.section-subtitle {
+  font-size: 10px; color: var(--silver4); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* Section actions */
 .sec-action-btn-lg {
   width: 28px; height: 28px; border-radius: 6px;
   background: none; border: 1px solid transparent;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  font-size: 12px; color: var(--silver3); transition: all 120ms;
+  font-size: 12px; color: var(--silver3); transition: all 120ms; flex-shrink: 0;
 }
 .sec-action-btn-lg:hover { background: var(--bg4); color: var(--silver); border-color: var(--border2); }
-.sec-action-btn-lg.danger:hover { background: var(--red-bg); color: var(--red); }
+.sec-action-btn-lg.danger:hover { background: var(--red-bg); color: var(--red); border-color: transparent; }
 
 /* Collapse button */
 .sec-collapse-btn {
@@ -193,21 +210,31 @@ input, textarea, select { font-family: var(--font); }
   background: none; border: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   color: var(--silver4); font-size: 11px; margin-left: auto;
-  transition: transform 150ms, color 120ms;
+  transition: transform 150ms, color 120ms; flex-shrink: 0;
 }
 .sec-collapse-btn:hover { color: var(--silver2); }
 .sec-collapse-btn.open { transform: rotate(180deg); }
 
-/* Section body — max 3 rows, hidden scroll */
+/* Section body */
 .section-body {
   padding: 8px;
-  max-height: calc(3 * (44px + 8px + 18px) + 16px); /* 3 rows: icon + label + gap */
+  max-height: calc(3 * (44px + 8px + 18px) + 16px);
   overflow-y: auto;
   scrollbar-width: none; -ms-overflow-style: none;
 }
 .section-body::-webkit-scrollbar { display: none; }
+.section-body.collapsed { display: none; }
 
-/* Section footer (save/cancel) */
+/* Empty state */
+.section-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 20px 12px; gap: 6px;
+  color: var(--silver4); text-align: center;
+}
+.section-empty-icon { font-size: 22px; opacity: 0.5; }
+.section-empty-text { font-size: 11px; font-weight: 500; line-height: 1.4; }
+
+/* Section footer */
 .section-footer {
   display: flex; gap: 8px; padding: 10px 12px;
   border-top: 1px solid var(--border);
@@ -215,23 +242,43 @@ input, textarea, select { font-family: var(--font); }
 .section-footer .btn-cancel {
   flex: 1; height: 32px; background: none;
   border: 1px solid var(--border2); border-radius: 8px;
-  color: var(--silver3); font-size: 12px; cursor: pointer;
+  color: var(--silver3); font-size: 12px; cursor: pointer; font-family: var(--font);
 }
 .section-footer .btn-save {
   flex: 2; height: 32px; background: var(--accent);
   border: none; border-radius: 8px;
-  color: white; font-size: 12px; font-weight: 700; cursor: pointer;
+  color: white; font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--font);
 }
 
-/* Drag handle */
+/* Drag handle — dots grid pattern */
 .drag-handle {
-  cursor: grab; touch-action: none; padding: 4px 6px;
-  border-radius: 6px; color: var(--silver4); font-size: 13px;
+  cursor: grab; touch-action: none;
+  padding: 6px 5px; border-radius: 6px;
+  color: var(--silver4); font-size: 11px;
   display: flex; align-items: center;
   transition: color 120ms, background 120ms;
+  letter-spacing: 1px; line-height: 0.6;
 }
 .drag-handle:hover { color: var(--accent); background: var(--accent-light); }
-.drag-handle:active { cursor: grabbing; }
+.drag-handle:active { cursor: grabbing; color: var(--accent); }
+
+/* ══════════════════════════════════════════════════════════
+   APP BACKGROUND — grid tipis
+══════════════════════════════════════════════════════════ */
+body {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--border) 60%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 60%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: 0 0;
+}
+/* Header dan card solid di atas grid */
+.header, .app-header {
+  background: color-mix(in srgb, var(--bg2) 97%, transparent) !important;
+}
+.section-card, .modal-box, .preview-dropdown-menu {
+  background: var(--card-bg) !important;
+}
 
 /* ══════════════════════════════════════════════════════════
    FOLDER GRID

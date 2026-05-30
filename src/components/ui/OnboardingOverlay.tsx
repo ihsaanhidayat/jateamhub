@@ -73,7 +73,7 @@ export default function OnboardingOverlay({ onDismiss, onStartEdit }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <div style={{
               width: 52, height: 52,
-              background: 'var(--mint-bg2)',
+              background: 'var(--accent-soft)',
               border: '1px solid var(--accent)',
               borderRadius: 14,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
