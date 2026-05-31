@@ -17,6 +17,7 @@ import { useAuthStore } from '../../store/authStore'
 import SectionCard from '../section/SectionCard'
 import type { Section } from '../../types'
 import NotesWidget from '../widgets/NotesWidget'
+import TodoWidget, { TodoInputFooter } from '../widgets/TodoWidget'
 import ClockWidget from '../widgets/ClockWidget'
 
 // ── Skeleton dashboard ───────────────────────────────────────
@@ -83,8 +84,15 @@ function SortableSectionCard({
             (section as any).widgetType === 'notes'
               ? <NotesWidget sectionId={section.id} />
               : (section as any).widgetType === 'clock'
-                ? <ClockWidget />
-                : null
+              ? <ClockWidget />
+              : (section as any).widgetType === 'todo'
+              ? <TodoWidget sectionId={section.id} />
+              : null
+          }
+          widgetFooter={
+            (section as any).widgetType === 'todo'
+              ? <TodoInputFooter sectionId={section.id} />
+              : undefined
           }
         />
       </div>
@@ -214,7 +222,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
       try {
         await syncPersonalToDbNow()
         if (useStore.getState().loadSharedSections) await useStore.getState().loadSharedSections()
-      } catch { } finally { clearTimeout(safety); setIsRefreshing(false); setPullY(0) }
+      } catch {} finally { clearTimeout(safety); setIsRefreshing(false); setPullY(0) }
     } else { setPullY(0) }
   }
 
@@ -226,7 +234,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
     return section.title.toLowerCase().includes(q) ||
       section.items.some((i: any) =>
         i.title.toLowerCase().includes(q) ||
-        (i.url && i.url.toLowerCase().includes(q)) ||
+        (i.url  && i.url.toLowerCase().includes(q)) ||
         (i.desc && i.desc.toLowerCase().includes(q))
       )
   }
@@ -235,7 +243,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
     if (!q) return acc
     return acc + (s.items ?? []).filter((i: any) =>
       i.title.toLowerCase().includes(q) ||
-      (i.url && i.url.toLowerCase().includes(q)) ||
+      (i.url  && i.url.toLowerCase().includes(q)) ||
       (i.desc && i.desc.toLowerCase().includes(q))
     ).length
   }, 0)
@@ -299,13 +307,13 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                 isShared={true}
                 canEdit={false}
                 isMobileView={isMobile}
-                onFocus={() => { }}
-                onEditSection={() => { }}
-                onEditItem={() => { }}
-                onAddItem={() => { }}
-                onDeleteSection={() => { }}
-                onSave={() => { }}
-                onCancel={() => { }}
+                onFocus={() => {}}
+                onEditSection={() => {}}
+                onEditItem={() => {}}
+                onAddItem={() => {}}
+                onDeleteSection={() => {}}
+                onSave={() => {}}
+                onCancel={() => {}}
               />
             </div>
           ))}
@@ -357,13 +365,13 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                 isShared={false}
                 canEdit={false}
                 isMobileView={isMobile}
-                onFocus={() => { }}
-                onEditSection={() => { }}
-                onEditItem={() => { }}
-                onAddItem={() => { }}
-                onDeleteSection={() => { }}
-                onSave={() => { }}
-                onCancel={() => { }}
+                onFocus={() => {}}
+                onEditSection={() => {}}
+                onEditItem={() => {}}
+                onAddItem={() => {}}
+                onDeleteSection={() => {}}
+                onSave={() => {}}
+                onCancel={() => {}}
               />
             </div>
           ) : null}

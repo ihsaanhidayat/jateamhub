@@ -8,15 +8,6 @@ import Header       from './components/layout/Header'
 import GridLayout   from './components/layout/GridLayout'
 import OfflineBar   from './components/ui/OfflineBar'
 import ToastContainer from './components/ui/Toast'
-
-// Apply tema sebelum render — prevent flash
-;(function initTheme() {
-  const saved = localStorage.getItem('jateamhub-theme')
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const theme = saved ?? (prefersDark ? 'slate' : 'pearl')
-  document.documentElement.setAttribute('data-theme', theme)
-})()
-
 // Lazy load komponen berat
 const SuperadminDashboard = lazy(() => import('./components/layout/SuperadminDashboard'))
 const ProfilePage         = lazy(() => import('./components/layout/ProfilePage'))
@@ -24,6 +15,8 @@ const CoffeeModal         = lazy(() => import('./components/ui/CoffeeModal'))
 const AddSectionModal          = lazy(() => import('./components/layout/AddSectionModal'))
 const ImportLinksModal         = lazy(() => import('./components/ui/ImportLinksModal'))
 const ForceChangePasswordModal = lazy(() => import('./components/ui/ForceChangePasswordModal'))
+const InstallPrompt             = lazy(() => import('./components/ui/InstallPrompt'))
+const TaskListPage              = lazy(() => import('./pages/TaskListPage'))
 const OnboardingOverlay        = lazy(() => import('./components/ui/OnboardingOverlay'))
 const ItemModal                = lazy(() => import('./components/item/ItemModal'))
 const SectionEditModal         = lazy(() => import('./components/layout/SectionEditModal'))
@@ -42,6 +35,7 @@ export default function App() {
   const [addSectionOpen, setAddSectionOpen] = useState(false)
   const [importLinksOpen, setImportLinksOpen] = useState(false)
   const [coffeeOpen,     setCoffeeOpen]     = useState(false)
+  const [taskListOpen,  setTaskListOpen]  = useState(false)
 
   // Edit state dari store
   const editingSection    = useStore(s => s.editingSection)
@@ -78,38 +72,6 @@ export default function App() {
     }, 6000)
     return () => clearTimeout(t)
   }, [])
-
-  // ── Idle timeout 30 menit — auto logout ────────────────────
-  useEffect(() => {
-    if (!profile) return
-
-    const IDLE_MS = 30 * 60 * 1000 // 30 menit
-    let timer: ReturnType<typeof setTimeout>
-
-    const resetTimer = () => {
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        // Simpan data dulu sebelum logout
-        const state = useStore.getState()
-        if (state.personalSections.length > 0) {
-          try { localStorage.setItem('jateamhub-personal', JSON.stringify(state.personalSections)) } catch {}
-        }
-        if (state.editMode) state.toggleEditMode()
-        toast('Sesi berakhir karena tidak aktif 30 menit.', 'warn')
-        setTimeout(() => useAuthStore.getState().logout(), 1500)
-      }, IDLE_MS)
-    }
-
-    // Reset timer setiap ada aktivitas user
-    const events = ['mousedown', 'keydown', 'touchstart', 'scroll']
-    events.forEach(e => document.addEventListener(e, resetTimer, { passive: true }))
-    resetTimer() // mulai timer
-
-    return () => {
-      clearTimeout(timer)
-      events.forEach(e => document.removeEventListener(e, resetTimer))
-    }
-  }, [profile?.id])
 
   // ── Page Visibility API — simpan saat hidden, refresh saat visible ──
   useEffect(() => {
@@ -276,6 +238,7 @@ export default function App() {
         onOpenAdvanced={() => setProfileOpen(true)}
         onAddSection={() => setAddSectionOpen(true)}
         onImportLinks={() => setImportLinksOpen(true)}
+        onOpenTaskList={() => setTaskListOpen(true)}
       />
 
       {/* Edit mode topbar — slim, di bawah header */}
@@ -360,6 +323,11 @@ export default function App() {
           />
         )}
       </Suspense>
+      {taskListOpen && (
+        <Suspense fallback={null}>
+          <TaskListPage onClose={() => setTaskListOpen(false)} />
+        </Suspense>
+      )}
       <ToastContainer />
     </div>
   )

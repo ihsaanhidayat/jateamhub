@@ -10,12 +10,11 @@ interface Props {
 }
 
 export default function AddSectionModal({ open, onClose }: Props) {
-  const { personalSections, addPersonalSectionAuto } = useStore()
+  const { personalSections, addPersonalSectionAuto, addPersonalSectionFirst } = useStore()
 
   // Cek apakah sudah ada widget jam (hanya boleh 1)
-  const hasClockWidget = personalSections.some(
-    s => s.type === 'widget' && s.widgetType === 'clock'
-  )
+  const hasClockWidget  = personalSections.some(s => s.type === 'widget' && s.widgetType === 'clock')
+  const hasTodoWidget   = personalSections.some(s => s.type === 'widget' && s.widgetType === 'todo')
 
   const addWidget = (widgetType: WidgetType) => {
     const { addPersonalSection } = useStore.getState()
@@ -26,23 +25,29 @@ export default function AddSectionModal({ open, onClose }: Props) {
     const sameRow = maxX + 3 <= 12
 
     const config: Record<WidgetType, { title: string; icon: string; w: number; h: number }> = {
-      clock: { title: 'Jam',   icon: '🕐', w: 3, h: 3 },
-      notes: { title: 'Notes', icon: '📝', w: 4, h: 5 },
+      clock:     { title: 'Jam',       icon: '🕐', w: 3, h: 3 },
+      notes:     { title: 'Notes',     icon: '📝', w: 4, h: 5 },
+      todo:      { title: 'To-do List', icon: '📋', w: 4, h: 6 },
     }
     const c = config[widgetType]
 
-    addPersonalSection({
+    const sectionData = {
       title:      c.title,
       icon:       c.icon,
       subtitle:   '',
       items:      [],
       layout:     { x: sameRow ? maxX : 0, y: sameRow ? Math.max(0, maxY - c.h) : maxY, w: c.w, h: c.h },
-      visibility: 'all',
+      visibility: 'all' as const,
       targetUnits: [],
       pageId:     'beranda',
-      type:       'widget',
+      type:       'widget' as const,
       widgetType,
-    })
+    }
+    if (widgetType === 'todo') {
+      addPersonalSectionFirst(sectionData)
+    } else {
+      addPersonalSection(sectionData)
+    }
     onClose()
   }
 
@@ -128,6 +133,24 @@ export default function AddSectionModal({ open, onClose }: Props) {
                   cursor: 'pointer', fontFamily: 'var(--font)',
                 }}>
                 📝 Notes
+              </button>
+              {/* Todo */}
+              <button
+                onClick={e => {
+                  e.stopPropagation()
+                  if (hasTodoWidget) { alert('Todo list sudah ada. Hanya boleh 1 todo list.'); return }
+                  addWidget('todo')
+                }}
+                disabled={hasTodoWidget}
+                style={{
+                  flex: 1, padding: '8px 6px', borderRadius: 8,
+                  background: hasTodoWidget ? 'var(--bg4)' : 'var(--accent-light)',
+                  border: `1px solid ${hasTodoWidget ? 'var(--border)' : 'var(--accent)'}`,
+                  color: hasTodoWidget ? 'var(--silver3)' : 'var(--accent)',
+                  fontSize: 11, fontWeight: 700,
+                  cursor: hasTodoWidget ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
+                }}>
+                📋 Todo{hasTodoWidget ? ' (aktif)' : ''}
               </button>
             </div>
           </div>

@@ -122,7 +122,7 @@ export const applyThemeToElement = (base: ThemeBase, _isDark: boolean) => {
 
 // ── Section ───────────────────────────────────
 export type SectionVisibility = 'all' | 'admin' | 'unit'
-export type WidgetType  = 'clock' | 'notes'
+export type WidgetType  = 'clock' | 'notes' | 'todo'
 export type SectionType = 'section' | 'widget'
 export interface SectionLayout { x: number; y: number; w: number; h: number }
 
@@ -226,3 +226,24 @@ export const SECTION_MIN_H     = 2
 export const SECTION_DEFAULT_W = 3   // 4 section per baris di 12 cols
 // Default tinggi: h:3 = 3×60 = 180px — muat 3 baris icon large (44px+label)
 export const SECTION_DEFAULT_H = 3
+
+export interface TodoItem {
+  id:        string
+  text:      string
+  done:      boolean
+  createdAt: number       // ms timestamp
+  doneAt?:   number       // ms timestamp saat selesai
+  dueTime?:  string       // 'HH:MM' jam due di hari yang sama
+  date:      string       // 'YYYY-MM-DD' tanggal task dibuat
+}
+
+export interface TodoHistory {
+  id:           string
+  user_id:      string
+  task_text:    string
+  due_date?:    string
+  status:       'done' | 'overdue'
+  created_at:   string
+  done_at?:     string
+  date:         string
+}

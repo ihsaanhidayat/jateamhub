@@ -149,6 +149,7 @@ interface DashboardStore {
   // -- UI State --
   toggleEditMode:    () => void
   reorderPersonalSections: (sections: Section[]) => void
+  addPersonalSectionFirst: (data: Partial<Section>) => void
   setEditingSection: (s: Section | null) => void
   setEditingItem:    (v: { sectionId: string; item: any } | null) => void
   setAddingItem:     (sectionId: string | null) => void
@@ -586,6 +587,30 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   reorderPersonalSections: (sections: Section[]) => {
     const updated = sections.map((s, i) => ({ ...s, layout: { ...s.layout, y: i } }))
+    persistPersonal(updated)
+    set({ personalSections: updated })
+    get().syncPersonalToDb()
+  },
+
+  addPersonalSectionFirst: (data: Partial<Section>) => {
+    const { personalSections } = get()
+    const newSection: Section = {
+      id:          crypto.randomUUID(),
+      title:       data.title       ?? 'Section',
+      icon:        data.icon        ?? '📋',
+      subtitle:    data.subtitle    ?? '',
+      items:       data.items       ?? [],
+      collapsed:   false,
+      layout:      { x: 0, y: 0, w: data.layout?.w ?? SECTION_DEFAULT_W, h: data.layout?.h ?? SECTION_DEFAULT_H },
+      visibility:  data.visibility  ?? 'all',
+      targetUnits: data.targetUnits ?? [],
+      pageId:      data.pageId      ?? 'beranda',
+      type:        data.type        ?? 'section',
+      ...(data.widgetType ? { widgetType: data.widgetType } : {}),
+    } as Section
+    // Geser semua section lain ke bawah
+    const shifted = personalSections.map(s => ({ ...s, layout: { ...s.layout, y: s.layout.y + (newSection.layout.h + 1) } }))
+    const updated = [newSection, ...shifted]
     persistPersonal(updated)
     set({ personalSections: updated })
     get().syncPersonalToDb()

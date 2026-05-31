@@ -2,10 +2,24 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>JateamHub</title>
+    <!-- Theme init SEBELUM apapun — mencegah flash -->
+    <script>
+      (function(){
+        try {
+          var t = localStorage.getItem('jateamhub-theme')
+          var d = window.matchMedia('(prefers-color-scheme: dark)').matches
+          var theme = t || (d ? 'slate' : 'pearl')
+          document.documentElement.setAttribute('data-theme', theme)
+          // Update status bar color ikut tema
+          var color = theme === 'slate' ? '#0F1117' : '#F5F6FA'
+          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', color)
+        } catch(e) {}
+      })()
+    </script>
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#2563EB" />
+    <meta name="theme-color" content="#F5F6FA" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -26,4 +40,3 @@
     </script>
   </body>
 </html>
-

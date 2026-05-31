@@ -7,14 +7,15 @@ import { uploadAvatar, updateProfile } from '../../utils/supabaseClient'
 import AvatarCropModal from '../ui/AvatarCropModal'
 
 interface Props {
-  onToggleOptions: () => void
-  optionsOpen: boolean
-  onOpenAdvanced: () => void
-  onAddSection: () => void
-  onImportLinks: () => void
+  onToggleOptions:  () => void
+  optionsOpen:      boolean
+  onOpenTaskList?:  () => void
+  onOpenAdvanced:  () => void
+  onAddSection:    () => void
+  onImportLinks:   () => void
 }
 
-export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks }: Props) {
+export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks, onOpenTaskList }: Props) {
   const {
     editMode, toggleEditMode,
     searchQuery, setSearch,
@@ -22,26 +23,47 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const { profile: session } = useAuthStore()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
-  const [cropDataUrl, setCropDataUrl] = useState<string | null>(null)
+  const [cropDataUrl,     setCropDataUrl]     = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const hideSearch = useStore(s => (s as any).notesLockActive ?? false)
 
-  // Theme toggle — Pearl (light) / Slate (dark)
-  const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem('jateamhub-theme')
-    if (saved) return saved === 'slate'
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  })
+  // Realtime clock di header
+  const [clockNow, setClockNow] = useState(new Date())
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', isDark ? 'slate' : 'pearl')
-    localStorage.setItem('jateamhub-theme', isDark ? 'slate' : 'pearl')
-  }, [isDark])
+    const t = setInterval(() => setClockNow(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const clockStr = clockNow.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) +
+    '  ·  ' + clockNow.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
-  const isEditable = canEdit(session as any)
-  const showOptions = canSeeOptions(session as any)
+  // Theme toggle — baca dari DOM aktual untuk sinkron sempurna
+  const getIsDark = () => document.documentElement.getAttribute('data-theme') === 'slate'
+  const [isDark, setIsDarkState] = useState(getIsDark)
+
+  const setIsDark = (dark: boolean) => {
+    const theme = dark ? 'slate' : 'pearl'
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('jateamhub-theme', theme)
+    setIsDarkState(dark)
+    // Update status bar color
+    const color = dark ? '#0F1117' : '#F5F6FA'
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', color)
+  }
+
+  // Sync saat tab lain mengubah tema
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'jateamhub-theme') setIsDarkState(e.newValue === 'slate')
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  const isEditable   = canEdit(session as any)
+  const showOptions  = canSeeOptions(session as any)
   const isAdminLevel = isAdmin(session as any)
-  const badge = getDisplayBadge(session as any)
-  const emoji = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
+  const badge        = getDisplayBadge(session as any)
+  const emoji        = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
 
 
 
@@ -96,12 +118,12 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   }
 
   const PREVIEW_OPTS = [
-    { value: null, label: 'Admin View' },
-    { value: '', label: 'User Umum' },
-    { value: 'pro', label: 'PRO' },
-    { value: 'cro', label: 'CRO' },
-    { value: 'klaim', label: 'Klaim' },
-    { value: 'ae', label: 'AE' },
+    { value: null,    label: 'Admin View' },
+    { value: '',      label: 'User Umum'  },
+    { value: 'pro',   label: 'PRO'        },
+    { value: 'cro',   label: 'CRO'        },
+    { value: 'klaim', label: 'Klaim'      },
+    { value: 'ae',    label: 'AE'         },
   ]
 
 
@@ -114,7 +136,14 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
 
             <div>
               <h1 className="header-title" style={{ fontSize: 22, fontWeight: 800 }}>JateamHub</h1>
-              <div className="header-sub">Selamat datang, {session?.username ?? ''}{emoji ? ` ${emoji}` : ''}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
+                <div className="header-sub">
+                  Selamat datang, {session?.username ?? ''}{emoji ? ` ${emoji}` : ''}
+                </div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--silver2)', fontWeight: 600, letterSpacing: '0.2px' }}>
+                  {clockStr}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -171,10 +200,17 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             )}
           </div>
 
+          {/* Task List button — tampil jika ada todo widget */}
+          {onOpenTaskList && (
+            <button className="icon-btn desktop-only" onClick={onOpenTaskList} title="Riwayat Task">
+              📋
+            </button>
+          )}
+
           {/* Theme Toggle — ☀️/🌙 */}
           <button
             className="theme-toggle"
-            onClick={() => setIsDark(v => !v)}
+            onClick={() => setIsDark(!isDark)}
             title={isDark ? 'Switch ke Pearl (Light)' : 'Switch ke Slate (Dark)'}
             aria-label="Toggle tema"
           >
@@ -212,6 +248,12 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                   onClick={() => { onOpenAdvanced(); setProfileDropdown(false) }}>
                   👤 Lihat Profil Saya
                 </button>
+                {onOpenTaskList && (
+                  <button className="preview-dropdown-item"
+                    onClick={() => { onOpenTaskList(); setProfileDropdown(false) }}>
+                    📋 Riwayat Task
+                  </button>
+                )}
                 <div className="preview-dropdown-divider" />
                 <button className="preview-dropdown-item danger"
                   onClick={() => useAuthStore.getState().logout()}>

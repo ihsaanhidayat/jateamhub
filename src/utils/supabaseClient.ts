@@ -384,3 +384,32 @@ export const sendWaNotification = async (phone: string, message: string) => {
   // TODO: panggil edge function send-wa saat token Fonnte sudah ada
   // console.log('[WA Notif placeholder]', phone, message)
 }
+
+// ── Todo History ──────────────────────────────────────────────
+export const saveTodoHistory = async (
+  userId: string,
+  items: import('../types').TodoItem[],
+  status: 'done' | 'overdue' = 'done'
+) => {
+  if (!items.length) return
+  const rows = items.map(item => ({
+    user_id:    userId,
+    task_text:  item.text,
+    due_date:   item.dueTime ?? null,
+    status,
+    created_at: new Date(item.createdAt).toISOString(),
+    done_at:    item.doneAt ? new Date(item.doneAt).toISOString() : null,
+    date:       item.date,
+  }))
+  return supabase.from('todo_history').insert(rows)
+}
+
+export const getTodoHistory = async (userId: string, limit = 200) => {
+  const { data } = await supabase
+    .from('todo_history')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  return data ?? []
+}

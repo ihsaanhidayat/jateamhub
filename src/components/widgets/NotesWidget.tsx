@@ -12,36 +12,34 @@ type LockMode = 'manual' | 'auto'
 export default function NotesWidget({ sectionId }: Props) {
   const { personalSections, updateItem, addItem, syncPersonalToDb } = useStore()
   const setNotesLockActive = useStore(s => (s as any).setNotesLockActive)
+  const { profile } = useAuthStore()
   const section = personalSections.find(s => s.id === sectionId)
   const noteItem = section?.items?.[0]
 
+  const lockKey = `notes-locked-${profile?.username ?? 'u'}-${sectionId}`
+  const lockModeKey = `notes-lockmode-${profile?.username ?? 'u'}-${sectionId}`
+
   const [text, setText] = useState(noteItem?.desc ?? '')
   const [saved, setSaved] = useState(true)
-  // Baca locked state dari localStorage — persist antar session
+
+  // Baca locked state dari localStorage — persist antar session dan login
   const [locked, setLockedState] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`notes-locked-${sectionId}`)
-    return saved === 'true'
+    try { return localStorage.getItem(lockKey) === 'true' } catch { return false }
   })
   const setLocked = (val: boolean) => {
     setLockedState(val)
-    localStorage.setItem(`notes-locked-${sectionId}`, String(val))
+    try { localStorage.setItem(lockKey, String(val)) } catch { }
   }
+
+  const [lockMode, setLockMode] = useState<LockMode>(() => {
+    try { return (localStorage.getItem(lockModeKey) as LockMode) ?? 'manual' } catch { return 'manual' }
+  })
+
   const [showLock, setShowLock] = useState(false)
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState('')
   const [checking, setChecking] = useState(false)
-
-  // Sembunyikan search bar di Header saat input password aktif
-  useEffect(() => {
-    setNotesLockActive?.(showLock)
-    return () => { setNotesLockActive?.(false) }
-  }, [showLock])
-  const [lockMode, setLockMode] = useState<LockMode>(() => {
-    // Baca preferensi dari localStorage
-    return (localStorage.getItem(`notes-lockmode-${sectionId}`) as LockMode) ?? 'manual'
-  })
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { profile } = useAuthStore()
 
   // Sync text dari section
   useEffect(() => {
@@ -49,17 +47,31 @@ export default function NotesWidget({ sectionId }: Props) {
     setText(s?.items?.[0]?.desc ?? '')
   }, [sectionId])
 
-  // Auto-lock saat mode auto dan sedang tidak terkunci — setelah 60 detik idle
+  // Sembunyikan search bar di Header saat input password aktif
+  useEffect(() => {
+    setNotesLockActive?.(showLock)
+    return () => { setNotesLockActive?.(false) }
+  }, [showLock])
+
+  // Auto-lock saat app di-background (tab tidak aktif / HP lock screen)
+  useEffect(() => {
+    const handle = () => {
+      if (document.visibilityState === 'hidden') setLocked(true)
+    }
+    document.addEventListener('visibilitychange', handle)
+    return () => document.removeEventListener('visibilitychange', handle)
+  }, [])
+
+  // Auto-lock saat mode auto — 60 detik idle
   useEffect(() => {
     if (lockMode !== 'auto' || locked) return
     const t = setTimeout(() => setLocked(true), 60 * 1000)
     return () => clearTimeout(t)
-  }, [lockMode, locked, text]) // text sebagai dependency = reset timer saat ada aktivitas
+  }, [lockMode, locked, text])
 
   const saveLockMode = (mode: LockMode) => {
     setLockMode(mode)
-    localStorage.setItem(`notes-lockmode-${sectionId}`, mode)
-    // Jangan reset locked — user yang menentukan kapan buka
+    try { localStorage.setItem(lockModeKey, mode) } catch { }
   }
 
   const handleChange = (val: string) => {
@@ -156,11 +168,15 @@ export default function NotesWidget({ sectionId }: Props) {
         </div>
       ) : (
         <textarea value={text} onChange={e => handleChange(e.target.value)}
-          placeholder={lockMode === 'auto' ? '🔐 Catatan sensitif (auto-lock 1 menit)...' : '📝 Tulis catatan...'}
+          placeholder={lockMode === 'auto' ? '🔐 Catatan sensitif (auto-lock)...' : '📝 Tulis catatan...'}
           style={{
-            flex: 1, width: '100%', background: 'transparent', border: 'none', outline: 'none',
-            resize: 'none', color: 'var(--silver)', fontSize: 13, lineHeight: 1.6,
-            fontFamily: 'var(--font)', padding: '10px 12px', minHeight: 140,
+            flex: 1, width: '100%', background: 'transparent',
+            border: 'none', outline: 'none', resize: 'none',
+            color: 'var(--silver)', fontSize: 13, lineHeight: '24px',
+            fontFamily: 'var(--font)', padding: '8px 12px',
+            minHeight: 140,
+            backgroundImage: 'repeating-linear-gradient(transparent, transparent 23px, var(--border) 23px, var(--border) 24px)',
+            backgroundAttachment: 'local',
           }}
         />
       )}

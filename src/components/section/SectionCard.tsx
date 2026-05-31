@@ -15,6 +15,7 @@ interface Props {
   isMobileView?:        boolean
   dragHandleProps?:     Record<string, unknown>  // dnd-kit drag handle attributes
   widgetContent?:       React.ReactNode            // content override untuk widget type
+  widgetFooter?:        React.ReactNode            // footer fix di bawah section body (tidak scroll)
   onFocus?:             (id: string) => void
   onEditSection:        (s: Section) => void
   onEditItem:           (sectionId: string, item: LinkItem) => void
@@ -32,7 +33,7 @@ const DENSITY: Record<string, { body: string; gap: string; headerPad: string }> 
 
 export default memo(function SectionCard({
   section, isShared, canEdit: canEditProp,
-  isFocused, isMobileView, dragHandleProps, widgetContent,
+  isFocused, isMobileView, dragHandleProps, widgetContent, widgetFooter,
   onFocus,
   onEditSection, onEditItem, onAddItem, onDeleteSection,
   onSave, onCancel,
@@ -407,6 +408,9 @@ export default memo(function SectionCard({
         </div>
       )}
     </div>
+
+    {/* Widget footer — fix di bawah, tidak ikut scroll */}
+    {widgetFooter && !effectiveCollapsed && widgetFooter}
 
     {/* Confirm dialog */}
     <ConfirmDialog
