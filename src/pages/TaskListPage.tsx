@@ -18,16 +18,16 @@ const fmtDateTime = (iso: string) => {
 }
 const fmtDate = (d: string) => {
   const [y, m, day] = d.split('-').map(Number)
-  return new Date(y, m - 1, day).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(y, m-1, day).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export default function TaskListPage({ onClose }: Props) {
   const { profile } = useAuthStore()
-  const [history, setHistory] = useState<TodoHistory[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<Filter>('all')
-  const [search, setSearch] = useState('')
-  const [undoing, setUndoing] = useState<string | null>(null)
+  const [history,    setHistory]    = useState<TodoHistory[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [filter,     setFilter]     = useState<Filter>('all')
+  const [search,     setSearch]     = useState('')
+  const [undoing,    setUndoing]    = useState<string|null>(null)
   const personalSections = useStore(s => s.personalSections)
 
   const TODAY = new Date().toISOString().split('T')[0]
@@ -48,25 +48,27 @@ export default function TaskListPage({ onClose }: Props) {
     // Hapus dari history
     await supabase.from('todo_history').delete().eq('id', h.id)
     // Kembalikan ke widget todo
-    const todoSection = personalSections.find(s => (s as any).widgetType === 'todo')
+    const store = useStore.getState()
+    const todoSection = store.personalSections.find((s: any) => s.widgetType === 'todo')
     if (todoSection) {
       const existingItems: TodoItem[] = (() => {
         try { return JSON.parse(todoSection.items?.[0]?.desc ?? '[]') } catch { return [] }
       })()
       const restored: TodoItem = {
         id: crypto.randomUUID(),
-        text: h.task_text,
-        done: false,
+        text: h.task_text, done: false,
         createdAt: new Date(h.created_at).getTime(),
-        date: h.date,
-        dueTime: h.due_date ?? undefined,
+        date: h.date, dueTime: h.due_date ?? undefined,
       }
       const next = [...existingItems, restored]
-      const store = (await import('../store/dashboardStore')).useStore.getState()
+      // Update subtitle
+      const pendingCount = next.filter((i: TodoItem) => !i.done).length
+      store.updatePersonalSection(todoSection.id, { subtitle: `${0}/${next.length} selesai` })
+      const json = JSON.stringify(next)
       if (todoSection.items.length > 0) {
-        store.updateItem(todoSection.id, todoSection.items[0].id, { ...todoSection.items[0], desc: JSON.stringify(next), title: 'todo-data' })
+        store.updateItem(todoSection.id, todoSection.items[0].id, { ...todoSection.items[0], desc: json, title: 'todo-data' })
       } else {
-        store.addItem(todoSection.id, { title: 'todo-data', url: '#', icon: '', desc: JSON.stringify(next), tags: [], newTab: false, useFavicon: false } as any)
+        store.addItem(todoSection.id, { title: 'todo-data', url: '#', icon: '', desc: json, tags: [], newTab: false, useFavicon: false } as any)
       }
       await store.syncPersonalToDb()
     }
@@ -75,7 +77,7 @@ export default function TaskListPage({ onClose }: Props) {
   }
 
   const filtered = history.filter(h => {
-    if (filter === 'done' && h.status !== 'done') return false
+    if (filter === 'done'    && h.status !== 'done')    return false
     if (filter === 'overdue' && h.status !== 'overdue') return false
     if (filter === 'week') {
       const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
@@ -90,11 +92,11 @@ export default function TaskListPage({ onClose }: Props) {
   })
 
   const filterBtns: { key: Filter; label: string }[] = [
-    { key: 'all', label: 'Semua' },
-    { key: 'done', label: '✅ Selesai' },
+    { key: 'all',     label: 'Semua' },
+    { key: 'done',    label: '✅ Selesai' },
     { key: 'overdue', label: '⚠️ Terlambat' },
-    { key: 'week', label: 'Minggu ini' },
-    { key: 'month', label: 'Bulan ini' },
+    { key: 'week',    label: 'Minggu ini' },
+    { key: 'month',   label: 'Bulan ini' },
   ]
 
   return (

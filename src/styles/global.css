@@ -588,3 +588,11 @@ mark.hl { background: var(--accent-soft); color: var(--accent); border-radius: 3
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes loginSpin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* ── Dark mode contrast fixes ─────────────────────────────── */
+[data-theme="slate"] .section-subtitle { color: var(--silver3); }
+[data-theme="slate"] .section-title    { color: var(--silver); }
+[data-theme="slate"] .header-sub       { color: var(--silver3); }
+[data-theme="slate"] .folder-item-label { color: var(--silver2); }
+[data-theme="slate"] .list-item-label  { color: var(--silver2); }
+[data-theme="slate"] .user-meta        { color: var(--silver3); }

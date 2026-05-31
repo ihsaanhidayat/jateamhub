@@ -136,13 +136,13 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
 
             <div>
               <h1 className="header-title" style={{ fontSize: 22, fontWeight: 800 }}>JateamHub</h1>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
-                <div className="header-sub">
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--silver2)' }}>
                   Selamat datang, {session?.username ?? ''}{emoji ? ` ${emoji}` : ''}
-                </div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--silver2)', fontWeight: 600, letterSpacing: '0.2px' }}>
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>
                   {clockStr}
-                </div>
+                </span>
               </div>
             </div>
           </div>

@@ -1,14 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import { saveTodoHistory } from '../../utils/supabaseClient'
 import type { TodoItem } from '../../types'
 
-interface Props { sectionId: string }
-
-const TODAY     = () => new Date().toISOString().split('T')[0]
-const fmtTime   = (ms: number) => new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-const fmtDate   = (d: string) => {
+const TODAY   = () => new Date().toISOString().split('T')[0]
+const fmtTime = (ms: number) => new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+const fmtDate = (d: string) => {
   const [y,m,day] = d.split('-').map(Number)
   return new Date(y,m-1,day).toLocaleDateString('id-ID', { weekday:'short', day:'numeric', month:'short' })
 }
@@ -22,8 +20,37 @@ const isDueSoon = (i: TodoItem) => {
   if (!i.dueTime || i.done || i.date !== TODAY()) return false
   const [h,m] = i.dueTime.split(':').map(Number)
   const due = new Date(); due.setHours(h,m,0,0)
-  const diff = due.getTime() - Date.now()
-  return diff > 0 && diff < 30 * 60 * 1000
+  const d = due.getTime() - Date.now()
+  return d > 0 && d < 30 * 60 * 1000
+}
+
+// ── Parse + save helpers ──────────────────────────────────────
+function parseTodoItems(sectionId: string): TodoItem[] {
+  const s = useStore.getState().personalSections.find(s => s.id === sectionId)
+  try { const d = s?.items?.[0]?.desc; return d ? JSON.parse(d) : [] } catch { return [] }
+}
+
+async function saveTodoItems(sectionId: string, next: TodoItem[]) {
+  const store = useStore.getState()
+  const s = store.personalSections.find(s => s.id === sectionId)
+  if (!s) return
+  // Update subtitle
+  const overdueCount = next.filter(i => isOverdue(i)).length
+  const pendingCount = next.filter(i => !i.done).length
+  const doneCount    = next.filter(i => i.done).length
+  const total        = next.length
+  // Subtitle: selesai / total
+  const subtitle = overdueCount > 0
+    ? `⚠️ ${overdueCount} terlambat · ${doneCount}/${total} selesai`
+    : `${doneCount}/${total} selesai`
+  store.updatePersonalSection(sectionId, { subtitle })
+  const json = JSON.stringify(next)
+  if (s.items.length > 0) {
+    store.updateItem(sectionId, s.items[0].id, { ...s.items[0], desc: json, title: 'todo-data' })
+  } else {
+    store.addItem(sectionId, { title: 'todo-data', url: '#', icon: '', desc: json, tags: [], newTab: false, useFavicon: false } as any)
+  }
+  await store.syncPersonalToDb()
 }
 
 function Separator({ label, color }: { label: string; color: string }) {
@@ -36,75 +63,23 @@ function Separator({ label, color }: { label: string; color: string }) {
   )
 }
 
-// Shared state store untuk TodoWidget — agar input dan list bisa share state
-// meski render terpisah
-const todoStates = new Map<string, {
-  items: TodoItem[]; setItems: (i: TodoItem[]) => void;
-  saving: boolean; setSaving: (v: boolean) => void;
-}>()
-
-function useTodoState(sectionId: string) {
-  const { personalSections, updateItem, addItem, syncPersonalToDb } = useStore()
-  const section  = personalSections.find(s => s.id === sectionId)
-  const noteItem = section?.items?.[0]
-
-  const parseItems = (): TodoItem[] => {
-    try { const d = noteItem?.desc; return d ? JSON.parse(d) : [] } catch { return [] }
-  }
-
-  const [items,  setItemsState]  = useState<TodoItem[]>(parseItems)
-  const [saving, setSavingState] = useState(false)
-  const saveTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
-
-  const setItems = useCallback((next: TodoItem[]) => {
-    setItemsState(next)
-    // Update subtitle realtime
-    const overdueCount = next.filter(i => isOverdue(i)).length
-    const pendingCount = next.filter(i => !i.done).length
-    const subtitle = overdueCount > 0
-      ? `⚠️ ${overdueCount} terlambat · ${pendingCount} pending`
-      : `${pendingCount} tugas pending`
-    useStore.getState().updatePersonalSection(sectionId, { subtitle })
-  }, [sectionId])
-
-  const persistItems = useCallback(async (next: TodoItem[]) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    setSavingState(true)
-    setItems(next)
-    saveTimer.current = setTimeout(async () => {
-      const s = useStore.getState().personalSections.find(s => s.id === sectionId)
-      if (!s) { setSavingState(false); return }
-      const json = JSON.stringify(next)
-      if (s.items.length > 0) {
-        updateItem(sectionId, s.items[0].id, { ...s.items[0], desc: json, title: 'todo-data' })
-      } else {
-        addItem(sectionId, { title: 'todo-data', url: '#', icon: '', desc: json, tags: [], newTab: false, useFavicon: false } as any)
-      }
-      await syncPersonalToDb()
-      setSavingState(false)
-    }, 400)
-  }, [sectionId, setItems, updateItem, addItem, syncPersonalToDb])
-
-  // Sync dari DB
-  useEffect(() => {
-    const s = useStore.getState().personalSections.find(s => s.id === sectionId)
-    try { const d = s?.items?.[0]?.desc; if (d) setItemsState(JSON.parse(d)) } catch {}
-  }, [sectionId])
-
-  return { items, saving, persistItems }
-}
-
-// ── Main list component ───────────────────────────────────────
-export default function TodoWidget({ sectionId }: Props) {
-  const { items, saving, persistItems } = useTodoState(sectionId)
+// ── List component ────────────────────────────────────────────
+export default function TodoWidget({ sectionId }: { sectionId: string }) {
   const { profile } = useAuthStore()
-  const [confirmId, setConfirmId] = useState<string|null>(null)
-  const [editId,    setEditId]    = useState<string|null>(null)
-  const [editText,  setEditText]  = useState('')
-  const editRef     = useRef<HTMLInputElement>(null)
-  const confirmTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
-  const notifSent   = useRef(new Set<string>())
+  // Baca items langsung dari store — single source of truth
+  const rawDesc = useStore(s => {
+    const sec = s.personalSections.find(x => x.id === sectionId)
+    return sec?.items?.[0]?.desc ?? ''
+  })
+  const items: TodoItem[] = (() => { try { return rawDesc ? JSON.parse(rawDesc) : [] } catch { return [] } })()
+
+  const [confirmId,  setConfirmId]  = useState<string|null>(null)
+  const [editId,     setEditId]     = useState<string|null>(null)
+  const [editText,   setEditText]   = useState('')
   const [notifAsked, setNotifAsked] = useState(false)
+  const editRef      = useRef<HTMLInputElement>(null)
+  const confirmTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const notifSent    = useRef(new Set<string>())
 
   useEffect(() => {
     if (localStorage.getItem('todo-notif-asked')) setNotifAsked(true)
@@ -117,9 +92,8 @@ export default function TodoWidget({ sectionId }: Props) {
         if (!item.dueTime || item.done || notifSent.current.has(item.id)) return
         if (isDueOver(item)) {
           notifSent.current.add(item.id)
-          if (Notification.permission === 'granted') {
+          if (Notification.permission === 'granted')
             new Notification('⏰ Tugas Lewat Waktu!', { body: item.text, icon: '/icon-192.png' })
-          }
         }
       })
     }, 30000)
@@ -130,7 +104,7 @@ export default function TodoWidget({ sectionId }: Props) {
     const item = items.find(i => i.id === id)
     if (!item || !profile?.id) return
     await saveTodoHistory(profile.id, [{ ...item, done: true, doneAt: Date.now() }], 'done')
-    persistItems(items.filter(i => i.id !== id))
+    await saveTodoItems(sectionId, items.filter(i => i.id !== id))
   }
 
   const startEdit = (item: TodoItem) => {
@@ -138,9 +112,9 @@ export default function TodoWidget({ sectionId }: Props) {
     setTimeout(() => editRef.current?.focus(), 50)
   }
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editId || !editText.trim()) { setEditId(null); return }
-    persistItems(items.map(i => i.id === editId ? { ...i, text: editText.trim() } : i))
+    await saveTodoItems(sectionId, items.map(i => i.id === editId ? { ...i, text: editText.trim() } : i))
     setEditId(null)
   }
 
@@ -166,12 +140,8 @@ export default function TodoWidget({ sectionId }: Props) {
   }
 
   const renderItem = (item: TodoItem) => {
-    const overdue   = isOverdue(item)
-    const dueOver   = isDueOver(item)
-    const dueSoon   = isDueSoon(item)
-    const isConfirm = confirmId === item.id
-    const isEditing = editId === item.id
-
+    const overdue = isOverdue(item), dueOver = isDueOver(item), dueSoon = isDueSoon(item)
+    const isConfirm = confirmId === item.id, isEditing = editId === item.id
     return (
       <div key={item.id}>
         <div style={{
@@ -190,38 +160,25 @@ export default function TodoWidget({ sectionId }: Props) {
               <input ref={editRef} value={editText} spellCheck={false}
                 onChange={e => setEditText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditId(null) }}
-                onBlur={saveEdit}
-                style={{ ...iSt, width: '100%' }} />
+                onBlur={saveEdit} style={{ ...iSt, width: '100%' }} />
             ) : (
-              <div style={{
-                fontSize: 13, lineHeight: 1.4, cursor: 'text',
-                color: overdue ? 'var(--red)' : 'var(--silver)', fontWeight: overdue ? 600 : 400,
-              }} onDoubleClick={() => startEdit(item)}>{item.text}</div>
+              <div style={{ fontSize: 13, lineHeight: 1.4, cursor: 'text', color: overdue ? 'var(--red)' : 'var(--silver)', fontWeight: overdue ? 600 : 400 }}
+                onDoubleClick={() => startEdit(item)}>{item.text}</div>
             )}
             <div style={{ fontSize: 10, color: 'var(--silver4)', marginTop: 2, fontFamily: 'var(--mono)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {overdue && <span style={{ color: 'var(--red)', fontWeight: 700 }}>📅 {fmtDate(item.date)}</span>}
               <span>🕐 {fmtTime(item.createdAt)}</span>
-              {item.dueTime && (
-                <span style={{ color: dueOver ? 'var(--red)' : dueSoon ? '#F59E0B' : 'var(--silver4)' }}>
-                  ⏰ {item.dueTime}{dueOver ? ' lewat!' : dueSoon ? ' segera!' : ''}
-                </span>
-              )}
+              {item.dueTime && <span style={{ color: dueOver ? 'var(--red)' : dueSoon ? '#F59E0B' : 'var(--silver4)' }}>⏰ {item.dueTime}{dueOver ? ' lewat!' : dueSoon ? ' segera!' : ''}</span>}
             </div>
           </div>
-          {!isEditing && (
-            <button onClick={() => startEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px', flexShrink: 0 }}
-              onMouseEnter={e => (e.currentTarget.style.color='var(--accent)')}
-              onMouseLeave={e => (e.currentTarget.style.color='var(--silver4)')}>✏️</button>
-          )}
-          <button onClick={() => askDelete(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px', flexShrink: 0 }}
-            onMouseEnter={e => (e.currentTarget.style.color='var(--red)')}
-            onMouseLeave={e => (e.currentTarget.style.color='var(--silver4)')}>✕</button>
+          {!isEditing && <button onClick={() => startEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px', flexShrink: 0 }} onMouseEnter={e=>(e.currentTarget.style.color='var(--accent)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--silver4)')}>✏️</button>}
+          <button onClick={() => askDelete(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px', flexShrink: 0 }} onMouseEnter={e=>(e.currentTarget.style.color='var(--red)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--silver4)')}>✕</button>
         </div>
         {isConfirm && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: 'var(--red-bg)', borderBottom: '1px solid var(--border)' }}>
             <span style={{ fontSize: 11, color: 'var(--red)', flex: 1 }}>Hapus tugas ini?</span>
             <button onClick={() => setConfirmId(null)} style={{ height: 22, padding: '0 8px', background: 'none', border: '1px solid var(--border2)', borderRadius: 5, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
-            <button onClick={() => { persistItems(items.filter(i => i.id !== item.id)); setConfirmId(null) }} style={{ height: 22, padding: '0 8px', background: 'var(--red)', border: 'none', borderRadius: 5, color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Hapus</button>
+            <button onClick={async () => { await saveTodoItems(sectionId, items.filter(i => i.id !== item.id)); setConfirmId(null) }} style={{ height: 22, padding: '0 8px', background: 'var(--red)', border: 'none', borderRadius: 5, color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Hapus</button>
           </div>
         )}
       </div>
@@ -246,23 +203,27 @@ export default function TodoWidget({ sectionId }: Props) {
   )
 }
 
-// ── Input area — dirender sebagai widgetFooter di luar section-body ──
+// ── Input footer — fix di bawah section, tidak scroll ─────────
 export function TodoInputFooter({ sectionId }: { sectionId: string }) {
-  const { persistItems } = useTodoState(sectionId)
-  const { items } = useTodoState(sectionId)
+  const rawDesc = useStore(s => {
+    const sec = s.personalSections.find(x => x.id === sectionId)
+    return sec?.items?.[0]?.desc ?? ''
+  })
+  const items: TodoItem[] = (() => { try { return rawDesc ? JSON.parse(rawDesc) : [] } catch { return [] } })()
+
   const [newText,    setNewText]    = useState('')
   const [newDueTime, setNewDueTime] = useState('')
   const [showDue,    setShowDue]    = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const addTask = () => {
+  const addTask = async () => {
     if (!newText.trim()) return
     const task: TodoItem = {
       id: crypto.randomUUID(), text: newText.trim(),
       done: false, createdAt: Date.now(),
       date: TODAY(), dueTime: newDueTime || undefined,
     }
-    persistItems([...items, task])
+    await saveTodoItems(sectionId, [...items, task])
     setNewText(''); setNewDueTime(''); setShowDue(false)
     inputRef.current?.focus()
   }
