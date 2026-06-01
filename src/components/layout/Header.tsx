@@ -7,12 +7,12 @@ import { uploadAvatar, updateProfile } from '../../utils/supabaseClient'
 import AvatarCropModal from '../ui/AvatarCropModal'
 
 interface Props {
-  onToggleOptions:  () => void
-  optionsOpen:      boolean
-  onOpenTaskList?:  () => void
-  onOpenAdvanced:  () => void
-  onAddSection:    () => void
-  onImportLinks:   () => void
+  onToggleOptions: () => void
+  optionsOpen: boolean
+  onOpenTaskList?: () => void
+  onOpenAdvanced: () => void
+  onAddSection: () => void
+  onImportLinks: () => void
 }
 
 export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks, onOpenTaskList }: Props) {
@@ -23,7 +23,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const { profile: session } = useAuthStore()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
-  const [cropDataUrl,     setCropDataUrl]     = useState<string | null>(null)
+  const [cropDataUrl, setCropDataUrl] = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const hideSearch = useStore(s => (s as any).notesLockActive ?? false)
 
@@ -59,11 +59,11 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  const isEditable   = canEdit(session as any)
-  const showOptions  = canSeeOptions(session as any)
+  const isEditable = canEdit(session as any)
+  const showOptions = canSeeOptions(session as any)
   const isAdminLevel = isAdmin(session as any)
-  const badge        = getDisplayBadge(session as any)
-  const emoji        = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
+  const badge = getDisplayBadge(session as any)
+  const emoji = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
 
 
 
@@ -118,12 +118,12 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   }
 
   const PREVIEW_OPTS = [
-    { value: null,    label: 'Admin View' },
-    { value: '',      label: 'User Umum'  },
-    { value: 'pro',   label: 'PRO'        },
-    { value: 'cro',   label: 'CRO'        },
-    { value: 'klaim', label: 'Klaim'      },
-    { value: 'ae',    label: 'AE'         },
+    { value: null, label: 'Admin View' },
+    { value: '', label: 'User Umum' },
+    { value: 'pro', label: 'PRO' },
+    { value: 'cro', label: 'CRO' },
+    { value: 'klaim', label: 'Klaim' },
+    { value: 'ae', label: 'AE' },
   ]
 
 
@@ -136,8 +136,8 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
 
             <div>
               <h1 className="header-title" style={{ fontSize: 22, fontWeight: 800 }}>JateamHub</h1>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--silver2)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
+                <span className="header-sub">
                   Selamat datang, {session?.username ?? ''}{emoji ? ` ${emoji}` : ''}
                 </span>
                 <span style={{ fontSize: 10, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>
