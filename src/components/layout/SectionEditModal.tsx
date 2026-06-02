@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Modal from '../ui/Modal'
+import EmojiPicker from '../ui/EmojiPicker'
 import { useStore } from '../../store/dashboardStore'
 import type { Section } from '../../types'
 
@@ -10,6 +11,7 @@ export default function SectionEditModal({ open, section, onClose }: Props) {
   const [title,    setTitle]    = useState(section.title)
   const [icon,     setIcon]     = useState(section.icon ?? '')
   const [subtitle, setSubtitle] = useState(section.subtitle ?? '')
+  const [showPicker, setShowPicker] = useState(false)
 
   useEffect(() => {
     setTitle(section.title); setIcon(section.icon ?? ''); setSubtitle(section.subtitle ?? '')
@@ -34,7 +36,19 @@ export default function SectionEditModal({ open, section, onClose }: Props) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
           <label className="input-label">Icon</label>
-          <input className="input" value={icon} onChange={e => setIcon(e.target.value)} placeholder="📁" maxLength={4} />
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button onClick={() => setShowPicker(v => !v)} style={{
+              width: 48, height: 48, borderRadius: 10,
+              background: 'var(--bg4)', border: '2px solid var(--border2)',
+              fontSize: 24, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'border-color 150ms',
+            }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border2)')}
+            >{icon || '📁'}</button>
+            {showPicker && <EmojiPicker value={icon} onChange={setIcon} onClose={() => setShowPicker(false)} />}
+          </div>
         </div>
         <div>
           <label className="input-label">Nama Section</label>

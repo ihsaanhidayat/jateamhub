@@ -18,6 +18,7 @@ const ForceChangePasswordModal = lazy(() => import('./components/ui/ForceChangeP
 const InstallPrompt             = lazy(() => import('./components/ui/InstallPrompt'))
 const TodoReminderModal         = lazy(() => import('./components/ui/TodoReminderModal'))
 const TaskListPage              = lazy(() => import('./pages/TaskListPage'))
+import DashboardSkeleton from './components/ui/DashboardSkeleton'
 const OnboardingOverlay        = lazy(() => import('./components/ui/OnboardingOverlay'))
 const ItemModal                = lazy(() => import('./components/item/ItemModal'))
 const SectionEditModal         = lazy(() => import('./components/layout/SectionEditModal'))
@@ -30,6 +31,7 @@ export default function App() {
   const globalTheme  = useStore(s => s.globalTheme)
   const isDirty      = useStore(s => s.isDirty)
   const isSyncing    = useStore(s => s.isSyncing)
+  const isDataInitialized = useStore(s => s.isDataInitialized)
   const { toggleEditMode, initUser, toast, setCurrentUserId, syncPersonalToDb } = useStore()
   const [showRegister,   setShowRegister]   = useState(false)
   const [profileOpen,    setProfileOpen]    = useState(false)
@@ -283,6 +285,7 @@ export default function App() {
       <OfflineBar />
 
       <main className={`main${editMode ? ' edit-active' : ''}`} style={{ flex: 1 }} role="main">
+        {!isDataInitialized && profile && <DashboardSkeleton />}
         <GridLayout onAddSection={() => setAddSectionOpen(true)} />
       </main>
 

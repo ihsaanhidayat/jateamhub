@@ -30,9 +30,26 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const searchRef = useRef<HTMLInputElement>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
-  // Close search on Escape + click outside
+  // Keyboard shortcuts + search close
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSearchOpen(false); setSearch('') } }
+    const h = (e: KeyboardEvent) => {
+      // Escape — close search
+      if (e.key === 'Escape') { setSearchOpen(false); setSearch('') }
+      // Ctrl+K / Cmd+K — toggle search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(v => {
+          if (!v) setTimeout(() => searchRef.current?.focus(), 280)
+          else setSearch('')
+          return !v
+        })
+      }
+      // Ctrl+E / Cmd+E — toggle edit mode
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault()
+        useStore.getState().toggleEditMode()
+      }
+    }
     const clickOutside = (e: MouseEvent) => {
       if (searchOpen && searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
         setSearchOpen(false); setSearch('')

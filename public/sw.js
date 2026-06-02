@@ -1,54 +1,40 @@
-// JateamHub Service Worker v4 — Minimal, stable
-const CACHE = 'jateamhub-v4'
+const CACHE = 'jateamhub-v3'
+const STATIC = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+]
 
 self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)))
   self.skipWaiting()
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(['/', '/index.html'])).catch(() => { })
-  )
 })
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    )
   )
+  self.clients.claim()
 })
 
 self.addEventListener('fetch', e => {
-  const url = e.request.url
+  const { request } = e
+  // Skip non-GET and API/supabase calls
+  if (request.method !== 'GET') return
+  if (request.url.includes('supabase') || request.url.includes('/api/')) return
 
-  // Skip non-GET dan third-party
-  if (e.request.method !== 'GET') return
-  if (url.includes('supabase.co')) return
-  if (url.includes('fonts.gstatic.com')) return
-  if (url.includes('fonts.googleapis.com')) return
-
-  // Navigation — network first, fallback index.html
-  if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match('/index.html'))
-    )
-    return
-  }
-
-  // Assets — cache first
-  if (url.includes('/assets/')) {
-    e.respondWith(
-      caches.match(e.request).then(cached => {
-        if (cached) return cached
-        return fetch(e.request).then(res => {
-          if (res.ok) {
-            const clone = res.clone()
-            caches.open(CACHE).then(c => c.put(e.request, clone))
-          }
-          return res
-        })
+  e.respondWith(
+    fetch(request)
+      .then(res => {
+        // Cache successful responses for static assets
+        if (res.ok && (request.url.match(/\.(js|css|woff2?|png|svg|ico)$/) || request.url.endsWith('/'))) {
+          const clone = res.clone()
+          caches.open(CACHE).then(c => c.put(request, clone))
+        }
+        return res
       })
-    )
-    return
-  }
-
-  // Semua lain — network only, tidak cache
+      .catch(() => caches.match(request).then(r => r || caches.match('/')))
+  )
 })

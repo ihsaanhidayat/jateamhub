@@ -32,6 +32,26 @@ export default function TaskListPage({ onClose }: Props) {
 
   const TODAY = new Date().toISOString().split('T')[0]
 
+  const exportCsv = () => {
+    const rows = [['No', 'Task', 'Due', 'Dibuat', 'Selesai', 'Status']]
+    filtered.forEach((h, i) => {
+      rows.push([
+        String(i + 1),
+        h.task_text,
+        h.due_date ?? '-',
+        new Date(h.created_at).toLocaleString('id-ID'),
+        h.done_at ? new Date(h.done_at).toLocaleString('id-ID') : '-',
+        h.status === 'done' ? 'Selesai' : 'Terlambat',
+      ])
+    })
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `todo-history-${new Date().toISOString().split('T')[0]}.csv`
+    a.click(); URL.revokeObjectURL(url)
+  }
+
   const loadHistory = () => {
     if (!profile?.id) return
     getTodoHistory(profile.id).then(data => {
@@ -123,7 +143,14 @@ export default function TaskListPage({ onClose }: Props) {
           </div>
           <div style={{ fontSize: 11, color: 'var(--silver3)' }}>{history.length} task total</div>
         </div>
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={exportCsv} title="Export CSV" style={{
+            height: 32, padding: '0 12px', background: 'var(--bg4)',
+            border: '1px solid var(--border2)', borderRadius: 8,
+            color: 'var(--silver2)', fontSize: 11, fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'var(--font)',
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}>📥 Export</button>
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Cari task..." spellCheck={false}
             style={{
@@ -163,7 +190,7 @@ export default function TaskListPage({ onClose }: Props) {
             <div style={{ fontSize: 13 }}>Tidak ada riwayat task</div>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
+          <table className="task-table" style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
                 {['No', 'Task', 'Due Date', 'Dibuat', 'Selesai', 'Status', ''].map(h => (
