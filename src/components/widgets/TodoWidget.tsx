@@ -24,25 +24,17 @@ const isDueSoon = (i: TodoItem) => {
   return d > 0 && d < 30 * 60 * 1000
 }
 
-// ── Parse + save helpers ──────────────────────────────────────
-function parseTodoItems(sectionId: string): TodoItem[] {
-  const s = useStore.getState().personalSections.find(s => s.id === sectionId)
-  try { const d = s?.items?.[0]?.desc; return d ? JSON.parse(d) : [] } catch { return [] }
-}
-
 async function saveTodoItems(sectionId: string, next: TodoItem[]) {
   const store = useStore.getState()
   const s = store.personalSections.find(s => s.id === sectionId)
   if (!s) return
-  // Update subtitle
   const overdueCount = next.filter(i => isOverdue(i)).length
   const pendingCount = next.filter(i => !i.done).length
-  const doneCount    = next.filter(i => i.done).length
-  const total        = next.length
-  // Subtitle: selesai / total
   const subtitle = overdueCount > 0
-    ? `⚠️ ${overdueCount} terlambat · ${doneCount}/${total} selesai`
-    : `${doneCount}/${total} selesai`
+    ? `⚠️ ${overdueCount} terlambat · ${pendingCount} pending`
+    : pendingCount > 0
+    ? `${pendingCount} tugas pending`
+    : 'Semua selesai ✓'
   store.updatePersonalSection(sectionId, { subtitle })
   const json = JSON.stringify(next)
   if (s.items.length > 0) {
@@ -63,10 +55,8 @@ function Separator({ label, color }: { label: string; color: string }) {
   )
 }
 
-// ── List component ────────────────────────────────────────────
 export default function TodoWidget({ sectionId }: { sectionId: string }) {
   const { profile } = useAuthStore()
-  // Baca items langsung dari store — single source of truth
   const rawDesc = useStore(s => {
     const sec = s.personalSections.find(x => x.id === sectionId)
     return sec?.items?.[0]?.desc ?? ''
@@ -171,8 +161,10 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
               {item.dueTime && <span style={{ color: dueOver ? 'var(--red)' : dueSoon ? '#F59E0B' : 'var(--silver4)' }}>⏰ {item.dueTime}{dueOver ? ' lewat!' : dueSoon ? ' segera!' : ''}</span>}
             </div>
           </div>
-          {!isEditing && <button onClick={() => startEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px', flexShrink: 0 }} onMouseEnter={e=>(e.currentTarget.style.color='var(--accent)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--silver4)')}>✏️</button>}
-          <button onClick={() => askDelete(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px', flexShrink: 0 }} onMouseEnter={e=>(e.currentTarget.style.color='var(--red)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--silver4)')}>✕</button>
+          {!isEditing && <button onClick={() => startEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px' }}
+            onMouseEnter={e=>(e.currentTarget.style.color='var(--accent)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--silver4)')}>✏️</button>}
+          <button onClick={() => askDelete(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px' }}
+            onMouseEnter={e=>(e.currentTarget.style.color='var(--red)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--silver4)')}>✕</button>
         </div>
         {isConfirm && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: 'var(--red-bg)', borderBottom: '1px solid var(--border)' }}>
@@ -189,7 +181,7 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
     <div>
       {overdueItems.length === 0 && todayPending.length === 0 && (
         <div style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--silver4)', fontSize: 12, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
-          <span>Tidak ada tugas hari ini</span>
+          <span>Tidak ada tugas hari ini ✓</span>
           {!notifAsked && 'Notification' in window && Notification.permission === 'default' && (
             <button onClick={requestNotif} style={{ height: 24, padding: '0 10px', background: 'var(--accent-light)', border: '1px solid var(--accent-soft)', borderRadius: 6, color: 'var(--accent)', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--mono)' }}>🔔 Aktifkan notifikasi</button>
           )}
@@ -203,14 +195,13 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
   )
 }
 
-// ── Input footer — fix di bawah section, tidak scroll ─────────
+// Input footer
 export function TodoInputFooter({ sectionId }: { sectionId: string }) {
   const rawDesc = useStore(s => {
     const sec = s.personalSections.find(x => x.id === sectionId)
     return sec?.items?.[0]?.desc ?? ''
   })
   const items: TodoItem[] = (() => { try { return rawDesc ? JSON.parse(rawDesc) : [] } catch { return [] } })()
-
   const [newText,    setNewText]    = useState('')
   const [newDueTime, setNewDueTime] = useState('')
   const [showDue,    setShowDue]    = useState(false)
@@ -218,21 +209,16 @@ export function TodoInputFooter({ sectionId }: { sectionId: string }) {
 
   const addTask = async () => {
     if (!newText.trim()) return
-    const task: TodoItem = {
-      id: crypto.randomUUID(), text: newText.trim(),
-      done: false, createdAt: Date.now(),
-      date: TODAY(), dueTime: newDueTime || undefined,
-    }
+    const task: TodoItem = { id: crypto.randomUUID(), text: newText.trim(), done: false, createdAt: Date.now(), date: TODAY(), dueTime: newDueTime || undefined }
     await saveTodoItems(sectionId, [...items, task])
     setNewText(''); setNewDueTime(''); setShowDue(false)
     inputRef.current?.focus()
   }
 
   const iSt: React.CSSProperties = {
-    height: 32, padding: '0 10px',
-    background: 'var(--bg4)', border: '1px solid var(--border2)',
-    borderRadius: 7, fontSize: 12, color: 'var(--silver)',
-    fontFamily: 'var(--font)', outline: 'none',
+    height: 32, padding: '0 10px', background: 'var(--bg4)',
+    border: '1px solid var(--border2)', borderRadius: 7, fontSize: 12,
+    color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none',
   }
 
   return (

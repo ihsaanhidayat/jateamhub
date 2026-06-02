@@ -1,4 +1,4 @@
-import React, { useState, useRef, memo, useCallback } from 'react'
+import React, { useState, useEffect, useRef, memo, useCallback } from 'react'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
@@ -13,9 +13,11 @@ interface Props {
   canEdit?:             boolean
   isFocused?:           boolean
   isMobileView?:        boolean
-  dragHandleProps?:     Record<string, unknown>  // dnd-kit drag handle attributes
-  widgetContent?:       React.ReactNode            // content override untuk widget type
-  widgetFooter?:        React.ReactNode            // footer fix di bawah section body (tidak scroll)
+  dragHandleProps?:     Record<string, unknown>
+  widgetContent?:       React.ReactNode
+  widgetFooter?:        React.ReactNode
+  isExpanded?:          boolean                    // todo expanded state
+  onExpandTodo?:        () => void                 // toggle todo expand
   onFocus?:             (id: string) => void
   onEditSection:        (s: Section) => void
   onEditItem:           (sectionId: string, item: LinkItem) => void
@@ -34,6 +36,7 @@ const DENSITY: Record<string, { body: string; gap: string; headerPad: string }> 
 export default memo(function SectionCard({
   section, isShared, canEdit: canEditProp,
   isFocused, isMobileView, dragHandleProps, widgetContent, widgetFooter,
+  isExpanded, onExpandTodo,
   onFocus,
   onEditSection, onEditItem, onAddItem, onDeleteSection,
   onSave, onCancel,
@@ -53,7 +56,15 @@ export default memo(function SectionCard({
   const appearance = { itemDisplayMode, folderGridCols, iconSize, faviconEnabled } as AppearanceSettings
   const { profile: session } = useAuthStore()
   const isAdmin  = isShared ? false : true
-  const canFocus  = editMode && !isShared  // semua user bisa edit section pribadi
+  const canFocus  = editMode && !isShared
+
+  // Force re-render saat notes mode toggle dari header
+  const [, forceRender] = useState(0)
+  useEffect(() => {
+    const h = () => forceRender(n => n + 1)
+    window.addEventListener('notes-mode-changed', h)
+    return () => window.removeEventListener('notes-mode-changed', h)
+  }, [])
 
   const [confirmDel, setConfirmDel] = useState<{
     open: boolean; type: 'section' | 'item'; itemId?: string; msg: string
@@ -204,7 +215,29 @@ export default memo(function SectionCard({
         </span>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="section-title">{section.title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="section-title">{section.title}</div>
+            {/* Badge item count untuk section biasa */}
+            {section.type !== 'widget' && section.items.length > 0 && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99,
+                background: 'var(--bg4)', color: 'var(--silver3)',
+                fontFamily: 'var(--mono)', border: '1px solid var(--border)',
+              }}>{section.items.length}</span>
+            )}
+            {/* Badge pending todo saat collapsed */}
+            {effectiveCollapsed && (section as any).widgetType === 'todo' && (() => {
+              try {
+                const its = JSON.parse(section.items?.[0]?.desc ?? '[]')
+                const tod = new Date().toISOString().split('T')[0]
+                const ov = its.filter((i: any) => !i.done && i.date < tod).length
+                const pn = its.filter((i: any) => !i.done).length
+                if (ov > 0) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--red)', color: 'white', fontFamily: 'var(--mono)' }}>⚠️ {ov}</span>
+                if (pn > 0) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--accent)', color: 'white', fontFamily: 'var(--mono)' }}>{pn}</span>
+              } catch {}
+              return null
+            })()}
+          </div>
           {section.subtitle && (
             <div style={{
               fontSize: 11, color: 'var(--silver3)', fontWeight: 400,
@@ -239,6 +272,52 @@ export default memo(function SectionCard({
               >🗑</button>
             </div>
           )}
+
+          {/* Expand button — todo & notes */}
+          {((section as any).widgetType === 'todo' || (section as any).widgetType === 'notes') && onExpandTodo && !editMode && (
+            <button
+              className="sec-action-btn-lg"
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); onExpandTodo() }}
+              title={isExpanded ? "Kecilkan" : "Perbesar"}
+              style={{ fontSize: 11 }}
+            >{isExpanded ? '⊟' : '⊞'}</button>
+          )}
+
+          {/* Notes lock toggle in header */}
+          {(section as any).widgetType === 'notes' && !editMode && (() => {
+            const mk = `notes-mode-${session?.username ?? 'u'}-${section.id}`
+            const lk = `notes-locked-${session?.username ?? 'u'}-${section.id}`
+            const mode = localStorage.getItem(mk) ?? 'open'
+            const isLocked = localStorage.getItem(lk) === 'true'
+
+            const handleGembok = (e: React.MouseEvent) => {
+              e.stopPropagation()
+              if (mode === 'open') {
+                // 🔓 → switch ke lock mode, langsung kunci
+                localStorage.setItem(mk, 'lock')
+                localStorage.setItem(lk, 'true')
+                window.dispatchEvent(new Event('notes-mode-changed'))
+              } else if (mode === 'lock' && !isLocked) {
+                // 🔒 tapi sedang unlocked (setelah password) → kunci lagi
+                localStorage.setItem(lk, 'true')
+                window.dispatchEvent(new Event('notes-mode-changed'))
+              }
+              // 🔒 dan locked → TIDAK bisa buka dari sini, harus via password di widget
+            }
+
+            return (
+              <button onClick={handleGembok} style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 13, padding: '2px 4px', borderRadius: 4,
+              }} title={
+                mode === 'open' ? 'Kunci catatan' :
+                !isLocked ? 'Kunci kembali' : 'Terkunci — buka di dalam widget'
+              }>
+                {mode === 'lock' ? '🔒' : '🔓'}
+              </button>
+            )
+          })()}
 
           {/* Collapse button — selalu ada */}
           <button

@@ -57,68 +57,8 @@ export function hasPermission(role: Role, permission: Permission): boolean {
   return (PERMISSIONS[permission] as readonly string[]).includes(role)
 }
 
-// ── Theme ─────────────────────────────────────
-// 2 tema: Ivory (light, professional) + Obsidian (dark, standalone)
-export type ThemeBase = 'ivory' | 'obsidian'
-export type ThemeId =
-  | ThemeBase
-  | 'ivory-light'
-  // Legacy compat — semua map ke ivory atau obsidian
-  | 'aurora-light' | 'aurora-dark' | 'aurora'
-  | 'sand-light'   | 'sand-dark'   | 'sand'
-  | 'slate-light'  | 'slate-dark'  | 'slate'
-  | 'pearl-light'  | 'pearl-dark'  | 'pearl'
-  | 'dark-mint' | 'dark-soft' | 'enterprise'
-
-export interface ThemeConfig {
-  id:          ThemeBase
-  name:        string
-  description: string
-  accent:      string
-  bgLight:     string
-  bgDark:      string
-  font:        string
-  standalone?: boolean
-}
-
-export const THEMES: ThemeConfig[] = [
-  {
-    id:          'ivory',
-    name:        'Ivory',
-    description: 'Clean · Professional · Light',
-    accent:      '#2563EB',
-    bgLight:     '#FAFAF8',
-    bgDark:      '#FAFAF8',
-    font:        'Plus Jakarta Sans',
-  },
-  {
-    id:          'obsidian',
-    name:        'Obsidian',
-    description: 'Dark · Elegant · Focused',
-    accent:      '#6EE7B7',
-    bgLight:     '#0E0E0E',
-    bgDark:      '#0E0E0E',
-    font:        'Space Grotesk',
-    standalone:  true,
-  },
-]
-
-// Terapkan tema ke DOM: set data-theme + font otomatis
-export const applyThemeToElement = (base: ThemeBase, _isDark: boolean) => {
-  const theme = THEMES.find(t => t.id === base) ?? THEMES[0]
-  const themeId = base === 'obsidian' ? 'obsidian' : 'ivory-light'
-  const root = document.documentElement
-  root.setAttribute('data-theme', themeId)
-  // Load font jika belum
-  const fontName = theme.font.replace(' ', '+')
-  if (!document.querySelector(`link[href*="${fontName}"]`)) {
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = `https://fonts.googleapis.com/css2?family=${fontName}:wght@300;400;500;600;700&display=swap`
-    document.head.appendChild(link)
-  }
-  root.style.setProperty('--font', `'${theme.font}', sans-serif`)
-}
+// ── Theme (simplified — Pearl/Slate via CSS vars) ─────────
+export type ThemeId = string  // legacy compat: 'pearl' | 'slate'
 
 // ── Section ───────────────────────────────────
 export type SectionVisibility = 'all' | 'admin' | 'unit'
@@ -155,8 +95,6 @@ export interface Section {
   widgetType?:  WidgetType
 }
 
-
-
 // ── Appearance ────────────────────────────────
 export type IconSize       = 'small' | 'medium' | 'large' | 'xl'
 export type ItemDisplayMode = 'folderGrid' | 'list'
@@ -171,7 +109,6 @@ export interface AppearanceSettings {
   faviconEnabled:   boolean
   colorMode:        ColorMode
   theme:            ThemeId
-  themeBase:        ThemeBase   // tema aktif: pearl/ivory/sage/obsidian
   isDarkMode:       boolean     // toggle dark mode
   sectionDensity?:  SectionDensity
 }
@@ -183,8 +120,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   tooltipEnabled:  true,
   faviconEnabled:  true,
   colorMode:       'light',
-  theme: 'ivory-light' as ThemeId,
-  themeBase:       'ivory',
+  theme:           'pearl',
   isDarkMode:      false,
 }
 

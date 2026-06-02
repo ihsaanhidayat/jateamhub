@@ -260,12 +260,10 @@ export const useStore = create<DashboardStore>((set, get) => ({
       const raw    = dbSections as Section[]
       const sorted = [...raw].sort((a, b) => (a.layout.y * 100 + a.layout.x) - (b.layout.y * 100 + b.layout.x))
       const sections = autoLayout(sorted)
-      // Notes widget selalu collapsed saat login — hanya di memory, tidak overwrite DB
-      const withCollapsed = sections.map(s =>
-        s.type === 'widget' ? { ...s, collapsed: true } : s
-      )
-      persistPersonal(withCollapsed)
-      set({ personalSections: withCollapsed })
+      // Semua section default expanded saat login
+      const withExpanded = sections.map(s => ({ ...s, collapsed: false }))
+      persistPersonal(withExpanded)
+      set({ personalSections: withExpanded })
       saveUserLayout(userId, sections).catch(() => {}) // simpan sections tanpa collapsed override
     } else {
       // DB kosong — cek localStorage (mungkin ada data yang belum sync)
@@ -309,6 +307,22 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
     // Mark data sebagai selesai di-load
     set({ isDataInitialized: true })
+    // Alert jika ada todo pending/overdue saat login
+    const today = new Date().toISOString().split('T')[0]
+    const allSections = get().personalSections
+    const todoSection = allSections.find((s: any) => s.widgetType === 'todo')
+    if (todoSection) {
+      try {
+        const todoItems = JSON.parse(todoSection.items?.[0]?.desc ?? '[]')
+        const overdueCount = todoItems.filter((i: any) => !i.done && i.date < today).length
+        const pendingCount = todoItems.filter((i: any) => !i.done).length
+        if (overdueCount > 0) {
+          setTimeout(() => get().toast(`⚠️ ${overdueCount} tugas terlambat!`, 'error'), 1500)
+        } else if (pendingCount > 0) {
+          setTimeout(() => get().toast(`📋 ${pendingCount} tugas pending hari ini`, 'warn'), 1500)
+        }
+      } catch {}
+    }
 
     // Process appearance dari DB (override localStorage jika ada)
     if (dbAppearance && Object.keys(dbAppearance).length > 0) {

@@ -13,10 +13,10 @@ import { useUserManagement, EMOJI_PRESETS } from '../../hooks/useUserManagement'
 function DetailInfo({ profile }: { profile: any }) {
   const [open, setOpen] = useState(false)
   const rows = [
-    { label: 'Username', value: `@${profile?.username}` },
-    { label: 'Wilayah', value: REGION_LABELS[profile?.region_scope] ?? profile?.region_scope ?? '—' },
-    { label: 'Unit', value: UNIT_LABELS[profile?.unit_scope] ?? profile?.unit_scope ?? '—' },
-    { label: 'Role', value: profile?.role ?? '—' },
+    { label: 'Username',  value: `@${profile?.username}` },
+    { label: 'Wilayah',   value: REGION_LABELS[profile?.region_scope] ?? profile?.region_scope ?? '—' },
+    { label: 'Unit',      value: UNIT_LABELS[profile?.unit_scope] ?? profile?.unit_scope ?? '—' },
+    { label: 'Role',      value: profile?.role ?? '—' },
   ]
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
@@ -50,16 +50,44 @@ function DetailInfo({ profile }: { profile: any }) {
   )
 }
 
+// ── Tombol Ganti Password (icon kunci) ──────────────────────
+function ChangePwButton({ profileId, username }: { profileId?: string; username?: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div>
+      <button onClick={() => setOpen(v => !v)} style={{
+        width: '100%', padding: '10px 14px',
+        background: 'none', border: '1px solid var(--border2)',
+        borderRadius: 10, cursor: 'pointer', fontFamily: 'var(--font)',
+        display: 'flex', alignItems: 'center', gap: 10,
+        color: 'var(--silver2)', fontSize: 13, transition: 'all 150ms',
+      }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.color = 'var(--accent)' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'; (e.currentTarget as HTMLElement).style.color = 'var(--silver2)' }}
+      >
+        <span style={{ fontSize: 16 }}>🔑</span>
+        <span style={{ fontWeight: 600 }}>Ganti Password</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--silver4)' }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div style={{ marginTop: 8, border: '1px solid var(--border2)', borderRadius: 10, overflow: 'hidden' }}>
+          <ChangePasswordSection profileId={profileId} username={username} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Ganti Password Mandiri ────────────────────────────────────
 function ChangePasswordSection({ profileId, username }: { profileId?: string, username?: string }) {
-  const [open, setOpen] = useState(false)
-  const [oldPw, setOldPw] = useState('')
-  const [newPw, setNewPw] = useState('')
+  const [open,      setOpen]      = useState(false)
+  const [oldPw,     setOldPw]     = useState('')
+  const [newPw,     setNewPw]     = useState('')
   const [confirmPw, setConfirmPw] = useState('')
-  const [showPw, setShowPw] = useState(false)
-  const [err, setErr] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [done, setDone] = useState(false)
+  const [showPw,    setShowPw]    = useState(false)
+  const [err,       setErr]       = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [done,      setDone]      = useState(false)
 
   const handleChange = async () => {
     if (!oldPw) return setErr('Masukkan password lama.')
@@ -138,12 +166,12 @@ interface Props { onClose: () => void }
 
 export default function ProfilePage({ onClose }: Props) {
   const { profile } = useAuthStore()
-  const { toast } = useStore()
+  const { toast }   = useStore()
 
   const um = useUserManagement()
   const { canManage, isSuperAdmin } = um
 
-  const [showAvatarMenu, setShowAvatarMenu] = useState(false)
+  const [showAvatarMenu,    setShowAvatarMenu]    = useState(false)
   const [showAvatarPreview, setShowAvatarPreview] = useState(false)
 
   // Tutup avatar menu saat klik di luar
@@ -156,10 +184,10 @@ export default function ProfilePage({ onClose }: Props) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showAvatarMenu])
-  const [siteTitle, setSiteTitle] = useState('')
+  const [siteTitle,    setSiteTitle]    = useState('')
   const [siteSubtitle, setSiteSubtitle] = useState('')
-  const [coffeeUrl, setCoffeeUrl] = useState('')
-  const [logoUrl, setLogoUrl] = useState('')
+  const [coffeeUrl,    setCoffeeUrl]    = useState('')
+  const [logoUrl,      setLogoUrl]      = useState('')
 
   const handleSaveSettings = async () => {
     // Simpan settings ke dashboard_config di Supabase
@@ -167,10 +195,10 @@ export default function ProfilePage({ onClose }: Props) {
     const CONFIG_ID = '00000000-0000-0000-0000-000000000001'
     const { data } = await supabase.from('dashboard_config').select('config').eq('id', CONFIG_ID).single()
     const cfg = (data?.config ?? {}) as Record<string, unknown>
-    cfg.title = siteTitle
+    cfg.title    = siteTitle
     cfg.subtitle = siteSubtitle
-    cfg.coffeeUrl = coffeeUrl
-    cfg.logoUrl = logoUrl
+    cfg.coffeeUrl= coffeeUrl
+    cfg.logoUrl  = logoUrl
     await supabase.from('dashboard_config').update({ config: cfg }).eq('id', CONFIG_ID)
     toast('Settings disimpan.', 'success')
   }
@@ -185,14 +213,14 @@ export default function ProfilePage({ onClose }: Props) {
 
   // Edit nama lengkap
   const [editingName, setEditingName] = useState(false)
-  const [nameValue, setNameValue] = useState(profile?.full_name || '')
-  const [nameSaving, setNameSaving] = useState(false)
+  const [nameValue,   setNameValue]   = useState(profile?.full_name || '')
+  const [nameSaving,  setNameSaving]  = useState(false)
 
   const handleSaveName = async () => {
     if (!profile || !nameValue.trim()) return
     setNameSaving(true)
     try {
-      const parts = nameValue.trim().split(' ').filter(Boolean)
+      const parts    = nameValue.trim().split(' ').filter(Boolean)
       const initials = parts.length >= 2
         ? (parts[0][0] + parts[1][0]).toUpperCase()
         : nameValue.slice(0, 2).toUpperCase()
@@ -291,7 +319,7 @@ export default function ProfilePage({ onClose }: Props) {
                   }}>
                     {profile?.avatar_url
                       ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : (profile?.full_name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('') ?? profile?.username?.slice(0, 2) ?? '?').toUpperCase()
+                      : (profile?.full_name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') ?? profile?.username?.slice(0,2) ?? '?').toUpperCase()
                     }
                   </div>
                   {showAvatarMenu && (
@@ -364,8 +392,8 @@ export default function ProfilePage({ onClose }: Props) {
                 )}
               </div>
 
-              {/* ── Ganti Password — langsung terlihat ── */}
-              <ChangePasswordSection profileId={profile?.id} username={profile?.username} />
+              {/* ── Ganti Password — icon kunci ── */}
+              <ChangePwButton profileId={profile?.id} username={profile?.username} />
 
               {/* ── Detail info — collapsible ── */}
               <DetailInfo profile={profile} />
@@ -393,7 +421,7 @@ export default function ProfilePage({ onClose }: Props) {
                 </select>
                 <select value={um.filterUnit} onChange={e => { um.setFilterUnit(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Unit</option>
-                  {(UNITS as readonly { label: string; value: string }[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                  {(UNITS as readonly {label: string; value: string}[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                 </select>
                 <select value={um.filterRole} onChange={e => { um.setFilterRole(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Role</option>
@@ -514,15 +542,15 @@ export default function ProfilePage({ onClose }: Props) {
               {/* User list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {um.pagedUsers.map(u => {
-                  const b = um.getBadge(u)
-                  const isMe = u.id === profile?.id
+                  const b       = um.getBadge(u)
+                  const isMe    = u.id === profile?.id
                   // Pastikan field scope tersedia untuk permission check
                   const currentUser = { ...profile, region_scope: (profile as any).region_scope ?? 'global', unit_scope: (profile as any).unit_scope ?? 'general' }
-                  const targetUser = { ...u, region_scope: u.region_scope ?? 'global', unit_scope: u.unit_scope ?? 'general' }
+                  const targetUser  = { ...u,       region_scope: u.region_scope ?? 'global',                unit_scope: u.unit_scope ?? 'general'                }
                   const canEdit_ = canManageUser(currentUser as any, targetUser as any)
-                  const region = REGION_LABELS[u.region_scope ?? 'global'] ?? u.region_scope
-                  const unit = UNIT_LABELS[u.unit_scope ?? 'general'] ?? u.unit_scope
-                  const emoji_ = u.emoji || u.avatar_emoji || ''
+                  const region  = REGION_LABELS[u.region_scope ?? 'global'] ?? u.region_scope
+                  const unit    = UNIT_LABELS[u.unit_scope ?? 'general'] ?? u.unit_scope
+                  const emoji_  = u.emoji || u.avatar_emoji || ''
 
                   return (
                     <div key={u.id} style={{
@@ -588,10 +616,10 @@ export default function ProfilePage({ onClose }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: 11, color: 'var(--silver3)', marginBottom: 4 }}>Pengaturan global — hanya superadmin</div>
               {[
-                { label: 'Site Title', val: siteTitle, set: setSiteTitle, ph: 'JateamHub' },
-                { label: 'Subtitle / Greeting', val: siteSubtitle, set: setSiteSubtitle, ph: 'Selamat datang, {username}' },
-                { label: 'Logo URL', val: logoUrl, set: setLogoUrl, ph: 'https://...' },
-                { label: 'Coffee / Donasi URL', val: coffeeUrl, set: setCoffeeUrl, ph: 'https://trakteer.id/...' },
+                { label: 'Site Title',              val: siteTitle,    set: setSiteTitle,    ph: 'JateamHub' },
+                { label: 'Subtitle / Greeting',     val: siteSubtitle, set: setSiteSubtitle, ph: 'Selamat datang, {username}' },
+                { label: 'Logo URL',                val: logoUrl,      set: setLogoUrl,      ph: 'https://...' },
+                { label: 'Coffee / Donasi URL',     val: coffeeUrl,    set: setCoffeeUrl,    ph: 'https://trakteer.id/...' },
               ].map(f => (
                 <div key={f.label}>
                   <label style={{ ...labelStyle, fontWeight: 700 }}>{f.label}</label>

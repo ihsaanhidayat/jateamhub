@@ -46,10 +46,12 @@ function SkeletonDashboard() {
 // ── Sortable wrapper untuk personal section ──────────────────
 function SortableSectionCard({
   section, editMode, isMobile, searchQuery, focusedId, onFocus,
+  isExpanded, onExpandTodo,
   onEditSection, onEditItem, onAddItem, onDeleteSection, onSave, onCancel,
 }: {
   section: Section, editMode: boolean, isMobile: boolean, searchQuery: string,
   focusedId: string | null, onFocus: (id: string | null) => void,
+  isExpanded?: boolean, onExpandTodo?: () => void,
   onEditSection: (s: Section) => void, onEditItem: (sid: string, item: any) => void,
   onAddItem: (sid: string) => void, onDeleteSection: (id: string) => void,
   onSave: () => void, onCancel: () => void,
@@ -80,14 +82,16 @@ function SortableSectionCard({
           onDeleteSection={onDeleteSection}
           onSave={onSave}
           onCancel={onCancel}
+          isExpanded={isExpanded}
+          onExpandTodo={onExpandTodo}
           widgetContent={
             (section as any).widgetType === 'notes'
               ? <NotesWidget sectionId={section.id} />
               : (section as any).widgetType === 'clock'
-              ? <ClockWidget />
-              : (section as any).widgetType === 'todo'
-              ? <TodoWidget sectionId={section.id} />
-              : null
+                ? <ClockWidget />
+                : (section as any).widgetType === 'todo'
+                  ? <TodoWidget sectionId={section.id} />
+                  : null
           }
           widgetFooter={
             (section as any).widgetType === 'todo'
@@ -146,6 +150,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
   const isMobile = useIsMobile()
 
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [expandedWidgetId, setExpandedWidgetId] = useState<string | null>(null)
   const [isDraggingActive, setIsDraggingActive] = useState(false)
   const [focusedId, setFocusedId] = useState<string | null>(null)
 
@@ -222,7 +227,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
       try {
         await syncPersonalToDbNow()
         if (useStore.getState().loadSharedSections) await useStore.getState().loadSharedSections()
-      } catch {} finally { clearTimeout(safety); setIsRefreshing(false); setPullY(0) }
+      } catch { } finally { clearTimeout(safety); setIsRefreshing(false); setPullY(0) }
     } else { setPullY(0) }
   }
 
@@ -234,7 +239,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
     return section.title.toLowerCase().includes(q) ||
       section.items.some((i: any) =>
         i.title.toLowerCase().includes(q) ||
-        (i.url  && i.url.toLowerCase().includes(q)) ||
+        (i.url && i.url.toLowerCase().includes(q)) ||
         (i.desc && i.desc.toLowerCase().includes(q))
       )
   }
@@ -243,7 +248,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
     if (!q) return acc
     return acc + (s.items ?? []).filter((i: any) =>
       i.title.toLowerCase().includes(q) ||
-      (i.url  && i.url.toLowerCase().includes(q)) ||
+      (i.url && i.url.toLowerCase().includes(q)) ||
       (i.desc && i.desc.toLowerCase().includes(q))
     ).length
   }, 0)
@@ -307,13 +312,13 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                 isShared={true}
                 canEdit={false}
                 isMobileView={isMobile}
-                onFocus={() => {}}
-                onEditSection={() => {}}
-                onEditItem={() => {}}
-                onAddItem={() => {}}
-                onDeleteSection={() => {}}
-                onSave={() => {}}
-                onCancel={() => {}}
+                onFocus={() => { }}
+                onEditSection={() => { }}
+                onEditItem={() => { }}
+                onAddItem={() => { }}
+                onDeleteSection={() => { }}
+                onSave={() => { }}
+                onCancel={() => { }}
               />
             </div>
           ))}
@@ -335,6 +340,9 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                 style={{
                   opacity: sectionMatches(section) ? 1 : 0.2,
                   transition: 'opacity 200ms',
+                  ...((((section as any).widgetType === 'todo' || (section as any).widgetType === 'notes') && expandedWidgetId === section.id) ? {
+                    gridColumn: 'span 2',
+                  } : {}),
                 }}
               >
                 <SortableSectionCard
@@ -343,7 +351,9 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                   isMobile={isMobile}
                   searchQuery={searchQuery}
                   focusedId={focusedId}
-                  onFocus={(id) => setFocusedId(prev => prev === id ? null : id)}
+                  onFocus={(id: string | null) => setFocusedId(prev => prev === id ? null : id)}
+                  isExpanded={expandedWidgetId === section.id}
+                  onExpandTodo={((section as any).widgetType === 'todo' || (section as any).widgetType === 'notes') ? () => setExpandedWidgetId(prev => prev === section.id ? null : section.id) : undefined}
                   onEditSection={handleEditSection}
                   onEditItem={handleEditItem}
                   onAddItem={handleAddItem}
@@ -365,18 +375,66 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                 isShared={false}
                 canEdit={false}
                 isMobileView={isMobile}
-                onFocus={() => {}}
-                onEditSection={() => {}}
-                onEditItem={() => {}}
-                onAddItem={() => {}}
-                onDeleteSection={() => {}}
-                onSave={() => {}}
-                onCancel={() => {}}
+                onFocus={() => { }}
+                onEditSection={() => { }}
+                onEditItem={() => { }}
+                onAddItem={() => { }}
+                onDeleteSection={() => { }}
+                onSave={() => { }}
+                onCancel={() => { }}
               />
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Mobile widget expand bottom sheet */}
+      {isMobile && expandedWidgetId && (() => {
+        const todoSection = personalSections.find(s => s.id === expandedWidgetId)
+        if (!todoSection) return null
+        return (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 300,
+            background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+            animation: 'fadeIn 200ms ease',
+          }} onClick={() => setExpandedWidgetId(null)}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: 'var(--card-bg)', borderRadius: '16px 16px 0 0',
+              maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+              animation: 'slideUp 250ms cubic-bezier(0.16,1,0.3,1)',
+            }}>
+              {/* Handle bar */}
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} />
+              </div>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px 12px', gap: 8, borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 18 }}>{todoSection.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)' }}>{todoSection.title}</div>
+                  {todoSection.subtitle && <div style={{ fontSize: 11, color: 'var(--silver3)' }}>{todoSection.subtitle}</div>}
+                </div>
+                <button onClick={() => setExpandedWidgetId(null)} style={{
+                  width: 30, height: 30, borderRadius: 8, background: 'var(--bg4)',
+                  border: '1px solid var(--border2)', cursor: 'pointer', color: 'var(--silver3)',
+                  fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>✕</button>
+              </div>
+              {/* Widget content */}
+              <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                {(todoSection as any).widgetType === 'todo'
+                  ? <TodoWidget sectionId={expandedWidgetId} />
+                  : (todoSection as any).widgetType === 'notes'
+                    ? <NotesWidget sectionId={expandedWidgetId} />
+                    : null}
+              </div>
+              {/* Todo input footer */}
+              {(todoSection as any).widgetType === 'todo' && <TodoInputFooter sectionId={expandedWidgetId} />}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

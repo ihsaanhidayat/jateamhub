@@ -7,12 +7,12 @@ import { uploadAvatar, updateProfile } from '../../utils/supabaseClient'
 import AvatarCropModal from '../ui/AvatarCropModal'
 
 interface Props {
-  onToggleOptions: () => void
-  optionsOpen: boolean
-  onOpenTaskList?: () => void
-  onOpenAdvanced: () => void
-  onAddSection: () => void
-  onImportLinks: () => void
+  onToggleOptions:  () => void
+  optionsOpen:      boolean
+  onOpenTaskList?:  () => void
+  onOpenAdvanced:  () => void
+  onAddSection:    () => void
+  onImportLinks:   () => void
 }
 
 export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks, onOpenTaskList }: Props) {
@@ -23,9 +23,25 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const { profile: session } = useAuthStore()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
-  const [cropDataUrl, setCropDataUrl] = useState<string | null>(null)
+  const [cropDataUrl,     setCropDataUrl]     = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
-  const hideSearch = useStore(s => (s as any).notesLockActive ?? false)
+  const hideSearch   = useStore(s => (s as any).notesLockActive ?? false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const searchContainerRef = useRef<HTMLDivElement>(null)
+
+  // Close search on Escape + click outside
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSearchOpen(false); setSearch('') } }
+    const clickOutside = (e: MouseEvent) => {
+      if (searchOpen && searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setSearchOpen(false); setSearch('')
+      }
+    }
+    window.addEventListener('keydown', h)
+    document.addEventListener('mousedown', clickOutside)
+    return () => { window.removeEventListener('keydown', h); document.removeEventListener('mousedown', clickOutside) }
+  }, [searchOpen])
 
   // Realtime clock di header
   const [clockNow, setClockNow] = useState(new Date())
@@ -59,11 +75,11 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  const isEditable = canEdit(session as any)
-  const showOptions = canSeeOptions(session as any)
+  const isEditable   = canEdit(session as any)
+  const showOptions  = canSeeOptions(session as any)
   const isAdminLevel = isAdmin(session as any)
-  const badge = getDisplayBadge(session as any)
-  const emoji = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
+  const badge        = getDisplayBadge(session as any)
+  const emoji        = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
 
 
 
@@ -118,12 +134,12 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   }
 
   const PREVIEW_OPTS = [
-    { value: null, label: 'Admin View' },
-    { value: '', label: 'User Umum' },
-    { value: 'pro', label: 'PRO' },
-    { value: 'cro', label: 'CRO' },
-    { value: 'klaim', label: 'Klaim' },
-    { value: 'ae', label: 'AE' },
+    { value: null,    label: 'Admin View' },
+    { value: '',      label: 'User Umum'  },
+    { value: 'pro',   label: 'PRO'        },
+    { value: 'cro',   label: 'CRO'        },
+    { value: 'klaim', label: 'Klaim'      },
+    { value: 'ae',    label: 'AE'         },
   ]
 
 
@@ -156,10 +172,59 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
           {/* Desktop buttons */}
           {!editMode ? (
             <>
-              <div className="search-wrap desktop-only" style={{ display: hideSearch ? 'none' : undefined }}>
-                <input className="search-input" placeholder="Filter..." value={searchQuery} onChange={e => setSearch(e.target.value)} autoComplete="off" />
-                <span className="search-icon">⌕</span>
-              </div>
+              {!hideSearch && (
+                <div ref={searchContainerRef} className="search-animated desktop-only" style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center',
+                    width: searchOpen ? 210 : 34, height: 34,
+                    background: searchOpen ? 'var(--bg4)' : 'none',
+                    border: searchOpen ? '1px solid var(--border2)' : '1px solid transparent',
+                    borderRadius: 8, overflow: 'hidden',
+                    transition: 'width 280ms cubic-bezier(0.16,1,0.3,1), background 200ms, border-color 200ms',
+                    flexShrink: 0,
+                  }}>
+                    <button onClick={() => {
+                      setSearchOpen(v => !v)
+                      if (!searchOpen) setTimeout(() => searchRef.current?.focus(), 280)
+                      else { setSearch('') }
+                    }} style={{
+                      width: 34, height: 34, flexShrink: 0,
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: searchOpen ? 'var(--accent)' : 'var(--silver3)', fontSize: 15,
+                      transition: 'color 150ms',
+                    }}>🔍</button>
+                    <input
+                      ref={searchRef}
+                      value={searchQuery}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Cari link..."
+                      autoComplete="off"
+                      spellCheck={false}
+                      tabIndex={searchOpen ? 0 : -1}
+                      readOnly={!searchOpen}
+                      style={{
+                        flex: 1, height: '100%', background: 'none',
+                        border: 'none', outline: 'none',
+                        fontSize: 13, color: 'var(--silver)',
+                        fontFamily: 'var(--font)',
+                        opacity: searchOpen ? 1 : 0,
+                        pointerEvents: searchOpen ? 'auto' : 'none',
+                        transition: 'opacity 200ms',
+                        paddingRight: 10,
+                      }}
+                    />
+                    {searchOpen && searchQuery && (
+                      <button onClick={() => setSearch('')} style={{
+                        width: 20, height: 20, flexShrink: 0, marginRight: 6,
+                        background: 'var(--border2)', border: 'none', borderRadius: '50%',
+                        cursor: 'pointer', color: 'var(--silver3)', fontSize: 10,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>✕</button>
+                    )}
+                  </div>
+                </div>
+              )}
               <button className="icon-btn desktop-only" onClick={toggleEditMode} title="Edit Mode" aria-label="Edit Mode">✏️</button>
             </>
           ) : (
@@ -186,11 +251,10 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
           {/* ── MOBILE: hanya search ── */}
           <div className="mobile-only">
             {!editMode && !hideSearch && (
-              <div className="search-wrap" style={{ marginRight: 4 }}>
-                <input className="search-input" placeholder="Cari..." value={searchQuery}
-                  onChange={e => setSearch(e.target.value)} style={{ width: 90 }} autoComplete="off" />
-                <span className="search-icon">⌕</span>
-              </div>
+              <button onClick={() => { setSearchOpen(v => !v); if (!searchOpen) setTimeout(() => searchRef.current?.focus(), 100) }}
+                style={{ width: 34, height: 34, background: searchOpen ? 'var(--accent-light)' : 'none', border: '1px solid transparent', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: searchOpen ? 'var(--accent)' : 'var(--silver3)', fontSize: 15 }}>
+                🔍
+              </button>
             )}
             {editMode && (
               <button className="icon-btn active"
@@ -264,6 +328,40 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
           </div>
         </div>
       </header>
+
+      {/* Mobile search slide-down */}
+      {searchOpen && (
+        <div className="mobile-only" style={{
+          position: 'sticky', top: 68, zIndex: 99,
+          padding: '8px 16px', background: 'var(--bg2)',
+          borderBottom: '1px solid var(--border)',
+          animation: 'slideDown 200ms ease',
+        }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 14, color: 'var(--silver4)' }}>🔍</span>
+            <input
+              ref={searchRef}
+              value={searchQuery}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Cari link..."
+              autoComplete="off" spellCheck={false}
+              autoFocus
+              style={{
+                flex: 1, height: 36, padding: '0 12px',
+                background: 'var(--bg4)', border: '1px solid var(--border2)',
+                borderRadius: 8, fontSize: 14, color: 'var(--silver)',
+                fontFamily: 'var(--font)', outline: 'none',
+              }}
+            />
+            <button onClick={() => { setSearchOpen(false); setSearch('') }} style={{
+              width: 36, height: 36, borderRadius: 8, background: 'var(--bg4)',
+              border: '1px solid var(--border2)', cursor: 'pointer',
+              color: 'var(--silver3)', fontSize: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>✕</button>
+          </div>
+        </div>
+      )}
 
       {/* Crop modal — muncul setelah user pilih foto */}
       {cropDataUrl && (
