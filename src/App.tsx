@@ -16,6 +16,7 @@ const AddSectionModal          = lazy(() => import('./components/layout/AddSecti
 const ImportLinksModal         = lazy(() => import('./components/ui/ImportLinksModal'))
 const ForceChangePasswordModal = lazy(() => import('./components/ui/ForceChangePasswordModal'))
 const InstallPrompt             = lazy(() => import('./components/ui/InstallPrompt'))
+const TodoReminderModal         = lazy(() => import('./components/ui/TodoReminderModal'))
 const TaskListPage              = lazy(() => import('./pages/TaskListPage'))
 const OnboardingOverlay        = lazy(() => import('./components/ui/OnboardingOverlay'))
 const ItemModal                = lazy(() => import('./components/item/ItemModal'))
