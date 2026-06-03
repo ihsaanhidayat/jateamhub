@@ -7,12 +7,12 @@ import { uploadAvatar, updateProfile } from '../../utils/supabaseClient'
 import AvatarCropModal from '../ui/AvatarCropModal'
 
 interface Props {
-  onToggleOptions:  () => void
-  optionsOpen:      boolean
-  onOpenTaskList?:  () => void
-  onOpenAdvanced:  () => void
-  onAddSection:    () => void
-  onImportLinks:   () => void
+  onToggleOptions: () => void
+  optionsOpen: boolean
+  onOpenTaskList?: () => void
+  onOpenAdvanced: () => void
+  onAddSection: () => void
+  onImportLinks: () => void
 }
 
 export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks, onOpenTaskList }: Props) {
@@ -23,9 +23,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const { profile: session } = useAuthStore()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
-  const [cropDataUrl,     setCropDataUrl]     = useState<string | null>(null)
+  const [cropDataUrl, setCropDataUrl] = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
-  const hideSearch   = useStore(s => (s as any).notesLockActive ?? false)
+  const hideSearch = useStore(s => (s as any).notesLockActive ?? false)
   const [searchOpen, setSearchOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
@@ -92,11 +92,11 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  const isEditable   = canEdit(session as any)
-  const showOptions  = canSeeOptions(session as any)
+  const isEditable = canEdit(session as any)
+  const showOptions = canSeeOptions(session as any)
   const isAdminLevel = isAdmin(session as any)
-  const badge        = getDisplayBadge(session as any)
-  const emoji        = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
+  const badge = getDisplayBadge(session as any)
+  const emoji = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
 
 
 
@@ -151,12 +151,12 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   }
 
   const PREVIEW_OPTS = [
-    { value: null,    label: 'Admin View' },
-    { value: '',      label: 'User Umum'  },
-    { value: 'pro',   label: 'PRO'        },
-    { value: 'cro',   label: 'CRO'        },
-    { value: 'klaim', label: 'Klaim'      },
-    { value: 'ae',    label: 'AE'         },
+    { value: null, label: 'Admin View' },
+    { value: '', label: 'User Umum' },
+    { value: 'pro', label: 'PRO' },
+    { value: 'cro', label: 'CRO' },
+    { value: 'klaim', label: 'Klaim' },
+    { value: 'ae', label: 'AE' },
   ]
 
 
@@ -242,6 +242,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                   </div>
                 </div>
               )}
+              <button className="icon-btn desktop-only" onClick={onImportLinks}
+                title="Import / Export Links" aria-label="Import / Export Links"
+                style={{ fontSize: 15 }}>📥</button>
               <button className="icon-btn desktop-only" onClick={toggleEditMode} title="Edit Mode" aria-label="Edit Mode">✏️</button>
             </>
           ) : (
@@ -249,12 +252,12 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
               <button className="icon-btn desktop-only" onClick={onAddSection}
                 style={{ fontWeight: 700, fontSize: 16 }} title="Tambah Section" aria-label="Tambah Section">＋</button>
               <button className="icon-btn desktop-only" onClick={onImportLinks}
-                style={{ fontWeight: 600, fontSize: 13 }} title="Import Link" aria-label="Import Link">📥</button>
+                title="Import / Export Links" aria-label="Import / Export Links"
+                style={{ fontSize: 15 }}>📥</button>
               <button
                 className="icon-btn desktop-only active"
                 onClick={e => {
                   e.stopPropagation()
-                  // Tutup options jika terbuka sebelum exit edit mode
                   if (optionsOpen) onToggleOptions()
                   toggleEditMode()
                 }}
@@ -265,7 +268,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             </>
           )}
 
-          {/* ── MOBILE: hanya search ── */}
+          {/* ── MOBILE: search ── */}
           <div className="mobile-only">
             {!editMode && !hideSearch && (
               <button onClick={() => { setSearchOpen(v => !v); if (!searchOpen) setTimeout(() => searchRef.current?.focus(), 100) }}
@@ -280,13 +283,6 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                 title="Selesai Edit" aria-label="Selesai Edit">✓ Selesai</button>
             )}
           </div>
-
-          {/* Task List button — tampil jika ada todo widget */}
-          {onOpenTaskList && (
-            <button className="icon-btn desktop-only" onClick={onOpenTaskList} title="Riwayat Task">
-              📋
-            </button>
-          )}
 
           {/* Theme Toggle — ☀️/🌙 */}
           <button

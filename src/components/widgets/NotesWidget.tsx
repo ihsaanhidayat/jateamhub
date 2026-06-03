@@ -9,24 +9,24 @@ export default function NotesWidget({ sectionId }: Props) {
   const { personalSections, updateItem, addItem, syncPersonalToDb } = useStore()
   const setNotesLockActive = useStore(s => (s as any).setNotesLockActive)
   const { profile } = useAuthStore()
-  const section = personalSections.find(s => s.id === sectionId)
+  const section  = personalSections.find(s => s.id === sectionId)
   const noteItem = section?.items?.[0]
 
-  const modeKey = `notes-mode-${profile?.username ?? 'u'}-${sectionId}`
+  const modeKey   = `notes-mode-${profile?.username ?? 'u'}-${sectionId}`
   const lockedKey = `notes-locked-${profile?.username ?? 'u'}-${sectionId}`
 
   // Reactive read dari localStorage — listen event 'notes-mode-changed'
-  const readMode = () => (localStorage.getItem(modeKey) as 'lock' | 'open') ?? 'open'
+  const readMode   = () => (localStorage.getItem(modeKey) as 'lock'|'open') ?? 'open'
   const readLocked = () => localStorage.getItem(lockedKey) === 'true'
 
-  const [mode, setMode] = useState<'lock' | 'open'>(readMode)
-  const [locked, setLockedState] = useState<boolean>(readLocked)
-  const [text, setText] = useState(noteItem?.desc ?? '')
-  const [saved, setSaved] = useState(true)
-  const [showPw, setShowPw] = useState(false)
-  const [pwInput, setPwInput] = useState('')
-  const [pwError, setPwError] = useState('')
-  const [checking, setChecking] = useState(false)
+  const [mode,   setMode]         = useState<'lock'|'open'>(readMode)
+  const [locked, setLockedState]  = useState<boolean>(readLocked)
+  const [text,   setText]         = useState(noteItem?.desc ?? '')
+  const [saved,  setSaved]        = useState(true)
+  const [showPw, setShowPw]       = useState(false)
+  const [pwInput, setPwInput]     = useState('')
+  const [pwError, setPwError]     = useState('')
+  const [checking, setChecking]   = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-grow textarea
@@ -38,8 +38,8 @@ export default function NotesWidget({ sectionId }: Props) {
   }
   useEffect(() => { autoGrow() }, [text, locked])
 
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const timerRef   = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const lockTimer  = useRef<ReturnType<typeof setTimeout>|null>(null)
 
   const setLocked = (val: boolean) => {
     setLockedState(val)
@@ -168,10 +168,10 @@ export default function NotesWidget({ sectionId }: Props) {
           spellCheck={false}
           style={{
             width: '100%', background: 'transparent', border: 'none', outline: 'none',
-            resize: 'none', color: 'var(--silver)', fontSize: 13, lineHeight: '24px',
+            resize: 'none', color: 'var(--silver)', fontSize: 13, lineHeight: '28px',
             fontFamily: 'var(--font)', padding: '8px 12px',
             minHeight: 120, overflow: 'hidden',
-            backgroundImage: 'repeating-linear-gradient(transparent, transparent 23px, color-mix(in srgb, var(--border) 40%, transparent) 23px, color-mix(in srgb, var(--border) 40%, transparent) 24px)',
+            backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, color-mix(in srgb, var(--border) 35%, transparent) 27px, color-mix(in srgb, var(--border) 35%, transparent) 28px)',
             backgroundAttachment: 'local',
           }}
         />

@@ -51,8 +51,31 @@ function DetailInfo({ profile }: { profile: any }) {
 }
 
 // ── Tombol Ganti Password (icon kunci) ──────────────────────
-function ChangePwButton({ profileId, username }: { profileId?: string; username?: string }) {
+function ChangePwButton({ profileId, username, iconOnly }: { profileId?: string; username?: string; iconOnly?: boolean }) {
   const [open, setOpen] = useState(false)
+
+  if (iconOnly) return (
+    <div style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(v => !v)} style={{
+        width: 22, height: 22, borderRadius: 5,
+        background: open ? 'var(--accent-light)' : 'none',
+        border: open ? '1px solid var(--accent-soft)' : '1px solid var(--border)',
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 12, transition: 'all 150ms', color: open ? 'var(--accent)' : 'var(--silver3)',
+      }} title="Ganti Password">🔑</button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 28, left: 0, zIndex: 50, width: 280,
+          background: 'var(--bg2)', border: '1px solid var(--border2)',
+          borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+          overflow: 'hidden',
+        }}>
+          <ChangePasswordSection profileId={profileId} username={username} />
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div>
       <button onClick={() => setOpen(v => !v)} style={{
@@ -359,6 +382,8 @@ export default function ProfilePage({ onClose }: Props) {
                         {badge.label}
                       </span>
                     )}
+                    {/* 🔑 Ganti password inline */}
+                    <ChangePwButton profileId={profile?.id} username={profile?.username} iconOnly />
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--silver3)', marginTop: 3 }}>@{profile?.username}</div>
                 </div>
@@ -391,12 +416,6 @@ export default function ProfilePage({ onClose }: Props) {
                   </div>
                 )}
               </div>
-
-              {/* ── Ganti Password — icon kunci ── */}
-              <ChangePwButton profileId={profile?.id} username={profile?.username} />
-
-              {/* ── Detail info — collapsible ── */}
-              <DetailInfo profile={profile} />
 
               {/* Preview foto fullscreen */}
               {showAvatarPreview && profile?.avatar_url && (

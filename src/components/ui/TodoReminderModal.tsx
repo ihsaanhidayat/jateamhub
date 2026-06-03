@@ -7,10 +7,14 @@ const TODAY = () => new Date().toISOString().split('T')[0]
 const fmtTime = (ms: number) => new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 
 function getPendingTasks(sections: any[]): TodoItem[] {
-  const todoSection = sections.find((s: any) => s.widgetType === 'todo')
+  const todoSection = sections.find((s: any) =>
+    s.widgetType === 'todo' || (s as any).widgetType === 'todo'
+  )
   if (!todoSection) return []
   try {
-    const all: TodoItem[] = JSON.parse(todoSection.items?.[0]?.desc ?? '[]')
+    const raw = todoSection.items?.[0]?.desc
+    if (!raw) return []
+    const all: TodoItem[] = JSON.parse(raw)
     return all.filter(i => !i.done)
   } catch { return [] }
 }
@@ -28,12 +32,13 @@ export default function TodoReminderModal() {
     if (!isDataInitialized || !profile || shownOnLogin.current) return
     shownOnLogin.current = true
     const timer = setTimeout(() => {
-      const pending = getPendingTasks(useStore.getState().personalSections)
+      const sections = useStore.getState().personalSections
+      const pending = getPendingTasks(sections)
       if (pending.length > 0) {
         setItems(pending)
         setShow(true)
       }
-    }, 2500)
+    }, 3000)
     return () => clearTimeout(timer)
   }, [isDataInitialized, profile])
 

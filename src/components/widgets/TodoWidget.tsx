@@ -4,22 +4,22 @@ import { useAuthStore } from '../../store/authStore'
 import { saveTodoHistory } from '../../utils/supabaseClient'
 import type { TodoItem } from '../../types'
 
-const TODAY   = () => new Date().toISOString().split('T')[0]
+const TODAY = () => new Date().toISOString().split('T')[0]
 const fmtTime = (ms: number) => new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 const fmtDate = (d: string) => {
-  const [y,m,day] = d.split('-').map(Number)
-  return new Date(y,m-1,day).toLocaleDateString('id-ID', { weekday:'short', day:'numeric', month:'short' })
+  const [y, m, day] = d.split('-').map(Number)
+  return new Date(y, m - 1, day).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 const isOverdue = (i: TodoItem) => !i.done && i.date < TODAY()
 const isDueOver = (i: TodoItem) => {
   if (!i.dueTime || i.done || i.date !== TODAY()) return false
-  const [h,m] = i.dueTime.split(':').map(Number)
-  const due = new Date(); due.setHours(h,m,0,0); return due.getTime() < Date.now()
+  const [h, m] = i.dueTime.split(':').map(Number)
+  const due = new Date(); due.setHours(h, m, 0, 0); return due.getTime() < Date.now()
 }
 const isDueSoon = (i: TodoItem) => {
   if (!i.dueTime || i.done || i.date !== TODAY()) return false
-  const [h,m] = i.dueTime.split(':').map(Number)
-  const due = new Date(); due.setHours(h,m,0,0)
+  const [h, m] = i.dueTime.split(':').map(Number)
+  const due = new Date(); due.setHours(h, m, 0, 0)
   const d = due.getTime() - Date.now()
   return d > 0 && d < 30 * 60 * 1000
 }
@@ -29,12 +29,15 @@ async function saveTodoItems(sectionId: string, next: TodoItem[]) {
   const s = store.personalSections.find(s => s.id === sectionId)
   if (!s) return
   const overdueCount = next.filter(i => isOverdue(i)).length
-  const pendingCount = next.filter(i => !i.done).length
-  const subtitle = overdueCount > 0
-    ? `⚠️ ${overdueCount} terlambat · ${pendingCount} pending`
-    : pendingCount > 0
-    ? `${pendingCount} tugas pending`
-    : 'Semua selesai ✓'
+  const todayCount = next.filter(i => !i.done && !isOverdue(i)).length
+  const totalActive = next.filter(i => !i.done).length
+  const subtitle = overdueCount > 0 && todayCount > 0
+    ? `⚠️ ${overdueCount} terlambat · ${todayCount} hari ini`
+    : overdueCount > 0
+      ? `⚠️ ${overdueCount} terlambat`
+      : totalActive > 0
+        ? `${totalActive} tugas`
+        : 'Tidak ada tugas ✓'
   store.updatePersonalSection(sectionId, { subtitle })
   const json = JSON.stringify(next)
   if (s.items.length > 0) {
@@ -63,13 +66,13 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
   })
   const items: TodoItem[] = (() => { try { return rawDesc ? JSON.parse(rawDesc) : [] } catch { return [] } })()
 
-  const [confirmId,  setConfirmId]  = useState<string|null>(null)
-  const [editId,     setEditId]     = useState<string|null>(null)
-  const [editText,   setEditText]   = useState('')
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
   const [notifAsked, setNotifAsked] = useState(false)
-  const editRef      = useRef<HTMLInputElement>(null)
-  const confirmTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
-  const notifSent    = useRef(new Set<string>())
+  const editRef = useRef<HTMLInputElement>(null)
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const notifSent = useRef(new Set<string>())
 
   useEffect(() => {
     if (localStorage.getItem('todo-notif-asked')) setNotifAsked(true)
@@ -93,7 +96,12 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
   const toggleTask = async (id: string) => {
     const item = items.find(i => i.id === id)
     if (!item || !profile?.id) return
-    await saveTodoHistory(profile.id, [{ ...item, done: true, doneAt: Date.now() }], 'done')
+    const overdue = isOverdue(item)
+    await saveTodoHistory(
+      profile.id,
+      [{ ...item, done: true, doneAt: Date.now() }],
+      overdue ? 'overdue' : 'done'
+    )
     await saveTodoItems(sectionId, items.filter(i => i.id !== id))
   }
 
@@ -119,8 +127,8 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
     setNotifAsked(true); localStorage.setItem('todo-notif-asked', '1')
   }
 
-  const overdueItems = items.filter(i => isOverdue(i)).sort((a,b) => a.createdAt - b.createdAt)
-  const todayPending = items.filter(i => !i.done && !isOverdue(i)).sort((a,b) => a.createdAt - b.createdAt)
+  const overdueItems = items.filter(i => isOverdue(i)).sort((a, b) => a.createdAt - b.createdAt)
+  const todayPending = items.filter(i => !i.done && !isOverdue(i)).sort((a, b) => a.createdAt - b.createdAt)
 
   const iSt: React.CSSProperties = {
     height: 28, padding: '0 10px',
@@ -156,15 +164,16 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
                 onDoubleClick={() => startEdit(item)}>{item.text}</div>
             )}
             <div style={{ fontSize: 10, color: 'var(--silver4)', marginTop: 2, fontFamily: 'var(--mono)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {overdue && <span style={{ color: 'var(--red)', fontWeight: 700 }}>📅 {fmtDate(item.date)}</span>}
               <span>🕐 {fmtTime(item.createdAt)}</span>
-              {item.dueTime && <span style={{ color: dueOver ? 'var(--red)' : dueSoon ? '#F59E0B' : 'var(--silver4)' }}>⏰ {item.dueTime}{dueOver ? ' lewat!' : dueSoon ? ' segera!' : ''}</span>}
+              {item.dueTime && <span style={{ color: dueOver ? 'var(--red)' : dueSoon ? '#F59E0B' : 'var(--silver4)' }}>
+                ⏰ {item.date !== TODAY() ? fmtDate(item.date) + ' ' : ''}{item.dueTime}{dueOver ? ' lewat!' : dueSoon ? ' segera!' : ''}
+              </span>}
             </div>
           </div>
           {!isEditing && <button onClick={() => startEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px' }}
-            onMouseEnter={e=>(e.currentTarget.style.color='var(--accent)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--silver4)')}>✏️</button>}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver4)')}>✏️</button>}
           <button onClick={() => askDelete(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px' }}
-            onMouseEnter={e=>(e.currentTarget.style.color='var(--red)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--silver4)')}>✕</button>
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver4)')}>✕</button>
         </div>
         {isConfirm && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: 'var(--red-bg)', borderBottom: '1px solid var(--border)' }}>
@@ -187,7 +196,6 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
           )}
         </div>
       )}
-      {overdueItems.length > 0 && <Separator label={`Terlambat (${overdueItems.length})`} color="var(--red)" />}
       {overdueItems.map(renderItem)}
       {todayPending.length > 0 && overdueItems.length > 0 && <Separator label="Hari ini" color="var(--accent)" />}
       {todayPending.map(renderItem)}
@@ -202,16 +210,16 @@ export function TodoInputFooter({ sectionId }: { sectionId: string }) {
     return sec?.items?.[0]?.desc ?? ''
   })
   const items: TodoItem[] = (() => { try { return rawDesc ? JSON.parse(rawDesc) : [] } catch { return [] } })()
-  const [newText,    setNewText]    = useState('')
+  const [newText, setNewText] = useState('')
   const [newDueTime, setNewDueTime] = useState('')
-  const [showDue,    setShowDue]    = useState(false)
+  const [showDue, setShowDue] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const addTask = async () => {
     if (!newText.trim()) return
-    const task: TodoItem = { id: crypto.randomUUID(), text: newText.trim(), done: false, createdAt: Date.now(), date: TODAY(), dueTime: newDueTime || undefined }
+    const task: TodoItem = { id: crypto.randomUUID(), text: newText.trim(), done: false, createdAt: Date.now(), date: newDueDate || TODAY(), dueTime: newDueTime || undefined }
     await saveTodoItems(sectionId, [...items, task])
-    setNewText(''); setNewDueTime(''); setShowDue(false)
+    setNewText(''); setNewDueTime(''); setNewDueDate(''); setShowDue(false)
     inputRef.current?.focus()
   }
 
@@ -232,7 +240,14 @@ export function TodoInputFooter({ sectionId }: { sectionId: string }) {
         <button onClick={() => setShowDue(v => !v)} style={{ ...iSt, width: 32, padding: 0, flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: showDue ? 'var(--accent-light)' : 'var(--bg4)', color: showDue ? 'var(--accent)' : 'var(--silver4)', fontSize: 14 }}>⏰</button>
         <button onClick={addTask} disabled={!newText.trim()} style={{ ...iSt, width: 32, padding: 0, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: newText.trim() ? 'var(--accent)' : 'var(--bg4)', color: newText.trim() ? 'white' : 'var(--silver4)', cursor: newText.trim() ? 'pointer' : 'default', fontSize: 16 }}>+</button>
       </div>
-      {showDue && <input type="time" value={newDueTime} onChange={e => setNewDueTime(e.target.value)} style={{ ...iSt, width: '100%', marginTop: 6 }} />}
+      {showDue && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+          <input type="date" value={newDueDate} onChange={e => setNewDueDate(e.target.value)}
+            min={TODAY()} style={{ ...iSt, flex: 1 }} />
+          <input type="time" value={newDueTime} onChange={e => setNewDueTime(e.target.value)}
+            style={{ ...iSt, width: 90 }} />
+        </div>
+      )}
     </div>
   )
 }

@@ -226,14 +226,14 @@ export default memo(function SectionCard({
               }}>{section.items.length}</span>
             )}
             {/* Badge pending todo saat collapsed */}
-            {effectiveCollapsed && (section as any).widgetType === 'todo' && (() => {
+            {(section as any).widgetType === 'todo' && (() => {
               try {
                 const its = JSON.parse(section.items?.[0]?.desc ?? '[]')
                 const tod = new Date().toISOString().split('T')[0]
                 const ov = its.filter((i: any) => !i.done && i.date < tod).length
                 const pn = its.filter((i: any) => !i.done).length
-                if (ov > 0) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--red)', color: 'white', fontFamily: 'var(--mono)' }}>⚠️ {ov}</span>
-                if (pn > 0) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--accent)', color: 'white', fontFamily: 'var(--mono)' }}>{pn}</span>
+                if (ov > 0) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--red)', color: 'white', fontFamily: 'var(--mono)', animation: 'pulse 2s infinite' }}>⚠️ {ov}</span>
+                if (pn > 0 && effectiveCollapsed) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--accent)', color: 'white', fontFamily: 'var(--mono)' }}>{pn}</span>
               } catch {}
               return null
             })()}
