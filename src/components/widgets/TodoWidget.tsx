@@ -212,6 +212,7 @@ export function TodoInputFooter({ sectionId }: { sectionId: string }) {
   const items: TodoItem[] = (() => { try { return rawDesc ? JSON.parse(rawDesc) : [] } catch { return [] } })()
   const [newText, setNewText] = useState('')
   const [newDueTime, setNewDueTime] = useState('')
+  const [newDueDate, setNewDueDate] = useState('')
   const [showDue, setShowDue] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
