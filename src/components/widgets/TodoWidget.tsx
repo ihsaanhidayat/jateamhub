@@ -4,22 +4,22 @@ import { useAuthStore } from '../../store/authStore'
 import { saveTodoHistory } from '../../utils/supabaseClient'
 import type { TodoItem } from '../../types'
 
-const TODAY = () => new Date().toISOString().split('T')[0]
+const TODAY   = () => new Date().toISOString().split('T')[0]
 const fmtTime = (ms: number) => new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 const fmtDate = (d: string) => {
-  const [y, m, day] = d.split('-').map(Number)
-  return new Date(y, m - 1, day).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })
+  const [y,m,day] = d.split('-').map(Number)
+  return new Date(y,m-1,day).toLocaleDateString('id-ID', { weekday:'short', day:'numeric', month:'short' })
 }
 const isOverdue = (i: TodoItem) => !i.done && i.date < TODAY()
 const isDueOver = (i: TodoItem) => {
   if (!i.dueTime || i.done || i.date !== TODAY()) return false
-  const [h, m] = i.dueTime.split(':').map(Number)
-  const due = new Date(); due.setHours(h, m, 0, 0); return due.getTime() < Date.now()
+  const [h,m] = i.dueTime.split(':').map(Number)
+  const due = new Date(); due.setHours(h,m,0,0); return due.getTime() < Date.now()
 }
 const isDueSoon = (i: TodoItem) => {
   if (!i.dueTime || i.done || i.date !== TODAY()) return false
-  const [h, m] = i.dueTime.split(':').map(Number)
-  const due = new Date(); due.setHours(h, m, 0, 0)
+  const [h,m] = i.dueTime.split(':').map(Number)
+  const due = new Date(); due.setHours(h,m,0,0)
   const d = due.getTime() - Date.now()
   return d > 0 && d < 30 * 60 * 1000
 }
@@ -29,15 +29,15 @@ async function saveTodoItems(sectionId: string, next: TodoItem[]) {
   const s = store.personalSections.find(s => s.id === sectionId)
   if (!s) return
   const overdueCount = next.filter(i => isOverdue(i)).length
-  const todayCount = next.filter(i => !i.done && !isOverdue(i)).length
-  const totalActive = next.filter(i => !i.done).length
+  const todayCount   = next.filter(i => !i.done && !isOverdue(i)).length
+  const totalActive  = next.filter(i => !i.done).length
   const subtitle = overdueCount > 0 && todayCount > 0
     ? `⚠️ ${overdueCount} terlambat · ${todayCount} hari ini`
     : overdueCount > 0
-      ? `⚠️ ${overdueCount} terlambat`
-      : totalActive > 0
-        ? `${totalActive} tugas`
-        : 'Tidak ada tugas ✓'
+    ? `⚠️ ${overdueCount} terlambat`
+    : totalActive > 0
+    ? `${totalActive} tugas`
+    : 'Tidak ada tugas ✓'
   store.updatePersonalSection(sectionId, { subtitle })
   const json = JSON.stringify(next)
   if (s.items.length > 0) {
@@ -66,13 +66,13 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
   })
   const items: TodoItem[] = (() => { try { return rawDesc ? JSON.parse(rawDesc) : [] } catch { return [] } })()
 
-  const [confirmId, setConfirmId] = useState<string | null>(null)
-  const [editId, setEditId] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
+  const [confirmId,  setConfirmId]  = useState<string|null>(null)
+  const [editId,     setEditId]     = useState<string|null>(null)
+  const [editText,   setEditText]   = useState('')
   const [notifAsked, setNotifAsked] = useState(false)
-  const editRef = useRef<HTMLInputElement>(null)
-  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const notifSent = useRef(new Set<string>())
+  const editRef      = useRef<HTMLInputElement>(null)
+  const confirmTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const notifSent    = useRef(new Set<string>())
 
   useEffect(() => {
     if (localStorage.getItem('todo-notif-asked')) setNotifAsked(true)
@@ -93,16 +93,32 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
     return () => clearInterval(t)
   }, [items])
 
-  const toggleTask = async (id: string) => {
+  const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set())
+  const undoTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+
+  const toggleTask = (id: string) => {
     const item = items.find(i => i.id === id)
     if (!item || !profile?.id) return
-    const overdue = isOverdue(item)
-    await saveTodoHistory(
-      profile.id,
-      [{ ...item, done: true, doneAt: Date.now() }],
-      overdue ? 'overdue' : 'done'
-    )
-    await saveTodoItems(sectionId, items.filter(i => i.id !== id))
+    if (checkingIds.has(id)) return
+    setCheckingIds(prev => new Set([...prev, id]))
+    const timer = setTimeout(async () => {
+      const overdue = isOverdue(item)
+      await saveTodoHistory(
+        profile.id!,
+        [{ ...item, done: true, doneAt: Date.now() }],
+        overdue ? 'overdue' : 'done'
+      )
+      await saveTodoItems(sectionId, items.filter(i => i.id !== id))
+      setCheckingIds(prev => { const s = new Set(prev); s.delete(id); return s })
+      undoTimers.current.delete(id)
+    }, 1000)
+    undoTimers.current.set(id, timer)
+  }
+
+  const undoTask = (id: string) => {
+    const timer = undoTimers.current.get(id)
+    if (timer) { clearTimeout(timer); undoTimers.current.delete(id) }
+    setCheckingIds(prev => { const s = new Set(prev); s.delete(id); return s })
   }
 
   const startEdit = (item: TodoItem) => {
@@ -127,8 +143,8 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
     setNotifAsked(true); localStorage.setItem('todo-notif-asked', '1')
   }
 
-  const overdueItems = items.filter(i => isOverdue(i)).sort((a, b) => a.createdAt - b.createdAt)
-  const todayPending = items.filter(i => !i.done && !isOverdue(i)).sort((a, b) => a.createdAt - b.createdAt)
+  const overdueItems = items.filter(i => isOverdue(i)).sort((a,b) => a.createdAt - b.createdAt)
+  const todayPending = items.filter(i => !i.done && !isOverdue(i)).sort((a,b) => a.createdAt - b.createdAt)
 
   const iSt: React.CSSProperties = {
     height: 28, padding: '0 10px',
@@ -150,9 +166,12 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
         }}>
           <button onClick={() => toggleTask(item.id)} style={{
             width: 16, height: 16, borderRadius: 3, flexShrink: 0, marginTop: 3,
-            border: `1.5px solid ${overdue ? 'var(--red)' : dueOver ? '#F59E0B' : 'var(--border2)'}`,
-            background: 'none', cursor: 'pointer',
-          }} />
+            border: `1.5px solid ${checkingIds.has(item.id) ? 'var(--accent)' : overdue ? 'var(--red)' : dueOver ? '#F59E0B' : 'var(--border2)'}`,
+            background: checkingIds.has(item.id) ? 'var(--accent)' : 'none',
+            cursor: checkingIds.has(item.id) ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'white', fontSize: 9, transition: 'all 200ms',
+          }}>{checkingIds.has(item.id) ? '✓' : ''}</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             {isEditing ? (
               <input ref={editRef} value={editText} spellCheck={false}
@@ -160,26 +179,39 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
                 onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditId(null) }}
                 onBlur={saveEdit} style={{ ...iSt, width: '100%' }} />
             ) : (
-              <div style={{ fontSize: 13, lineHeight: 1.4, cursor: 'text', color: overdue ? 'var(--red)' : 'var(--silver)', fontWeight: overdue ? 600 : 400 }}
-                onDoubleClick={() => startEdit(item)}>{item.text}</div>
+              <div style={{
+                fontSize: 13, lineHeight: 1.5, cursor: 'text',
+                color: checkingIds.has(item.id) ? 'var(--silver4)' : overdue ? 'var(--red)' : 'var(--silver)',
+                fontWeight: overdue ? 600 : 400,
+                textDecoration: checkingIds.has(item.id) ? 'line-through' : 'none',
+                wordBreak: 'break-word', whiteSpace: 'normal',
+                transition: 'all 300ms',
+              }} onDoubleClick={() => startEdit(item)}>{item.text}</div>
             )}
-            <div style={{ fontSize: 10, color: 'var(--silver4)', marginTop: 2, fontFamily: 'var(--mono)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <span>🕐 {fmtTime(item.createdAt)}</span>
-              {item.dueTime && <span style={{ color: dueOver ? 'var(--red)' : dueSoon ? '#F59E0B' : 'var(--silver4)' }}>
-                ⏰ {item.date !== TODAY() ? fmtDate(item.date) + ' ' : ''}{item.dueTime}{dueOver ? ' lewat!' : dueSoon ? ' segera!' : ''}
-              </span>}
-            </div>
+            {(item.dueTime || item.date !== TODAY()) && (
+              <div style={{ fontSize: 10, color: 'var(--silver4)', marginTop: 2, fontFamily: 'var(--mono)', display: 'flex', gap: 6 }}>
+                {item.date !== TODAY() && <span style={{ color: overdue ? 'var(--red)' : 'var(--silver4)' }}>📅 {fmtDate(item.date)}</span>}
+                {item.dueTime && <span style={{ color: dueOver ? 'var(--red)' : dueSoon ? '#F59E0B' : 'var(--silver4)' }}>
+                  🕐 {item.dueTime}{dueOver ? ' ⚠️' : dueSoon ? ' !' : ''}
+                </span>}
+              </div>
+            )}
           </div>
-          {!isEditing && <button onClick={() => startEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver4)')}>✏️</button>}
-          <button onClick={() => askDelete(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver4)')}>✕</button>
+          {!isEditing && !checkingIds.has(item.id) && (
+            <>
+              <button onClick={() => startEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px', flexShrink: 0 }}
+                onMouseEnter={e=>(e.currentTarget.style.color='var(--accent)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--silver4)')}>✏️</button>
+              <button onClick={() => askDelete(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 11, padding: '2px 3px', flexShrink: 0 }}
+                onMouseEnter={e=>(e.currentTarget.style.color='var(--red)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--silver4)')}>✕</button>
+            </>
+          )}
         </div>
         {isConfirm && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: 'var(--red-bg)', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 34px', background: 'color-mix(in srgb, var(--red) 6%, var(--bg4))', borderBottom: '1px solid var(--border)' }}>
             <span style={{ fontSize: 11, color: 'var(--red)', flex: 1 }}>Hapus tugas ini?</span>
-            <button onClick={() => setConfirmId(null)} style={{ height: 22, padding: '0 8px', background: 'none', border: '1px solid var(--border2)', borderRadius: 5, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
-            <button onClick={async () => { await saveTodoItems(sectionId, items.filter(i => i.id !== item.id)); setConfirmId(null) }} style={{ height: 22, padding: '0 8px', background: 'var(--red)', border: 'none', borderRadius: 5, color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Hapus</button>
+            <button onClick={() => setConfirmId(null)} style={{ height: 20, padding: '0 7px', background: 'none', border: '1px solid var(--border2)', borderRadius: 4, color: 'var(--silver3)', fontSize: 10, cursor: 'pointer', fontFamily: 'var(--font)' }}>Tidak</button>
+            <button onClick={async () => { await saveTodoItems(sectionId, items.filter(i => i.id !== item.id)); setConfirmId(null) }}
+              style={{ height: 20, padding: '0 7px', background: 'var(--red)', border: 'none', borderRadius: 4, color: 'white', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Hapus</button>
           </div>
         )}
       </div>
@@ -210,43 +242,161 @@ export function TodoInputFooter({ sectionId }: { sectionId: string }) {
     return sec?.items?.[0]?.desc ?? ''
   })
   const items: TodoItem[] = (() => { try { return rawDesc ? JSON.parse(rawDesc) : [] } catch { return [] } })()
-  const [newText, setNewText] = useState('')
-  const [newDueTime, setNewDueTime] = useState('')
+
+
+  const [newText,    setNewText]    = useState('')
   const [newDueDate, setNewDueDate] = useState('')
-  const [showDue, setShowDue] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [newDueTime, setNewDueTime] = useState('')
+  const [showDate,   setShowDate]   = useState(false)
+  const [showTime,   setShowTime]   = useState(false)
+  const [escConfirm, setEscConfirm] = useState(false)
+  const taRef  = useRef<HTMLTextAreaElement>(null)
+  const escRef = useRef<ReturnType<typeof setTimeout>|null>(null)
 
   const addTask = async () => {
     if (!newText.trim()) return
-    const task: TodoItem = { id: crypto.randomUUID(), text: newText.trim(), done: false, createdAt: Date.now(), date: newDueDate || TODAY(), dueTime: newDueTime || undefined }
+    const task: TodoItem = {
+      id: crypto.randomUUID(), text: newText.trim(), done: false,
+      createdAt: Date.now(),
+      date: newDueDate || TODAY(),
+      dueTime: newDueTime || undefined,
+    }
     await saveTodoItems(sectionId, [...items, task])
-    setNewText(''); setNewDueTime(''); setNewDueDate(''); setShowDue(false)
-    inputRef.current?.focus()
+    reset()
   }
 
-  const iSt: React.CSSProperties = {
-    height: 32, padding: '0 10px', background: 'var(--bg4)',
-    border: '1px solid var(--border2)', borderRadius: 7, fontSize: 12,
-    color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none',
+  const reset = () => {
+    setNewText(''); setNewDueDate(''); setNewDueTime('')
+    setShowDate(false); setShowTime(false); setEscConfirm(false)
+    if (taRef.current) { taRef.current.style.height = '32px' }
   }
+
+  const handleEsc = () => {
+    if (!newText.trim() && !newDueDate && !newDueTime) return
+    setEscConfirm(true)
+    if (escRef.current) clearTimeout(escRef.current)
+    escRef.current = setTimeout(() => setEscConfirm(false), 4000)
+  }
+
+  const autoGrow = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 80) + 'px'
+    const isWide = el.scrollHeight > 38 || el.value.length > 30
+  }
+
+  const iBtnSt: React.CSSProperties = {
+    width: 32, height: 32, flexShrink: 0, borderRadius: 7,
+    border: '1px solid var(--border2)', background: 'var(--bg4)',
+    cursor: 'pointer', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', fontSize: 15, transition: 'all 150ms',
+  }
+
+  // Format time input — validate HH:MM 24h
+  const handleTimeChange = (val: string) => {
+    // Allow typing: filter non-numeric except ':'
+    const clean = val.replace(/[^0-9:]/g, '').slice(0, 5)
+    // Auto-insert colon after 2 digits
+    let formatted = clean
+    if (clean.length === 2 && !clean.includes(':') && newDueTime.length < 2) {
+      formatted = clean + ':'
+    }
+    setNewDueTime(formatted)
+  }
+
+  const timeValid = /^([01]\d|2[0-3]):([0-5]\d)$/.test(newDueTime)
 
   return (
     <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border)', background: 'var(--card-bg)' }}>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <input ref={inputRef} value={newText} spellCheck={false}
-          onChange={e => setNewText(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') addTask() }}
+      {/* Esc confirm dropdown */}
+      {escConfirm && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', marginBottom: 6,
+          background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 8,
+          animation: 'slideDown 150ms ease',
+        }}>
+          <span style={{ fontSize: 12, color: 'var(--silver2)', flex: 1 }}>Batalkan input?</span>
+          <button onClick={reset} style={{ height: 24, padding: '0 10px', background: 'var(--red)', border: 'none', borderRadius: 5, color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Ya</button>
+          <button onClick={() => { setEscConfirm(false); taRef.current?.focus() }} style={{ height: 24, padding: '0 10px', background: 'none', border: '1px solid var(--border2)', borderRadius: 5, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Tidak</button>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+        {/* Auto-expand textarea */}
+        <textarea
+          ref={taRef} value={newText} spellCheck={false} rows={1}
+          onChange={e => { setNewText(e.target.value); autoGrow(e.target) }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addTask() }
+            if (e.key === 'Escape') { e.preventDefault(); handleEsc() }
+          }}
           placeholder="Tambah tugas... (Enter)"
-          style={{ ...iSt, flex: 1 }} />
-        <button onClick={() => setShowDue(v => !v)} style={{ ...iSt, width: 32, padding: 0, flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: showDue ? 'var(--accent-light)' : 'var(--bg4)', color: showDue ? 'var(--accent)' : 'var(--silver4)', fontSize: 14 }}>⏰</button>
-        <button onClick={addTask} disabled={!newText.trim()} style={{ ...iSt, width: 32, padding: 0, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: newText.trim() ? 'var(--accent)' : 'var(--bg4)', color: newText.trim() ? 'white' : 'var(--silver4)', cursor: newText.trim() ? 'pointer' : 'default', fontSize: 16 }}>+</button>
+          style={{
+            flex: 1, padding: '7px 10px', background: 'var(--bg4)',
+            border: '1px solid var(--border2)', borderRadius: 7,
+            fontSize: 12, color: 'var(--silver)', fontFamily: 'var(--font)',
+            outline: 'none', resize: 'none', overflow: 'hidden',
+            minHeight: 32, lineHeight: '18px',
+          }}
+        />
+
+        {/* 📅 Calendar */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button onClick={() => { setShowDate(v => !v); setShowTime(false) }}
+            style={{ ...iBtnSt, color: newDueDate ? 'var(--accent)' : 'var(--silver4)', background: newDueDate ? 'var(--accent-light)' : 'var(--bg4)', border: `1px solid ${newDueDate ? 'var(--accent-soft)' : 'var(--border2)'}` }}
+            title="Pilih tanggal">📅</button>
+          {showDate && (
+            <div style={{ position: 'absolute', bottom: 36, right: 0, zIndex: 30, background: 'var(--card-bg)', border: '1px solid var(--border2)', borderRadius: 8, padding: '10px 12px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+              <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', marginBottom: 6 }}>Tanggal</div>
+              <input type="date" value={newDueDate} min={TODAY()}
+                onChange={e => { setNewDueDate(e.target.value); setShowDate(false) }}
+                onKeyDown={e => e.key === 'Escape' && setShowDate(false)}
+                style={{ height: 32, padding: '0 8px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 12, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none' }} />
+              {newDueDate && <button onClick={() => { setNewDueDate(''); setShowDate(false) }} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--silver4)', cursor: 'pointer', fontSize: 11 }}>✕</button>}
+            </div>
+          )}
+        </div>
+
+        {/* 🕐 Clock — manual HH:MM 24h */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button onClick={() => { setShowTime(v => !v); setShowDate(false) }}
+            style={{ ...iBtnSt, color: timeValid ? 'var(--accent)' : 'var(--silver4)', background: timeValid ? 'var(--accent-light)' : 'var(--bg4)', border: `1px solid ${timeValid ? 'var(--accent-soft)' : 'var(--border2)'}` }}
+            title="Pilih jam">🕐</button>
+          {showTime && (
+            <div style={{ position: 'absolute', bottom: 36, right: 0, zIndex: 30, background: 'var(--card-bg)', border: '1px solid var(--border2)', borderRadius: 8, padding: '10px 12px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', width: 140 }}>
+              <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', marginBottom: 6 }}>Jam (HH:MM, 24h)</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  value={newDueTime}
+                  onChange={e => handleTimeChange(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') setShowTime(false)
+                    if (e.key === 'Escape') { setNewDueTime(''); setShowTime(false) }
+                  }}
+                  placeholder="14:30"
+                  maxLength={5}
+                  autoFocus
+                  style={{ flex: 1, height: 32, padding: '0 8px', background: 'var(--bg4)', border: `1px solid ${timeValid || !newDueTime ? 'var(--border2)' : 'var(--red)'}`, borderRadius: 6, fontSize: 14, color: 'var(--silver)', fontFamily: 'var(--mono)', outline: 'none', letterSpacing: 1 }} />
+                {newDueTime && <button onClick={() => { setNewDueTime(''); setShowTime(false) }} style={{ background: 'none', border: 'none', color: 'var(--silver4)', cursor: 'pointer', fontSize: 12 }}>✕</button>}
+              </div>
+              {newDueTime && !timeValid && <div style={{ fontSize: 10, color: 'var(--red)', marginTop: 4 }}>Format: HH:MM</div>}
+            </div>
+          )}
+        </div>
+
+        {/* + Add */}
+        <button onClick={addTask} disabled={!newText.trim()} style={{
+          ...iBtnSt, fontSize: 18, border: 'none',
+          background: newText.trim() ? 'var(--accent)' : 'var(--bg4)',
+          color: newText.trim() ? 'white' : 'var(--silver4)',
+          cursor: newText.trim() ? 'pointer' : 'default',
+        }}>+</button>
       </div>
-      {showDue && (
-        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-          <input type="date" value={newDueDate} onChange={e => setNewDueDate(e.target.value)}
-            min={TODAY()} style={{ ...iSt, flex: 1 }} />
-          <input type="time" value={newDueTime} onChange={e => setNewDueTime(e.target.value)}
-            style={{ ...iSt, width: 90 }} />
+
+      {/* Due preview — hanya jika ada nilai */}
+      {(newDueDate || timeValid) && (
+        <div style={{ fontSize: 10, color: 'var(--accent)', fontFamily: 'var(--mono)', marginTop: 5, display: 'flex', gap: 8 }}>
+          {newDueDate && <span>📅 {newDueDate}</span>}
+          {timeValid && <span>🕐 {newDueTime}</span>}
         </div>
       )}
     </div>

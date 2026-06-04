@@ -1,96 +1,114 @@
 /* ═══════════════════════════════════════════════════════════════
-   JATEAMHUB THEME SYSTEM v4.0
-   Pearl (Light) + Slate (Dark)
-   Clean · Modern · Elegant
+   JATEAMHUB THEME SYSTEM v5.0
+   Lumina (Light) + Obsidian (Dark)
+   Premium · Refined · Minimal
 ═══════════════════════════════════════════════════════════════ */
 
-/* ── Pearl — Light Theme ─────────────────────────────────── */
+/* ── Lumina — Premium Light ─────────────────────────────── */
 :root, [data-theme="pearl"] {
-  --bg:          #F5F6FA;
+  /* Backgrounds — subtle cool white layering */
+  --bg:          #F4F6FB;
   --bg2:         #FFFFFF;
-  --bg3:         #FFFFFF;
-  --bg4:         #F0F1F5;
+  --bg3:         #FAFBFD;
+  --bg4:         #EEF0F6;
 
+  /* Cards */
   --card-bg:     #FFFFFF;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04);
-  --card-shadow-hover: 0 4px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+  --card-shadow: 0 1px 2px rgba(16,24,48,0.04), 0 4px 16px rgba(16,24,48,0.06);
+  --card-shadow-hover: 0 2px 8px rgba(16,24,48,0.06), 0 12px 32px rgba(16,24,48,0.10);
 
-  --border:      #E8E9EE;
-  --border2:     #D8DAE2;
+  /* Borders — almost invisible */
+  --border:      #E8EAF2;
+  --border2:     #D4D7E6;
 
-  --silver:      #0F1117;
-  --silver2:     #3A3D4A;
-  --silver3:     #6B7280;
-  --silver4:     #9CA3AF;
+  /* Typography */
+  --silver:      #0D1020;
+  --silver2:     #2D3142;
+  --silver3:     #6B7192;
+  --silver4:     #9EA3BE;
 
-  --accent:      #2563EB;
-  --accent-hover:#1D4ED8;
-  --accent-light:#EFF6FF;
-  --accent-soft: #DBEAFE;
+  /* Accent — Indigo */
+  --accent:      #5B5BD6;
+  --accent-hover:#4A4ABF;
+  --accent-light:#EDEDFB;
+  --accent-soft: #DDDDFB;
 
-  --green:       #16A34A;
-  --green-bg:    #F0FDF4;
-  /* mint aliases → pakai accent */
-  --mint-bg:     #EFF6FF;
-  --mint-bg2:    #DBEAFE;
-
-  --red:         #DC2626;
+  /* Semantic */
+  --green:       #0E9F6E;
+  --green-bg:    #ECFDF5;
+  --red:         #E02424;
   --red-bg:      #FEF2F2;
 
+  /* Typography */
   --font:        'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   --mono:        'JetBrains Mono', 'Fira Code', monospace;
 
-  --radius:      12px;
-  --radius-sm:   8px;
-  --radius-lg:   16px;
-  --radius-xl:   20px;
+  /* Radius — consistent scale */
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r:      10px;
+  --r-md:   12px;
+  --r-lg:   16px;
+  --r-xl:   20px;
 
-  --dur-fast:    120ms;
-  --dur-med:     220ms;
-  --ease:        cubic-bezier(0.16, 1, 0.3, 1);
+  /* Legacy aliases */
+  --radius:     10px;
+  --radius-sm:  6px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
 
-  --shadow:      0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04);
-  --shadow-lg:   0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  /* Motion */
+  --dur-fast:   100ms;
+  --dur-med:    200ms;
+  --ease:       cubic-bezier(0.16, 1, 0.3, 1);
 
-  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
-  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
-  --header-h: 68px;
+  /* Shadows */
+  --shadow:     0 1px 2px rgba(16,24,48,0.04), 0 4px 16px rgba(16,24,48,0.06);
+  --shadow-lg:  0 4px 6px rgba(16,24,48,0.05), 0 16px 48px rgba(16,24,48,0.12);
+  --shadow-xl:  0 8px 16px rgba(16,24,48,0.08), 0 32px 80px rgba(16,24,48,0.16);
+
+  /* Spacing */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
+  --sp-5:20px; --sp-6:24px; --sp-8:32px;
+  --header-h: 64px;
 
   color-scheme: light;
 }
 
-/* ── Slate — Dark Theme ──────────────────────────────────── */
+/* ── Obsidian — Premium Dark ────────────────────────────── */
 [data-theme="slate"] {
-  --bg:          #0F1117;
-  --bg2:         #1A1D27;
-  --bg3:         #1E2130;
-  --bg4:         #252836;
+  /* Backgrounds — deep navy-black */
+  --bg:          #080A12;
+  --bg2:         #0D1018;
+  --bg3:         #111520;
+  --bg4:         #181C2A;
 
-  --card-bg:     #1A1D27;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
-  --card-shadow-hover: 0 4px 20px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
+  /* Cards */
+  --card-bg:     #0D1018;
+  --card-shadow: 0 1px 1px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.3);
+  --card-shadow-hover: 0 2px 8px rgba(0,0,0,0.5), 0 12px 40px rgba(0,0,0,0.4);
 
-  --border:      #2A2D3E;
-  --border2:     #343748;
+  /* Borders */
+  --border:      #1A1F30;
+  --border2:     #242840;
 
-  --silver:      #F1F5F9;
-  --silver2:     #CBD5E1;
-  --silver3:     #94A3B8;
-  --silver4:     #64748B;
+  /* Typography */
+  --silver:      #ECF0FA;
+  --silver2:     #B8C2DC;
+  --silver3:     #7B86A8;
+  --silver4:     #4E5670;
 
-  --accent:      #3B82F6;
-  --accent-hover:#2563EB;
-  --accent-light:#1E3A5F;
-  --accent-soft: #1E3A5F;
+  /* Accent — Soft Indigo glow */
+  --accent:      #7B7BFA;
+  --accent-hover:#9090FB;
+  --accent-light:#16163A;
+  --accent-soft: #1E1E4A;
 
-  --green:       #4ADE80;
-  --green-bg:    #0F2A1A;
-  /* mint aliases → pakai accent */
-  --mint-bg:     #1E3A5F;
-  --mint-bg2:    #1E3A5F;
-
-  --red:         #F87171;
-  --red-bg:      #2D1515;
+  /* Semantic */
+  --green:       #34D399;
+  --green-bg:    #062016;
+  --red:         #FC6D6D;
+  --red-bg:      #200A0A;
 
   color-scheme: dark;
 }

@@ -7,12 +7,12 @@ import { uploadAvatar, updateProfile } from '../../utils/supabaseClient'
 import AvatarCropModal from '../ui/AvatarCropModal'
 
 interface Props {
-  onToggleOptions: () => void
-  optionsOpen: boolean
-  onOpenTaskList?: () => void
-  onOpenAdvanced: () => void
-  onAddSection: () => void
-  onImportLinks: () => void
+  onToggleOptions:  () => void
+  optionsOpen:      boolean
+  onOpenTaskList?:  () => void
+  onOpenAdvanced:  () => void
+  onAddSection:    () => void
+  onImportLinks:   () => void
 }
 
 export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks, onOpenTaskList }: Props) {
@@ -23,9 +23,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const { profile: session } = useAuthStore()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
-  const [cropDataUrl, setCropDataUrl] = useState<string | null>(null)
+  const [cropDataUrl,     setCropDataUrl]     = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
-  const hideSearch = useStore(s => (s as any).notesLockActive ?? false)
+  const hideSearch   = useStore(s => (s as any).notesLockActive ?? false)
   const [searchOpen, setSearchOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
@@ -92,11 +92,11 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  const isEditable = canEdit(session as any)
-  const showOptions = canSeeOptions(session as any)
+  const isEditable   = canEdit(session as any)
+  const showOptions  = canSeeOptions(session as any)
   const isAdminLevel = isAdmin(session as any)
-  const badge = getDisplayBadge(session as any)
-  const emoji = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
+  const badge        = getDisplayBadge(session as any)
+  const emoji        = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
 
 
 
@@ -151,12 +151,12 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   }
 
   const PREVIEW_OPTS = [
-    { value: null, label: 'Admin View' },
-    { value: '', label: 'User Umum' },
-    { value: 'pro', label: 'PRO' },
-    { value: 'cro', label: 'CRO' },
-    { value: 'klaim', label: 'Klaim' },
-    { value: 'ae', label: 'AE' },
+    { value: null,    label: 'Admin View' },
+    { value: '',      label: 'User Umum'  },
+    { value: 'pro',   label: 'PRO'        },
+    { value: 'cro',   label: 'CRO'        },
+    { value: 'klaim', label: 'Klaim'      },
+    { value: 'ae',    label: 'AE'         },
   ]
 
 

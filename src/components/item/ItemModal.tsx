@@ -108,10 +108,10 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
           />
         </div>
         <div>
-          <label style={lSt}>Deskripsi (opsional)</label>
+          <label style={lSt}>Teks popup (hover)</label>
           <input
             style={iSt} value={desc} onChange={e => setDesc(e.target.value)}
-            placeholder="Keterangan singkat"
+            placeholder="Tampil saat kursor diarahkan ke icon link..."
             onFocus={e => e.target.style.borderColor = 'var(--accent)'}
             onBlur={e  => e.target.style.borderColor = 'var(--border2)'}
           />

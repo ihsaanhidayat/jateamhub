@@ -13,10 +13,10 @@ import { useUserManagement, EMOJI_PRESETS } from '../../hooks/useUserManagement'
 function DetailInfo({ profile }: { profile: any }) {
   const [open, setOpen] = useState(false)
   const rows = [
-    { label: 'Username',  value: `@${profile?.username}` },
-    { label: 'Wilayah',   value: REGION_LABELS[profile?.region_scope] ?? profile?.region_scope ?? '—' },
-    { label: 'Unit',      value: UNIT_LABELS[profile?.unit_scope] ?? profile?.unit_scope ?? '—' },
-    { label: 'Role',      value: profile?.role ?? '—' },
+    { label: 'Username', value: `@${profile?.username}` },
+    { label: 'Wilayah', value: REGION_LABELS[profile?.region_scope] ?? profile?.region_scope ?? '—' },
+    { label: 'Unit', value: UNIT_LABELS[profile?.unit_scope] ?? profile?.unit_scope ?? '—' },
+    { label: 'Role', value: profile?.role ?? '—' },
   ]
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
@@ -55,25 +55,40 @@ function ChangePwButton({ profileId, username, iconOnly }: { profileId?: string;
   const [open, setOpen] = useState(false)
 
   if (iconOnly) return (
-    <div style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(v => !v)} style={{
+    <>
+      <button onClick={() => setOpen(true)} style={{
         width: 22, height: 22, borderRadius: 5,
-        background: open ? 'var(--accent-light)' : 'none',
-        border: open ? '1px solid var(--accent-soft)' : '1px solid var(--border)',
+        background: 'none', border: '1px solid var(--border)',
         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 12, transition: 'all 150ms', color: open ? 'var(--accent)' : 'var(--silver3)',
-      }} title="Ganti Password">🔑</button>
+        fontSize: 12, transition: 'all 150ms', color: 'var(--silver3)',
+      }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.color = 'var(--accent)' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.color = 'var(--silver3)' }}
+        title="Ganti Password">🔑</button>
       {open && (
         <div style={{
-          position: 'absolute', top: 28, left: 0, zIndex: 50, width: 280,
-          background: 'var(--bg2)', border: '1px solid var(--border2)',
-          borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-          overflow: 'hidden',
-        }}>
-          <ChangePasswordSection profileId={profileId} username={username} />
+          position: 'fixed', inset: 0, zIndex: 9000,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 20, animation: 'fadeIn 200ms ease',
+        }} onClick={() => setOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg3)', border: '1px solid var(--border2)',
+            borderRadius: 16, width: '100%', maxWidth: 360,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+            overflow: 'hidden', animation: 'scaleIn 200ms ease',
+          }}>
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>🔑 Ganti Password</div>
+              <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 16 }}>✕</button>
+            </div>
+            <div style={{ padding: '16px 20px 20px' }}>
+              <ChangePasswordSection profileId={profileId} username={username} onDone={() => setOpen(false)} defaultOpen={true} />
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   )
 
   return (
@@ -102,15 +117,15 @@ function ChangePwButton({ profileId, username, iconOnly }: { profileId?: string;
 }
 
 // ── Ganti Password Mandiri ────────────────────────────────────
-function ChangePasswordSection({ profileId, username }: { profileId?: string, username?: string }) {
-  const [open,      setOpen]      = useState(false)
-  const [oldPw,     setOldPw]     = useState('')
-  const [newPw,     setNewPw]     = useState('')
+function ChangePasswordSection({ profileId, username, onDone, defaultOpen }: { profileId?: string, username?: string, onDone?: () => void, defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen ?? false)
+  const [oldPw, setOldPw] = useState('')
+  const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
-  const [showPw,    setShowPw]    = useState(false)
-  const [err,       setErr]       = useState('')
-  const [loading,   setLoading]   = useState(false)
-  const [done,      setDone]      = useState(false)
+  const [showPw, setShowPw] = useState(false)
+  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [done, setDone] = useState(false)
 
   const handleChange = async () => {
     if (!oldPw) return setErr('Masukkan password lama.')
@@ -137,7 +152,7 @@ function ChangePasswordSection({ profileId, username }: { profileId?: string, us
       const data = await res.json()
       if (!res.ok || data.error) { setErr(data.error ?? 'Gagal ganti password.'); setLoading(false); return }
       setDone(true)
-      setTimeout(() => { setOpen(false); setDone(false); setOldPw(''); setNewPw(''); setConfirmPw('') }, 2000)
+      setTimeout(() => { setOpen(false); setDone(false); setOldPw(''); setNewPw(''); setConfirmPw(''); onDone?.() }, 2000)
     } catch { setErr('Koneksi gagal. Coba lagi.') }
     setLoading(false)
   }
@@ -189,12 +204,12 @@ interface Props { onClose: () => void }
 
 export default function ProfilePage({ onClose }: Props) {
   const { profile } = useAuthStore()
-  const { toast }   = useStore()
+  const { toast } = useStore()
 
   const um = useUserManagement()
   const { canManage, isSuperAdmin } = um
 
-  const [showAvatarMenu,    setShowAvatarMenu]    = useState(false)
+  const [showAvatarMenu, setShowAvatarMenu] = useState(false)
   const [showAvatarPreview, setShowAvatarPreview] = useState(false)
 
   // Tutup avatar menu saat klik di luar
@@ -207,10 +222,10 @@ export default function ProfilePage({ onClose }: Props) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showAvatarMenu])
-  const [siteTitle,    setSiteTitle]    = useState('')
+  const [siteTitle, setSiteTitle] = useState('')
   const [siteSubtitle, setSiteSubtitle] = useState('')
-  const [coffeeUrl,    setCoffeeUrl]    = useState('')
-  const [logoUrl,      setLogoUrl]      = useState('')
+  const [coffeeUrl, setCoffeeUrl] = useState('')
+  const [logoUrl, setLogoUrl] = useState('')
 
   const handleSaveSettings = async () => {
     // Simpan settings ke dashboard_config di Supabase
@@ -218,10 +233,10 @@ export default function ProfilePage({ onClose }: Props) {
     const CONFIG_ID = '00000000-0000-0000-0000-000000000001'
     const { data } = await supabase.from('dashboard_config').select('config').eq('id', CONFIG_ID).single()
     const cfg = (data?.config ?? {}) as Record<string, unknown>
-    cfg.title    = siteTitle
+    cfg.title = siteTitle
     cfg.subtitle = siteSubtitle
-    cfg.coffeeUrl= coffeeUrl
-    cfg.logoUrl  = logoUrl
+    cfg.coffeeUrl = coffeeUrl
+    cfg.logoUrl = logoUrl
     await supabase.from('dashboard_config').update({ config: cfg }).eq('id', CONFIG_ID)
     toast('Settings disimpan.', 'success')
   }
@@ -236,14 +251,14 @@ export default function ProfilePage({ onClose }: Props) {
 
   // Edit nama lengkap
   const [editingName, setEditingName] = useState(false)
-  const [nameValue,   setNameValue]   = useState(profile?.full_name || '')
-  const [nameSaving,  setNameSaving]  = useState(false)
+  const [nameValue, setNameValue] = useState(profile?.full_name || '')
+  const [nameSaving, setNameSaving] = useState(false)
 
   const handleSaveName = async () => {
     if (!profile || !nameValue.trim()) return
     setNameSaving(true)
     try {
-      const parts    = nameValue.trim().split(' ').filter(Boolean)
+      const parts = nameValue.trim().split(' ').filter(Boolean)
       const initials = parts.length >= 2
         ? (parts[0][0] + parts[1][0]).toUpperCase()
         : nameValue.slice(0, 2).toUpperCase()
@@ -342,7 +357,7 @@ export default function ProfilePage({ onClose }: Props) {
                   }}>
                     {profile?.avatar_url
                       ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : (profile?.full_name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') ?? profile?.username?.slice(0,2) ?? '?').toUpperCase()
+                      : (profile?.full_name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('') ?? profile?.username?.slice(0, 2) ?? '?').toUpperCase()
                     }
                   </div>
                   {showAvatarMenu && (
@@ -440,7 +455,7 @@ export default function ProfilePage({ onClose }: Props) {
                 </select>
                 <select value={um.filterUnit} onChange={e => { um.setFilterUnit(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Unit</option>
-                  {(UNITS as readonly {label: string; value: string}[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                  {(UNITS as readonly { label: string; value: string }[]).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                 </select>
                 <select value={um.filterRole} onChange={e => { um.setFilterRole(e.target.value); um.setPage(0) }} style={{ ...selectStyle, flex: 'none', width: 'auto' }}>
                   <option value="">Semua Role</option>
@@ -561,15 +576,15 @@ export default function ProfilePage({ onClose }: Props) {
               {/* User list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {um.pagedUsers.map(u => {
-                  const b       = um.getBadge(u)
-                  const isMe    = u.id === profile?.id
+                  const b = um.getBadge(u)
+                  const isMe = u.id === profile?.id
                   // Pastikan field scope tersedia untuk permission check
                   const currentUser = { ...profile, region_scope: (profile as any).region_scope ?? 'global', unit_scope: (profile as any).unit_scope ?? 'general' }
-                  const targetUser  = { ...u,       region_scope: u.region_scope ?? 'global',                unit_scope: u.unit_scope ?? 'general'                }
+                  const targetUser = { ...u, region_scope: u.region_scope ?? 'global', unit_scope: u.unit_scope ?? 'general' }
                   const canEdit_ = canManageUser(currentUser as any, targetUser as any)
-                  const region  = REGION_LABELS[u.region_scope ?? 'global'] ?? u.region_scope
-                  const unit    = UNIT_LABELS[u.unit_scope ?? 'general'] ?? u.unit_scope
-                  const emoji_  = u.emoji || u.avatar_emoji || ''
+                  const region = REGION_LABELS[u.region_scope ?? 'global'] ?? u.region_scope
+                  const unit = UNIT_LABELS[u.unit_scope ?? 'general'] ?? u.unit_scope
+                  const emoji_ = u.emoji || u.avatar_emoji || ''
 
                   return (
                     <div key={u.id} style={{
@@ -635,10 +650,10 @@ export default function ProfilePage({ onClose }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: 11, color: 'var(--silver3)', marginBottom: 4 }}>Pengaturan global — hanya superadmin</div>
               {[
-                { label: 'Site Title',              val: siteTitle,    set: setSiteTitle,    ph: 'JateamHub' },
-                { label: 'Subtitle / Greeting',     val: siteSubtitle, set: setSiteSubtitle, ph: 'Selamat datang, {username}' },
-                { label: 'Logo URL',                val: logoUrl,      set: setLogoUrl,      ph: 'https://...' },
-                { label: 'Coffee / Donasi URL',     val: coffeeUrl,    set: setCoffeeUrl,    ph: 'https://trakteer.id/...' },
+                { label: 'Site Title', val: siteTitle, set: setSiteTitle, ph: 'JateamHub' },
+                { label: 'Subtitle / Greeting', val: siteSubtitle, set: setSiteSubtitle, ph: 'Selamat datang, {username}' },
+                { label: 'Logo URL', val: logoUrl, set: setLogoUrl, ph: 'https://...' },
+                { label: 'Coffee / Donasi URL', val: coffeeUrl, set: setCoffeeUrl, ph: 'https://trakteer.id/...' },
               ].map(f => (
                 <div key={f.label}>
                   <label style={{ ...labelStyle, fontWeight: 700 }}>{f.label}</label>

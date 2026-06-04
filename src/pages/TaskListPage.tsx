@@ -1,60 +1,43 @@
-// ─────────────────────────────────────────────────────────────
-// TASK LIST PAGE — Riwayat semua todo yang sudah selesai/overdue
-// ─────────────────────────────────────────────────────────────
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useStore } from '../store/dashboardStore'
 import { getTodoHistory, supabase } from '../utils/supabaseClient'
 import type { TodoHistory, TodoItem } from '../types'
 
 interface Props { onClose: () => void }
+type Filter = 'all' | 'done' | 'overdue'
 
-type Filter = 'all' | 'done' | 'overdue' | 'week' | 'month'
-
-const fmtDateTime = (iso: string) => {
-  const d = new Date(iso)
-  return d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' }) +
-    ' ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-}
 const fmtDate = (d: string) => {
   const [y, m, day] = d.split('-').map(Number)
   return new Date(y, m - 1, day).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 }
+const fmtDuration = (createdAt: string, doneAt?: string | null) => {
+  if (!doneAt) return null
+  const ms = new Date(doneAt).getTime() - new Date(createdAt).getTime()
+  if (ms < 0) return null
+  const h = Math.floor(ms / 3600000)
+  if (h === 0) return '< 1 jam'
+  return `${h} jam`
+}
+const isLate = (h: TodoHistory) => {
+  if (!h.done_at || !h.due_date) return false
+  return new Date(h.done_at) > new Date(h.due_date + (h.due_date.includes('T') ? '' : 'T23:59:59'))
+}
 
 export default function TaskListPage({ onClose }: Props) {
   const { profile } = useAuthStore()
-  const [history, setHistory] = useState<TodoHistory[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<Filter>('all')
-  const [search, setSearch] = useState('')
-  const [undoing, setUndoing] = useState<string | null>(null)
+  const [history,  setHistory]  = useState<TodoHistory[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [filter,   setFilter]   = useState<Filter>('all')
+  const [search,   setSearch]   = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
-  const [page, setPage] = useState(1)
+  const [undoing,  setUndoing]  = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo,   setDateTo]   = useState('')
+  const [page,     setPage]     = useState(1)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const PAGE_SIZE = 10
-  const personalSections = useStore(s => s.personalSections)
-
-  const TODAY = new Date().toISOString().split('T')[0]
-
-  const exportCsv = () => {
-    const rows = [['No', 'Task', 'Due', 'Dibuat', 'Selesai', 'Status']]
-    filtered.forEach((h, i) => {
-      rows.push([
-        String(i + 1),
-        h.task_text,
-        h.due_date ?? '-',
-        new Date(h.created_at).toLocaleString('id-ID'),
-        h.done_at ? new Date(h.done_at).toLocaleString('id-ID') : '-',
-        h.status === 'done' ? 'Selesai' : 'Terlambat',
-      ])
-    })
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `todo-history-${new Date().toISOString().split('T')[0]}.csv`
-    a.click(); URL.revokeObjectURL(url)
-  }
 
   const loadHistory = () => {
     if (!profile?.id) return
@@ -64,56 +47,50 @@ export default function TaskListPage({ onClose }: Props) {
     })
   }
 
-  const toggleSelect = (id: string) => {
-    setSelected(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
+  useEffect(() => { loadHistory() }, [profile?.id])
+  useEffect(() => { setPage(1); setSelected(new Set()) }, [filter, search, dateFrom, dateTo])
 
-  const toggleSelectAll = () => {
-    if (selected.size === paginated.length) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(paginated.map(h => h.id)))
-    }
+  const filtered = useMemo(() => history.filter(h => {
+    if (filter === 'done'    && h.status !== 'done')    return false
+    if (filter === 'overdue' && h.status !== 'overdue') return false
+    if (dateFrom && h.date < dateFrom) return false
+    if (dateTo   && h.date > dateTo)   return false
+    if (search && !h.task_text.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  }), [history, filter, search, dateFrom, dateTo])
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const toggleSelect = (id: string) => setSelected(prev => {
+    const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s
+  })
+  const toggleAll = () => {
+    if (selected.size === paginated.length) setSelected(new Set())
+    else setSelected(new Set(paginated.map(h => h.id)))
   }
 
   const deleteSelected = async () => {
-    if (!selected.size) return
     setDeleting(true)
     await supabase.from('todo_history').delete().in('id', Array.from(selected))
-    setSelected(new Set())
-    setDeleting(false)
+    setSelected(new Set()); setDeleting(false); setConfirmDelete(false)
     loadHistory()
   }
 
-  useEffect(() => { loadHistory() }, [profile?.id])
-  useEffect(() => { setPage(1); setSelected(new Set()) }, [filter, search])
-
-  const handleUndo = async (h: TodoHistory) => {
-    if (!profile?.id) return
-    setUndoing(h.id)
-    // Hapus dari history
-    await supabase.from('todo_history').delete().eq('id', h.id)
-    // Kembalikan ke widget todo
+  const restoreSelected = async () => {
+    if (!profile?.id || !selected.size) return
+    setUndoing(true)
+    const toRestore = history.filter(h => selected.has(h.id))
+    await supabase.from('todo_history').delete().in('id', toRestore.map(h => h.id))
     const store = useStore.getState()
     const todoSection = store.personalSections.find((s: any) => s.widgetType === 'todo')
     if (todoSection) {
-      const existingItems: TodoItem[] = (() => {
-        try { return JSON.parse(todoSection.items?.[0]?.desc ?? '[]') } catch { return [] }
-      })()
-      const restored: TodoItem = {
-        id: crypto.randomUUID(),
-        text: h.task_text, done: false,
-        createdAt: new Date(h.created_at).getTime(),
-        date: h.date, dueTime: h.due_date ?? undefined,
-      }
-      const next = [...existingItems, restored]
-      // Update subtitle
-      const pendingCount = next.filter((i: TodoItem) => !i.done).length
-      store.updatePersonalSection(todoSection.id, { subtitle: `${0}/${next.length} selesai` })
+      const existing: TodoItem[] = (() => { try { return JSON.parse(todoSection.items?.[0]?.desc ?? '[]') } catch { return [] } })()
+      const restored: TodoItem[] = toRestore.map(h => ({
+        id: crypto.randomUUID(), text: h.task_text, done: false,
+        createdAt: Date.now(), date: h.date, dueTime: h.due_date ?? undefined,
+      }))
+      const next = [...existing, ...restored]
       const json = JSON.stringify(next)
       if (todoSection.items.length > 0) {
         store.updateItem(todoSection.id, todoSection.items[0].id, { ...todoSection.items[0], desc: json, title: 'todo-data' })
@@ -122,214 +99,173 @@ export default function TaskListPage({ onClose }: Props) {
       }
       await store.syncPersonalToDb()
     }
-    setUndoing(null)
-    loadHistory()
+    setSelected(new Set()); setUndoing(false); loadHistory()
   }
 
-  const filtered = history.filter(h => {
-    if (filter === 'done' && h.status !== 'done') return false
-    if (filter === 'overdue' && h.status !== 'overdue') return false
-    if (filter === 'week') {
-      const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
-      if (new Date(h.created_at) < weekAgo) return false
-    }
-    if (filter === 'month') {
-      const monthAgo = new Date(); monthAgo.setMonth(monthAgo.getMonth() - 1)
-      if (new Date(h.created_at) < monthAgo) return false
-    }
-    if (search && !h.task_text.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
-
-  const filterBtns: { key: Filter; label: string }[] = [
-    { key: 'all', label: 'Semua' },
-    { key: 'done', label: '✅ Selesai' },
-    { key: 'overdue', label: '⚠️ Terlambat' },
-    { key: 'week', label: 'Minggu ini' },
-    { key: 'month', label: 'Bulan ini' },
-  ]
-
-  // Reset page saat filter/search berubah
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const exportCsv = () => {
+    const rows = [['No','Task','Tanggal','Selesai','Durasi','Status']]
+    filtered.forEach((h, i) => {
+      rows.push([
+        String(i+1), h.task_text, fmtDate(h.date),
+        h.done_at ? new Date(h.done_at).toLocaleString('id-ID') : '-',
+        fmtDuration(h.created_at, h.done_at) ?? '-',
+        h.status === 'done' ? 'Selesai' : 'Terlambat',
+      ])
+    })
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `riwayat-tugas-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+  }
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 200,
-      background: 'var(--bg)', fontFamily: 'var(--font)',
+      position: 'fixed', inset: 0, zIndex: 500, background: 'var(--bg)',
       display: 'flex', flexDirection: 'column',
-      animation: 'fadeIn 200ms ease',
     }}>
       {/* Header */}
       <div style={{
-        height: 56, background: 'var(--bg2)', borderBottom: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12,
-        position: 'sticky', top: 0, zIndex: 10, flexShrink: 0,
+        height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 24px', borderBottom: '1px solid var(--border)',
+        background: 'var(--bg2)', flexShrink: 0,
       }}>
-        <button onClick={onClose} style={{
-          width: 34, height: 34, borderRadius: 8, background: 'var(--bg4)',
-          border: '1px solid var(--border2)', cursor: 'pointer', color: 'var(--silver2)',
-          fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>←</button>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--silver)', letterSpacing: -0.3 }}>
-            📋 Riwayat Task
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)', fontSize: 18, display: 'flex', alignItems: 'center' }}>←</button>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)' }}>Riwayat Tugas</div>
+            <div style={{ fontSize: 11, color: 'var(--silver4)' }}>{filtered.length} tugas</div>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--silver3)' }}>{history.length} task total</div>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={exportCsv} title="Export CSV" style={{
-            height: 32, padding: '0 12px', background: 'var(--bg4)',
-            border: '1px solid var(--border2)', borderRadius: 8,
-            color: 'var(--silver2)', fontSize: 11, fontWeight: 600,
-            cursor: 'pointer', fontFamily: 'var(--font)',
-            display: 'flex', alignItems: 'center', gap: 4,
-          }}>📥 Export</button>
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Cari task..." spellCheck={false}
-            style={{
-              height: 32, padding: '0 12px', background: 'var(--bg4)',
-              border: '1px solid var(--border2)', borderRadius: 8,
-              fontSize: 12, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none',
-              width: 180,
-            }} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={exportCsv} style={{ height: 32, padding: '0 12px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--silver3)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>📥 Export</button>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari..." spellCheck={false}
+            style={{ height: 32, padding: '0 10px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 8, fontSize: 12, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', width: 140 }} />
         </div>
       </div>
 
       {/* Filter bar */}
-      <div style={{
-        display: 'flex', gap: 6, padding: '10px 20px',
-        background: 'var(--bg2)', borderBottom: '1px solid var(--border)',
-        overflowX: 'auto', flexShrink: 0,
-      }}>
-        {filterBtns.map(f => (
-          <button key={f.key} onClick={() => setFilter(f.key)} style={{
-            height: 30, padding: '0 12px', borderRadius: 99, whiteSpace: 'nowrap',
-            background: filter === f.key ? 'var(--accent)' : 'var(--bg4)',
-            border: `1px solid ${filter === f.key ? 'var(--accent)' : 'var(--border2)'}`,
-            color: filter === f.key ? 'white' : 'var(--silver2)',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
-            transition: 'all 150ms',
-          }}>{f.label}</button>
+      <div style={{ padding: '10px 24px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
+        {(['all','done','overdue'] as Filter[]).map(f => (
+          <button key={f} onClick={() => setFilter(f)} style={{
+            height: 28, padding: '0 12px', borderRadius: 20, border: 'none',
+            background: filter === f ? 'var(--accent)' : 'var(--bg4)',
+            color: filter === f ? 'white' : 'var(--silver3)',
+            fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
+          }}>{f === 'all' ? 'Semua' : f === 'done' ? '✅ Selesai' : '⚠️ Terlambat'}</button>
         ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4 }}>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            style={{ height: 28, padding: '0 8px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 7, fontSize: 11, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none' }} />
+          <span style={{ fontSize: 11, color: 'var(--silver4)' }}>—</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            style={{ height: 28, padding: '0 8px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 7, fontSize: 11, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none' }} />
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(''); setDateTo('') }} style={{ height: 28, width: 28, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--silver4)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          )}
+        </div>
       </div>
 
       {/* Selection toolbar */}
       {selected.size > 0 && (
-        <div style={{
-          padding: '8px 20px', background: 'var(--accent-light)',
-          borderBottom: '1px solid var(--accent-soft)',
-          display: 'flex', alignItems: 'center', gap: 12,
-        }}>
-          <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
-            {selected.size} item dipilih
-          </span>
-          <button onClick={deleteSelected} disabled={deleting} style={{
-            height: 28, padding: '0 12px', background: 'var(--red)',
-            border: 'none', borderRadius: 7, color: 'white',
-            fontSize: 11, fontWeight: 700, cursor: 'pointer',
-            opacity: deleting ? 0.6 : 1,
-          }}>{deleting ? 'Menghapus...' : '🗑 Hapus yang dipilih'}</button>
-          <button onClick={() => setSelected(new Set())} style={{
-            height: 28, padding: '0 10px', background: 'none',
-            border: '1px solid var(--accent-soft)', borderRadius: 7,
-            color: 'var(--accent)', fontSize: 11, cursor: 'pointer',
-          }}>Batalkan pilihan</button>
+        <div style={{ padding: '8px 24px', background: 'var(--accent-light)', borderBottom: '1px solid var(--accent-soft)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, flex: 1 }}>{selected.size} dipilih</span>
+          <button onClick={restoreSelected} disabled={undoing} style={{ height: 28, padding: '0 12px', background: 'var(--accent)', border: 'none', borderRadius: 7, color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', opacity: undoing ? 0.6 : 1 }}>
+            {undoing ? '...' : '↩ Kembalikan'}
+          </button>
+          {confirmDelete ? (
+            <>
+              <span style={{ fontSize: 11, color: 'var(--red)' }}>Yakin hapus?</span>
+              <button onClick={deleteSelected} disabled={deleting} style={{ height: 28, padding: '0 10px', background: 'var(--red)', border: 'none', borderRadius: 7, color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Ya</button>
+              <button onClick={() => setConfirmDelete(false)} style={{ height: 28, padding: '0 10px', background: 'none', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer' }}>Tidak</button>
+            </>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} style={{ height: 28, padding: '0 12px', background: 'var(--red)', border: 'none', borderRadius: 7, color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>🗑 Hapus</button>
+          )}
+          <button onClick={() => setSelected(new Set())} style={{ height: 28, width: 28, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--silver3)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
         </div>
       )}
 
-      {/* Table */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 20px' }}>
+      {/* List */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--silver3)' }}>Memuat...</div>
+          <div style={{ textAlign: 'center', color: 'var(--silver4)', fontSize: 13, padding: 40 }}>Memuat...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--silver3)' }}>
+          <div style={{ textAlign: 'center', padding: 60 }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
-            <div style={{ fontSize: 13 }}>Tidak ada riwayat task</div>
+            <div style={{ fontSize: 13, color: 'var(--silver4)' }}>Tidak ada riwayat tugas</div>
           </div>
         ) : (
-          <table className="task-table" style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                <th style={{ padding: '8px 12px', width: 36 }}>
-                  <input type="checkbox"
-                    checked={selected.size === paginated.length && paginated.length > 0}
-                    onChange={toggleSelectAll}
-                    style={{ cursor: 'pointer' }} />
-                </th>
-                {['No', 'Task', 'Due Date', 'Dibuat', 'Selesai', 'Status', ''].map(h => (
-                  <th key={h} style={{
-                    padding: '8px 12px', textAlign: 'left', fontSize: 10,
-                    fontWeight: 700, color: 'var(--silver3)', fontFamily: 'var(--mono)',
-                    textTransform: 'uppercase', letterSpacing: '0.8px',
-                    whiteSpace: 'nowrap',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map((h, i) => (
-                <tr key={h.id} style={{
-                  borderBottom: '1px solid var(--border)',
-                  background: i % 2 === 0 ? 'transparent' : 'color-mix(in srgb, var(--bg4) 40%, transparent)',
-                  transition: 'background 120ms',
-                }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-light)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'color-mix(in srgb, var(--bg4) 40%, transparent)')}
-                >
-                  <td style={{ padding: '10px 12px', width: 36 }}>
-                    <input type="checkbox"
-                      checked={selected.has(h.id)}
-                      onChange={() => toggleSelect(h.id)}
-                      style={{ cursor: 'pointer' }} />
-                  </td>
-                  <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--silver4)', fontFamily: 'var(--mono)', width: 40 }}>{(page - 1) * PAGE_SIZE + i + 1}</td>
-                  <td style={{ padding: '10px 12px', fontSize: 13, color: 'var(--silver)', fontWeight: 500, maxWidth: 300 }}>
-                    <div>{h.task_text}</div>
-                    <div style={{ fontSize: 10, color: 'var(--silver4)', marginTop: 2 }}>
-                      {fmtDate(h.date)}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {/* Select all row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 12px', marginBottom: 2 }}>
+              <input type="checkbox" checked={selected.size === paginated.length && paginated.length > 0} onChange={toggleAll} style={{ cursor: 'pointer' }} />
+              <span style={{ fontSize: 10, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pilih semua halaman ini</span>
+            </div>
+            {paginated.map((h, i) => {
+              const late = isLate(h)
+              const dur = fmtDuration(h.created_at, h.done_at)
+              const overdue = h.status === 'overdue'
+              return (
+                <div key={h.id} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px',
+                  background: selected.has(h.id) ? 'var(--accent-light)' : 'var(--card-bg)',
+                  border: `1px solid ${selected.has(h.id) ? 'var(--accent-soft)' : 'var(--border)'}`,
+                  borderRadius: 10, cursor: 'pointer', transition: 'all 150ms',
+                }} onClick={() => toggleSelect(h.id)}>
+                  <input type="checkbox" checked={selected.has(h.id)} onChange={() => toggleSelect(h.id)}
+                    onClick={e => e.stopPropagation()} style={{ cursor: 'pointer', marginTop: 2, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, color: overdue ? 'var(--red)' : 'var(--silver)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{h.task_text}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 99, flexShrink: 0,
+                        background: overdue ? 'color-mix(in srgb, var(--red) 12%, transparent)' : 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                        color: overdue ? 'var(--red)' : 'var(--accent)',
+                      }}>{overdue ? '⚠️ Terlambat' : '✅ Selesai'}</span>
                     </div>
-                  </td>
-                  <td style={{ padding: '10px 12px', fontSize: 12, color: 'var(--silver3)', whiteSpace: 'nowrap' }}>
-                    {h.due_date ? fmtDate(h.due_date) : <span style={{ color: 'var(--silver4)' }}>—</span>}
-                  </td>
-                  <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--silver3)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>
-                    {fmtDateTime(h.created_at)}
-                  </td>
-                  <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--silver3)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>
-                    {h.done_at ? fmtDateTime(h.done_at) : <span style={{ color: 'var(--silver4)' }}>—</span>}
-                  </td>
-                  <td style={{ padding: '10px 12px' }}>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-                      fontFamily: 'var(--mono)', textTransform: 'uppercase',
-                      background: h.status === 'done' ? 'var(--accent-light)' : 'var(--red-bg)',
-                      color: h.status === 'done' ? 'var(--accent)' : 'var(--red)',
-                    }}>
-                      {h.status === 'done' ? '✅ Selesai' : '⚠️ Terlambat'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 12px' }}>
-                    {h.date === TODAY && (
-                      <button
-                        onClick={() => handleUndo(h)}
-                        disabled={undoing === h.id}
-                        style={{
-                          height: 26, padding: '0 10px', background: 'var(--bg4)',
-                          border: '1px solid var(--border2)', borderRadius: 6,
-                          color: 'var(--silver2)', fontSize: 11, cursor: 'pointer',
-                          fontFamily: 'var(--font)', opacity: undoing === h.id ? 0.5 : 1,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >{undoing === h.id ? '...' : '↩ Batalkan'}</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <div style={{ display: 'flex', gap: 12, marginTop: 5, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 10, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>📅 {fmtDate(h.date)}</span>
+                      {h.done_at && (
+                        <span style={{ fontSize: 10, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>
+                          ✓ {new Date(h.done_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                      {dur && (
+                        <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: late ? 'var(--red)' : 'var(--silver3)', fontWeight: late ? 700 : 400 }}>
+                          ⏱ {dur}{late ? ' (lewat)' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--silver4)', fontFamily: 'var(--mono)', flexShrink: 0, marginTop: 2 }}>#{(page-1)*PAGE_SIZE + i + 1}</span>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '12px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+          <button onClick={() => setPage(1)} disabled={page === 1} style={{ height: 30, padding: '0 10px', borderRadius: 7, border: '1px solid var(--border2)', background: 'none', cursor: page === 1 ? 'default' : 'pointer', color: page === 1 ? 'var(--silver4)' : 'var(--silver2)', fontSize: 12 }}>«</button>
+          <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1} style={{ height: 30, padding: '0 10px', borderRadius: 7, border: '1px solid var(--border2)', background: 'none', cursor: page === 1 ? 'default' : 'pointer', color: page === 1 ? 'var(--silver4)' : 'var(--silver2)', fontSize: 12 }}>‹</button>
+          {Array.from({ length: totalPages }, (_, i) => i+1)
+            .filter(p => p === 1 || p === totalPages || Math.abs(p-page) <= 1)
+            .reduce((acc: (number|string)[], p, idx, arr) => {
+              if (idx > 0 && (arr[idx-1] as number) < p-1) acc.push('...')
+              acc.push(p); return acc
+            }, [])
+            .map((p, idx) => typeof p === 'string'
+              ? <span key={idx} style={{ fontSize: 12, color: 'var(--silver4)', padding: '0 2px' }}>…</span>
+              : <button key={p} onClick={() => setPage(p as number)} style={{ height: 30, minWidth: 30, padding: '0 8px', borderRadius: 7, border: page === p ? '1px solid var(--accent)' : '1px solid var(--border2)', background: page === p ? 'var(--accent)' : 'none', color: page === p ? 'white' : 'var(--silver2)', cursor: 'pointer', fontSize: 12, fontWeight: page === p ? 700 : 400 }}>{p}</button>
+            )}
+          <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages} style={{ height: 30, padding: '0 10px', borderRadius: 7, border: '1px solid var(--border2)', background: 'none', cursor: page === totalPages ? 'default' : 'pointer', color: page === totalPages ? 'var(--silver4)' : 'var(--silver2)', fontSize: 12 }}>›</button>
+          <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={{ height: 30, padding: '0 10px', borderRadius: 7, border: '1px solid var(--border2)', background: 'none', cursor: page === totalPages ? 'default' : 'pointer', color: page === totalPages ? 'var(--silver4)' : 'var(--silver2)', fontSize: 12 }}>»</button>
+          <span style={{ fontSize: 11, color: 'var(--silver4)', marginLeft: 4 }}>{(page-1)*PAGE_SIZE + 1}–{Math.min(page*PAGE_SIZE, filtered.length)} / {filtered.length}</span>
+        </div>
+      )}
     </div>
   )
 }

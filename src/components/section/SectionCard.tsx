@@ -601,6 +601,22 @@ function FolderItem({ item, searchQuery, urlDescMatch, editMode, dragOver, appea
             boxShadow: '0 0 4px var(--accent)',
           }} />
         )}
+        {/* Custom tooltip untuk deskripsi */}
+        {item.desc && hovered && !editMode && (
+          <div style={{
+            position: 'absolute', bottom: '110%', left: '50%', transform: 'translateX(-50%)',
+            background: 'var(--bg2)', border: '1px solid var(--border2)',
+            borderRadius: 7, padding: '5px 9px', zIndex: 50, pointerEvents: 'none',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+            whiteSpace: 'nowrap', maxWidth: 200,
+            fontSize: 11, color: 'var(--silver2)', lineHeight: 1.4,
+            animation: 'fadeIn 150ms ease',
+            overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {item.desc}
+            <div style={{ position: 'absolute', bottom: -4, left: '50%', width: 8, height: 8, background: 'var(--bg2)', border: '1px solid var(--border2)', borderTop: 'none', borderLeft: 'none', transform: 'translateX(-50%) rotate(45deg)' }} />
+          </div>
+        )}
       </div>
 
       {showLabel && (
