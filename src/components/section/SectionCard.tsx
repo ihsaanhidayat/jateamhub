@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, memo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
@@ -8,29 +9,29 @@ import AppIcon from '../ui/AppIcon'
 import { sanitizeUrl } from '../../utils/security'
 
 interface Props {
-  section:              Section
-  isShared?:            boolean
-  canEdit?:             boolean
-  isFocused?:           boolean
-  isMobileView?:        boolean
-  dragHandleProps?:     Record<string, unknown>
-  widgetContent?:       React.ReactNode
-  widgetFooter?:        React.ReactNode
-  isExpanded?:          boolean                    // todo expanded state
-  onExpandTodo?:        () => void                 // toggle todo expand
-  onFocus?:             (id: string) => void
-  onEditSection:        (s: Section) => void
-  onEditItem:           (sectionId: string, item: LinkItem) => void
-  onAddItem:            (sectionId: string) => void
-  onDeleteSection:      (id: string) => void
-  onSave?:              () => void
-  onCancel?:            () => void
+  section: Section
+  isShared?: boolean
+  canEdit?: boolean
+  isFocused?: boolean
+  isMobileView?: boolean
+  dragHandleProps?: Record<string, unknown>
+  widgetContent?: React.ReactNode
+  widgetFooter?: React.ReactNode
+  isExpanded?: boolean                    // todo expanded state
+  onExpandTodo?: () => void                 // toggle todo expand
+  onFocus?: (id: string) => void
+  onEditSection: (s: Section) => void
+  onEditItem: (sectionId: string, item: LinkItem) => void
+  onAddItem: (sectionId: string) => void
+  onDeleteSection: (id: string) => void
+  onSave?: () => void
+  onCancel?: () => void
 }
 
 const DENSITY: Record<string, { body: string; gap: string; headerPad: string }> = {
-  compact:     { body: '4px',  gap: '2px',  headerPad: '7px 12px 7px 15px'  },
-  comfortable: { body: '6px',  gap: '4px',  headerPad: '9px 12px 9px 15px'  },
-  spacious:    { body: '12px', gap: '8px',  headerPad: '12px 14px 12px 17px' },
+  compact: { body: '4px', gap: '2px', headerPad: '7px 12px 7px 15px' },
+  comfortable: { body: '6px', gap: '4px', headerPad: '9px 12px 9px 15px' },
+  spacious: { body: '12px', gap: '8px', headerPad: '12px 14px 12px 17px' },
 }
 
 export default memo(function SectionCard({
@@ -42,21 +43,21 @@ export default memo(function SectionCard({
   onSave, onCancel,
 }: Props) {
   // Granular selectors — SectionCard hanya re-render saat data relevan berubah
-  const editMode      = useStore(s => s.editMode)
-  const searchQuery   = useStore(s => s.searchQuery)
+  const editMode = useStore(s => s.editMode)
+  const searchQuery = useStore(s => s.searchQuery)
   // Hanya field appearance yang dipakai SectionCard
   const itemDisplayMode = useStore(s => s.appearance.itemDisplayMode)
-  const folderGridCols  = useStore(s => s.appearance.folderGridCols)
-  const iconSize        = useStore(s => s.appearance.iconSize)
-  const faviconEnabled  = useStore(s => s.appearance.faviconEnabled)
-  const isSyncing     = useStore(s => s.isSyncing)
+  const folderGridCols = useStore(s => s.appearance.folderGridCols)
+  const iconSize = useStore(s => s.appearance.iconSize)
+  const faviconEnabled = useStore(s => s.appearance.faviconEnabled)
+  const isSyncing = useStore(s => s.isSyncing)
   const { moveItem, toggleCollapse, deleteItem, toast, syncPersonalToDb } = useStore()
 
   // Build appearance object dari fields (tidak trigger re-render untuk fields lain)
   const appearance = { itemDisplayMode, folderGridCols, iconSize, faviconEnabled } as AppearanceSettings
   const { profile: session } = useAuthStore()
-  const isAdmin  = isShared ? false : true
-  const canFocus  = editMode && !isShared
+  const isAdmin = isShared ? false : true
+  const canFocus = editMode && !isShared
 
   // Force re-render saat notes mode toggle dari header
   const [, forceRender] = useState(0)
@@ -70,7 +71,7 @@ export default memo(function SectionCard({
     open: boolean; type: 'section' | 'item'; itemId?: string; msg: string
   }>({ open: false, type: 'section', msg: '' })
 
-  const accent  = section.accentColor || 'var(--accent)'
+  const accent = section.accentColor || 'var(--accent)'
   const density = DENSITY[(appearance as any).sectionDensity ?? 'compact'] || DENSITY.compact
   const isFolderGrid = appearance.itemDisplayMode === 'folderGrid'
 
@@ -116,11 +117,11 @@ export default memo(function SectionCard({
   const q = searchQuery.toLowerCase()
   const filteredItems = q
     ? section.items.filter(i =>
-        i.title.toLowerCase().includes(q) ||
-        (i.desc  && i.desc.toLowerCase().includes(q))  ||
-        (i.url   && i.url.toLowerCase().includes(q))   ||
-        i.tags.some(t => t.toLowerCase().includes(q))
-      )
+      i.title.toLowerCase().includes(q) ||
+      (i.desc && i.desc.toLowerCase().includes(q)) ||
+      (i.url && i.url.toLowerCase().includes(q)) ||
+      i.tags.some(t => t.toLowerCase().includes(q))
+    )
     : section.items
 
   // Item yang match via url/desc saja (bukan title) — untuk badge dot
@@ -129,10 +130,10 @@ export default memo(function SectionCard({
       .filter(i =>
         !i.title.toLowerCase().includes(q) &&
         ((i.url && i.url.toLowerCase().includes(q)) ||
-         (i.desc && i.desc.toLowerCase().includes(q)))
+          (i.desc && i.desc.toLowerCase().includes(q)))
       )
       .map(i => i.id)
-    : []
+      : []
   )
 
   // Auto-expand saat ada search query yang match
@@ -166,348 +167,350 @@ export default memo(function SectionCard({
 
   return (
     <>
-    <div
-      className={`section-card${isFocused ? ' is-focused' : ''}${editMode && !isFocused ? ' is-blurred' : ''}`}
-      style={{
-        '--section-accent': accent,
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        ...(isFocused ? {
-          border: `1.5px solid ${accent === 'var(--accent)' ? 'var(--accent)' : accent}`,
-          boxShadow: `0 0 0 3px var(--accent-soft), var(--card-shadow-hover)`,
-          zIndex: 2,
-        } : {}),
-        transition: 'border 200ms var(--ease), box-shadow 200ms var(--ease), opacity 200ms var(--ease)',
-      } as React.CSSProperties}
-    >
-      {/* ── Header ─────────────────────────────────────── */}
       <div
-        className="section-header"
+        className={`section-card${isFocused ? ' is-focused' : ''}${editMode && !isFocused ? ' is-blurred' : ''}`}
         style={{
-          padding: density.headerPad,
-          cursor: canFocus ? 'pointer' : 'default',
-          alignItems: section.subtitle ? 'flex-start' : 'center',
-          // Header highlight saat focused
-          ...(isFocused ? { background: 'var(--accent-light)' } : {}),
-        }}
-        onClick={handleHeaderClick}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+          '--section-accent': accent,
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          ...(isFocused ? {
+            border: `1.5px solid ${accent === 'var(--accent)' ? 'var(--accent)' : accent}`,
+            boxShadow: `0 0 0 3px var(--accent-soft), var(--card-shadow-hover)`,
+            zIndex: 2,
+          } : {}),
+          transition: 'border 200ms var(--ease), box-shadow 200ms var(--ease), opacity 200ms var(--ease)',
+        } as React.CSSProperties}
       >
-        {/* Drag handle — tampil saat edit mode, pakai dnd-kit listeners */}
-        {editMode && dragHandleProps && (
-          <div
-            className="drag-handle"
-            {...dragHandleProps as any}
-            title="Seret untuk pindah"
-          >
-            <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
-              <circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/>
-              <circle cx="2" cy="7" r="1.5"/><circle cx="8" cy="7" r="1.5"/>
-              <circle cx="2" cy="12" r="1.5"/><circle cx="8" cy="12" r="1.5"/>
-            </svg>
-          </div>
-        )}
-
-        <span className="section-icon" style={{ marginTop: section.subtitle ? 1 : 0 }}>
-          {section.icon || '📁'}
-        </span>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div className="section-title">{section.title}</div>
-            {/* Badge item count untuk section biasa */}
-            {section.type !== 'widget' && section.items.length > 0 && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99,
-                background: 'var(--bg4)', color: 'var(--silver3)',
-                fontFamily: 'var(--mono)', border: '1px solid var(--border)',
-              }}>{section.items.length}</span>
-            )}
-            {/* Badge pending todo saat collapsed */}
-            {(section as any).widgetType === 'todo' && (() => {
-              try {
-                const its = JSON.parse(section.items?.[0]?.desc ?? '[]')
-                const tod = new Date().toISOString().split('T')[0]
-                const ov = its.filter((i: any) => !i.done && i.date < tod).length
-                const pn = its.filter((i: any) => !i.done).length
-                if (ov > 0) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--red)', color: 'white', fontFamily: 'var(--mono)', animation: 'pulse 2s infinite' }}>⚠️ {ov}</span>
-                if (pn > 0 && effectiveCollapsed) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--accent)', color: 'white', fontFamily: 'var(--mono)' }}>{pn}</span>
-              } catch {}
-              return null
-            })()}
-          </div>
-          {section.subtitle && (
-            <div style={{
-              fontSize: 11, color: 'var(--silver3)', fontWeight: 400,
-              marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>
-              {section.subtitle}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
-          {/* Focus tools — muncul saat section focused, hapus favourite */}
-          {isFocused && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {/* Edit section */}
-              <button
-                className="sec-action-btn-lg"
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); onEditSection(section) }}
-                title="Edit Section"
-              >⚙️</button>
-              {/* Hapus section */}
-              <button
-                className="sec-action-btn-lg danger"
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => {
-                  e.stopPropagation()
-                  setConfirmDel({ open: true, type: 'section',
-                    msg: `Hapus section "${section.title}" beserta semua item di dalamnya?` })
-                }}
-                title="Hapus Section"
-              >🗑</button>
+        {/* ── Header ─────────────────────────────────────── */}
+        <div
+          className="section-header"
+          style={{
+            padding: density.headerPad,
+            cursor: canFocus ? 'pointer' : 'default',
+            alignItems: section.subtitle ? 'flex-start' : 'center',
+            // Header highlight saat focused
+            ...(isFocused ? { background: 'var(--accent-light)' } : {}),
+          }}
+          onClick={handleHeaderClick}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Drag handle — tampil saat edit mode, pakai dnd-kit listeners */}
+          {editMode && dragHandleProps && (
+            <div
+              className="drag-handle"
+              {...dragHandleProps as any}
+              title="Seret untuk pindah"
+            >
+              <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                <circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" />
+                <circle cx="2" cy="7" r="1.5" /><circle cx="8" cy="7" r="1.5" />
+                <circle cx="2" cy="12" r="1.5" /><circle cx="8" cy="12" r="1.5" />
+              </svg>
             </div>
           )}
 
-          {/* Expand button — todo & notes */}
-          {((section as any).widgetType === 'todo' || (section as any).widgetType === 'notes') && onExpandTodo && !editMode && (
-            <button
-              className="sec-action-btn-lg"
-              onMouseDown={e => e.stopPropagation()}
-              onClick={e => { e.stopPropagation(); onExpandTodo() }}
-              title={isExpanded ? "Kecilkan" : "Perbesar"}
-              style={{ fontSize: 11 }}
-            >{isExpanded ? '⊟' : '⊞'}</button>
-          )}
+          <span className="section-icon" style={{ marginTop: section.subtitle ? 1 : 0 }}>
+            {section.icon || '📁'}
+          </span>
 
-          {/* Notes lock toggle in header */}
-          {(section as any).widgetType === 'notes' && !editMode && (() => {
-            const mk = `notes-mode-${session?.username ?? 'u'}-${section.id}`
-            const lk = `notes-locked-${session?.username ?? 'u'}-${section.id}`
-            const mode = localStorage.getItem(mk) ?? 'open'
-            const isLocked = localStorage.getItem(lk) === 'true'
-
-            const handleGembok = (e: React.MouseEvent) => {
-              e.stopPropagation()
-              if (mode === 'open') {
-                // 🔓 → switch ke lock mode, langsung kunci
-                localStorage.setItem(mk, 'lock')
-                localStorage.setItem(lk, 'true')
-                window.dispatchEvent(new Event('notes-mode-changed'))
-              } else if (mode === 'lock' && !isLocked) {
-                // 🔒 tapi sedang unlocked (setelah password) → kunci lagi
-                localStorage.setItem(lk, 'true')
-                window.dispatchEvent(new Event('notes-mode-changed'))
-              }
-              // 🔒 dan locked → TIDAK bisa buka dari sini, harus via password di widget
-            }
-
-            return (
-              <button onClick={handleGembok} style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 13, padding: '2px 4px', borderRadius: 4,
-              }} title={
-                mode === 'open' ? 'Kunci catatan' :
-                !isLocked ? 'Kunci kembali' : 'Terkunci — buka di dalam widget'
-              }>
-                {mode === 'lock' ? '🔒' : '🔓'}
-              </button>
-            )
-          })()}
-
-          {/* Collapse button — selalu ada */}
-          <button
-            className={`sec-collapse-btn${section.collapsed ? '' : ' open'}`}
-            onMouseDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); toggleCollapse(section.id) }}
-            title={section.collapsed ? "Buka Section" : "Tutup Section"}
-            aria-label={section.collapsed ? "Buka Section" : "Tutup Section"}
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* ── Body ─────────────────────────────────────────── */}
-      <div className={`section-body${effectiveCollapsed ? ' collapsed' : ''}`}>
-        {/* Empty state */}
-        {!widgetContent && filteredItems.length === 0 && !editMode && (
-          <div className="section-empty">
-            <span className="section-empty-icon">🔗</span>
-            <span className="section-empty-text">Belum ada link</span>
-          </div>
-        )}
-        {/* Widget content override */}
-        {widgetContent ? widgetContent : (isFolderGrid ? (
-          <div
-            className="folder-grid"
-            style={{ '--folder-cols': appearance.folderGridCols } as React.CSSProperties}
-            onDragOver={e => e.preventDefault()}
-            onDrop={e => {
-              e.preventDefault()
-              const raw = e.dataTransfer.getData('text/plain')
-              if (!raw.startsWith('item:')) return
-              const [, srcItemId, srcSectionId] = raw.split(':')
-              moveItem(srcSectionId, srcItemId, section.id)
-            }}
-          >
-            {filteredItems.map(item => (
-              <FolderItem
-                key={item.id}
-                item={item}
-                searchQuery={q}
-                urlDescMatch={urlDescMatchIds.has(item.id)}
-                editMode={editMode}
-                dragOver={itemDragOver === item.id}
-                appearance={appearance}
-                onDragStart={onItemDragStart}
-                onDragOver={onItemDragOver}
-                onDrop={onItemDrop}
-                onDragLeave={handleDragLeave}
-                onEdit={handleEditItem}
-                onDelete={handleDeleteItem}
-              />
-            ))}
-            {/* Ghost add item — saat section focused (desktop edit mode) */}
-            {isFocused && isAdmin && editMode && (
-              <GhostAddItem onClick={handleAddItem} />
-            )}
-            {/* Mobile: tombol tambah link selalu tampil untuk personal section */}
-            {isMobileView && !isShared && !editMode && (
-              <div
-                onClick={handleAddItem}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  gap: 2, cursor: 'pointer', padding: '8px 4px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1.5px dashed var(--border2)',
-                  color: 'var(--silver3)', fontSize: 18,
-                  minHeight: 48,
-                  transition: 'border-color 150ms, color 150ms',
-                }}
-              >
-                <span>＋</span>
-                <span style={{ fontSize: 9, fontWeight: 600 }}>Tambah</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="section-title">{section.title}</div>
+              {/* Badge item count untuk section biasa */}
+              {section.type !== 'widget' && section.items.length > 0 && (
+                <span style={{
+                  fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99,
+                  background: 'var(--bg4)', color: 'var(--silver3)',
+                  fontFamily: 'var(--mono)', border: '1px solid var(--border)',
+                }}>{section.items.length}</span>
+              )}
+              {/* Badge pending todo saat collapsed */}
+              {(section as any).widgetType === 'todo' && (() => {
+                try {
+                  const its = JSON.parse(section.items?.[0]?.desc ?? '[]')
+                  const tod = new Date().toISOString().split('T')[0]
+                  const ov = its.filter((i: any) => !i.done && i.date < tod).length
+                  const pn = its.filter((i: any) => !i.done).length
+                  if (ov > 0) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--red)', color: 'white', fontFamily: 'var(--mono)', animation: 'pulse 2s infinite' }}>⚠️ {ov}</span>
+                  if (pn > 0 && effectiveCollapsed) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--accent)', color: 'white', fontFamily: 'var(--mono)' }}>{pn}</span>
+                } catch { }
+                return null
+              })()}
+            </div>
+            {section.subtitle && (
+              <div style={{
+                fontSize: 11, color: 'var(--silver3)', fontWeight: 400,
+                marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {section.subtitle}
               </div>
             )}
           </div>
-        ) : (
-          <div
-            style={{ padding: density.body, display: 'flex', flexDirection: 'column', gap: density.gap }}
-            onDragOver={e => e.preventDefault()}
-            onDrop={onListDrop}
-          >
-            {filteredItems.map(item => (
-              <ListItem
-                key={item.id}
-                item={item}
-                searchQuery={q}
-                urlDescMatch={urlDescMatchIds.has(item.id)}
-                editMode={editMode}
-                appearance={appearance}
-                onEdit={handleEditItem}
-                onDelete={handleDeleteItem}
-              />
-            ))}
-            {/* Poin 12: tombol tambah link di list view saat focused (desktop) */}
-            {!!isFocused && isAdmin && editMode && (
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+            {/* Focus tools — muncul saat section focused, hapus favourite */}
+            {isFocused && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {/* Edit section */}
+                <button
+                  className="sec-action-btn-lg"
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); onEditSection(section) }}
+                  title="Edit Section"
+                >⚙️</button>
+                {/* Hapus section */}
+                <button
+                  className="sec-action-btn-lg danger"
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => {
+                    e.stopPropagation()
+                    setConfirmDel({
+                      open: true, type: 'section',
+                      msg: `Hapus section "${section.title}" beserta semua item di dalamnya?`
+                    })
+                  }}
+                  title="Hapus Section"
+                >🗑</button>
+              </div>
+            )}
+
+            {/* Expand button — todo & notes */}
+            {((section as any).widgetType === 'todo' || (section as any).widgetType === 'notes') && onExpandTodo && !editMode && (
               <button
+                className="sec-action-btn-lg"
                 onMouseDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); handleAddItem() }}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  gap: 6, height: 36, width: '100%',
-                  background: 'var(--accent-light)',
-                  border: '1px dashed var(--border2)',
-                  borderRadius: 'var(--radius-sm)',
-                  color: 'var(--accent)', fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'var(--font)',
-                }}>
-                ＋ Tambah Link
-              </button>
+                onClick={e => { e.stopPropagation(); onExpandTodo() }}
+                title={isExpanded ? "Kecilkan" : "Perbesar"}
+                style={{ fontSize: 11 }}
+              >{isExpanded ? '⊟' : '⊞'}</button>
             )}
-            {/* Mobile: tombol tambah link selalu tampil untuk personal section */}
-            {isMobileView && !isShared && !editMode && (
-              <button
-                onClick={handleAddItem}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  gap: 6, height: 36, width: '100%',
-                  background: 'none',
-                  border: '1.5px dashed var(--border2)',
-                  borderRadius: 'var(--radius-sm)',
-                  color: 'var(--silver3)', fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'var(--font)',
-                }}>
-                ＋ Tambah Link
-              </button>
-            )}
+
+            {/* Notes lock toggle in header */}
+            {(section as any).widgetType === 'notes' && !editMode && (() => {
+              const mk = `notes-mode-${session?.username ?? 'u'}-${section.id}`
+              const lk = `notes-locked-${session?.username ?? 'u'}-${section.id}`
+              const mode = localStorage.getItem(mk) ?? 'open'
+              const isLocked = localStorage.getItem(lk) === 'true'
+
+              const handleGembok = (e: React.MouseEvent) => {
+                e.stopPropagation()
+                if (mode === 'open') {
+                  // 🔓 → switch ke lock mode, langsung kunci
+                  localStorage.setItem(mk, 'lock')
+                  localStorage.setItem(lk, 'true')
+                  window.dispatchEvent(new Event('notes-mode-changed'))
+                } else if (mode === 'lock' && !isLocked) {
+                  // 🔒 tapi sedang unlocked (setelah password) → kunci lagi
+                  localStorage.setItem(lk, 'true')
+                  window.dispatchEvent(new Event('notes-mode-changed'))
+                }
+                // 🔒 dan locked → TIDAK bisa buka dari sini, harus via password di widget
+              }
+
+              return (
+                <button onClick={handleGembok} style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 13, padding: '2px 4px', borderRadius: 4,
+                }} title={
+                  mode === 'open' ? 'Kunci catatan' :
+                    !isLocked ? 'Kunci kembali' : 'Terkunci — buka di dalam widget'
+                }>
+                  {mode === 'lock' ? '🔒' : '🔓'}
+                </button>
+              )
+            })()}
+
+            {/* Collapse button — selalu ada */}
+            <button
+              className={`sec-collapse-btn${section.collapsed ? '' : ' open'}`}
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); toggleCollapse(section.id) }}
+              title={section.collapsed ? "Buka Section" : "Tutup Section"}
+              aria-label={section.collapsed ? "Buka Section" : "Tutup Section"}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
           </div>
-        ))}
-      </div>
-      {isFocused && isAdmin && (
-        <div style={{
-          display: 'flex', gap: 8, padding: '10px 12px',
-          borderTop: '1px solid var(--border)',
-          background: 'var(--accent-light)',
-          flexShrink: 0,
-        }}>
-          <button
-            onMouseDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onCancel?.() }}
-            style={{
-              flex: 1, height: 36, background: 'none',
-              border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)',
-              color: 'var(--silver3)', fontSize: 12, fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'var(--font)',
-            }}>Batal</button>
-          <button
-            onMouseDown={e => e.stopPropagation()}
-            onClick={async e => {
-              e.stopPropagation()
-              // Tunggu sync selesai dulu
-              await syncPersonalToDb()
-              onSave?.()
-            }}
-            disabled={isSyncing}
-            style={{
-              flex: 2, height: 36,
-              background: 'var(--accent)', border: 'none',
-              borderRadius: 'var(--radius-sm)',
-              color: 'white', fontSize: 12, fontWeight: 700,
-              cursor: isSyncing ? 'wait' : 'pointer', fontFamily: 'var(--font)',
-              opacity: isSyncing ? 0.7 : 1,
-            }}>{isSyncing ? '⏳ Menyimpan...' : '✓ Simpan'}</button>
         </div>
-      )}
-    </div>
 
-    {/* Widget footer — fix di bawah, tidak ikut scroll */}
-    {widgetFooter && !effectiveCollapsed && widgetFooter}
+        {/* ── Body ─────────────────────────────────────────── */}
+        <div className={`section-body${effectiveCollapsed ? ' collapsed' : ''}`}>
+          {/* Empty state */}
+          {!widgetContent && filteredItems.length === 0 && !editMode && (
+            <div className="section-empty">
+              <span className="section-empty-icon">🔗</span>
+              <span className="section-empty-text">Belum ada link</span>
+            </div>
+          )}
+          {/* Widget content override */}
+          {widgetContent ? widgetContent : (isFolderGrid ? (
+            <div
+              className="folder-grid"
+              style={{ '--folder-cols': appearance.folderGridCols } as React.CSSProperties}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => {
+                e.preventDefault()
+                const raw = e.dataTransfer.getData('text/plain')
+                if (!raw.startsWith('item:')) return
+                const [, srcItemId, srcSectionId] = raw.split(':')
+                moveItem(srcSectionId, srcItemId, section.id)
+              }}
+            >
+              {filteredItems.map(item => (
+                <FolderItem
+                  key={item.id}
+                  item={item}
+                  searchQuery={q}
+                  urlDescMatch={urlDescMatchIds.has(item.id)}
+                  editMode={editMode}
+                  dragOver={itemDragOver === item.id}
+                  appearance={appearance}
+                  onDragStart={onItemDragStart}
+                  onDragOver={onItemDragOver}
+                  onDrop={onItemDrop}
+                  onDragLeave={handleDragLeave}
+                  onEdit={handleEditItem}
+                  onDelete={handleDeleteItem}
+                />
+              ))}
+              {/* Ghost add item — saat section focused (desktop edit mode) */}
+              {isFocused && isAdmin && editMode && (
+                <GhostAddItem onClick={handleAddItem} />
+              )}
+              {/* Mobile: tombol tambah link selalu tampil untuk personal section */}
+              {isMobileView && !isShared && !editMode && (
+                <div
+                  onClick={handleAddItem}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 2, cursor: 'pointer', padding: '8px 4px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1.5px dashed var(--border2)',
+                    color: 'var(--silver3)', fontSize: 18,
+                    minHeight: 48,
+                    transition: 'border-color 150ms, color 150ms',
+                  }}
+                >
+                  <span>＋</span>
+                  <span style={{ fontSize: 9, fontWeight: 600 }}>Tambah</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div
+              style={{ padding: density.body, display: 'flex', flexDirection: 'column', gap: density.gap }}
+              onDragOver={e => e.preventDefault()}
+              onDrop={onListDrop}
+            >
+              {filteredItems.map(item => (
+                <ListItem
+                  key={item.id}
+                  item={item}
+                  searchQuery={q}
+                  urlDescMatch={urlDescMatchIds.has(item.id)}
+                  editMode={editMode}
+                  appearance={appearance}
+                  onEdit={handleEditItem}
+                  onDelete={handleDeleteItem}
+                />
+              ))}
+              {/* Poin 12: tombol tambah link di list view saat focused (desktop) */}
+              {!!isFocused && isAdmin && editMode && (
+                <button
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); handleAddItem() }}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    gap: 6, height: 36, width: '100%',
+                    background: 'var(--accent-light)',
+                    border: '1px dashed var(--border2)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--accent)', fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'var(--font)',
+                  }}>
+                  ＋ Tambah Link
+                </button>
+              )}
+              {/* Mobile: tombol tambah link selalu tampil untuk personal section */}
+              {isMobileView && !isShared && !editMode && (
+                <button
+                  onClick={handleAddItem}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    gap: 6, height: 36, width: '100%',
+                    background: 'none',
+                    border: '1.5px dashed var(--border2)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--silver3)', fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'var(--font)',
+                  }}>
+                  ＋ Tambah Link
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        {isFocused && isAdmin && (
+          <div style={{
+            display: 'flex', gap: 8, padding: '10px 12px',
+            borderTop: '1px solid var(--border)',
+            background: 'var(--accent-light)',
+            flexShrink: 0,
+          }}>
+            <button
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); onCancel?.() }}
+              style={{
+                flex: 1, height: 36, background: 'none',
+                border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)',
+                color: 'var(--silver3)', fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'var(--font)',
+              }}>Batal</button>
+            <button
+              onMouseDown={e => e.stopPropagation()}
+              onClick={async e => {
+                e.stopPropagation()
+                // Tunggu sync selesai dulu
+                await syncPersonalToDb()
+                onSave?.()
+              }}
+              disabled={isSyncing}
+              style={{
+                flex: 2, height: 36,
+                background: 'var(--accent)', border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                color: 'white', fontSize: 12, fontWeight: 700,
+                cursor: isSyncing ? 'wait' : 'pointer', fontFamily: 'var(--font)',
+                opacity: isSyncing ? 0.7 : 1,
+              }}>{isSyncing ? '⏳ Menyimpan...' : '✓ Simpan'}</button>
+          </div>
+        )}
+      </div>
 
-    {/* Confirm dialog */}
-    <ConfirmDialog
-      open={confirmDel.open}
-      title={confirmDel.type === 'section' ? 'Hapus Section' : 'Hapus Link'}
-      message={confirmDel.msg}
-      danger={true}
-      onConfirm={() => {
-        if (confirmDel.type === 'section') {
-          onDeleteSection(section.id)
-        } else if (confirmDel.type === 'item' && confirmDel.itemId) {
-          deleteItem(section.id, confirmDel.itemId)
-          toast('Link dihapus.', 'success')
-        }
-        setConfirmDel({ open: false, type: 'section', msg: '' })
-      }}
-      onCancel={() => setConfirmDel({ open: false, type: 'section', msg: '' })}
-    />
+      {/* Widget footer — fix di bawah, tidak ikut scroll */}
+      {widgetFooter && !effectiveCollapsed && widgetFooter}
+
+      {/* Confirm dialog */}
+      <ConfirmDialog
+        open={confirmDel.open}
+        title={confirmDel.type === 'section' ? 'Hapus Section' : 'Hapus Link'}
+        message={confirmDel.msg}
+        danger={true}
+        onConfirm={() => {
+          if (confirmDel.type === 'section') {
+            onDeleteSection(section.id)
+          } else if (confirmDel.type === 'item' && confirmDel.itemId) {
+            deleteItem(section.id, confirmDel.itemId)
+            toast('Link dihapus.', 'success')
+          }
+          setConfirmDel({ open: false, type: 'section', msg: '' })
+        }}
+        onCancel={() => setConfirmDel({ open: false, type: 'section', msg: '' })}
+      />
     </>
   )
 })
@@ -540,21 +543,22 @@ function GhostAddItem({ onClick }: { onClick: () => void }) {
 
 // ── Folder Item ───────────────────────────────────────────
 interface FolderItemProps {
-  item:        LinkItem
+  item: LinkItem
   searchQuery: string
-  editMode:    boolean
-  dragOver:    boolean
-  appearance:  AppearanceSettings
+  editMode: boolean
+  dragOver: boolean
+  appearance: AppearanceSettings
   onDragStart: (e: React.DragEvent, item: LinkItem) => void
-  onDragOver:  (e: React.DragEvent, id: string) => void
-  onDrop:      (e: React.DragEvent, id: string) => void
+  onDragOver: (e: React.DragEvent, id: string) => void
+  onDrop: (e: React.DragEvent, id: string) => void
   onDragLeave: () => void
-  onEdit:      (itemId: string) => void
-  onDelete:    (itemId: string, title: string) => void
+  onEdit: (itemId: string) => void
+  onDelete: (itemId: string, title: string) => void
 }
 
 function FolderItem({ item, searchQuery, urlDescMatch, editMode, dragOver, appearance, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete }: FolderItemProps & { urlDescMatch?: boolean }) {
   const [hovered, setHovered] = useState(false)
+  const [tipPos, setTipPos] = useState({ x: 0, y: 0 })
 
   const handleItemClick = (item: LinkItem, editMode: boolean) => {
     if (editMode) return
@@ -584,7 +588,7 @@ function FolderItem({ item, searchQuery, urlDescMatch, editMode, dragOver, appea
       onDrop={e => onDrop(e, item.id)}
       onDragLeave={onDragLeave}
       onClick={() => handleItemClick(item, editMode)}
-      onMouseEnter={() => setHovered(true)}
+      onMouseEnter={e => { setHovered(true); const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setTipPos({ x: r.left + r.width / 2, y: r.top }) }}
       onMouseLeave={() => setHovered(false)}
       aria-label={item.title}
       title={matchContext || undefined}
@@ -601,21 +605,33 @@ function FolderItem({ item, searchQuery, urlDescMatch, editMode, dragOver, appea
             boxShadow: '0 0 4px var(--accent)',
           }} />
         )}
-        {/* Custom tooltip untuk deskripsi */}
-        {item.desc && hovered && !editMode && (
+        {/* Tooltip via portal — bypass overflow:hidden dan transform parent */}
+        {item.desc && hovered && !editMode && createPortal(
           <div style={{
-            position: 'absolute', bottom: '110%', left: '50%', transform: 'translateX(-50%)',
-            background: 'var(--bg2)', border: '1px solid var(--border2)',
-            borderRadius: 7, padding: '5px 9px', zIndex: 50, pointerEvents: 'none',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
-            whiteSpace: 'nowrap', maxWidth: 200,
+            position: 'fixed',
+            left: tipPos.x,
+            top: tipPos.y - 8,
+            transform: 'translate(-50%, -100%)',
+            background: 'var(--bg2)',
+            border: '1px solid var(--border2)',
+            borderRadius: 7, padding: '5px 10px',
+            zIndex: 99999, pointerEvents: 'none',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            whiteSpace: 'nowrap', maxWidth: 240,
             fontSize: 11, color: 'var(--silver2)', lineHeight: 1.4,
-            animation: 'fadeIn 150ms ease',
-            overflow: 'hidden', textOverflow: 'ellipsis',
+            animation: 'fadeIn 120ms ease',
           }}>
             {item.desc}
-            <div style={{ position: 'absolute', bottom: -4, left: '50%', width: 8, height: 8, background: 'var(--bg2)', border: '1px solid var(--border2)', borderTop: 'none', borderLeft: 'none', transform: 'translateX(-50%) rotate(45deg)' }} />
-          </div>
+            <div style={{
+              position: 'absolute', bottom: -4, left: '50%',
+              width: 8, height: 8,
+              background: 'var(--bg2)',
+              border: '1px solid var(--border2)',
+              borderTop: 'none', borderLeft: 'none',
+              transform: 'translateX(-50%) rotate(45deg)',
+            }} />
+          </div>,
+          document.body
         )}
       </div>
 
@@ -650,12 +666,12 @@ function FolderItem({ item, searchQuery, urlDescMatch, editMode, dragOver, appea
 
 // ── List Item ─────────────────────────────────────────────
 interface ListItemProps {
-  item:        LinkItem
+  item: LinkItem
   searchQuery: string
-  editMode:    boolean
-  appearance:  AppearanceSettings
-  onEdit:      (itemId: string) => void
-  onDelete:    (itemId: string, title: string) => void
+  editMode: boolean
+  appearance: AppearanceSettings
+  onEdit: (itemId: string) => void
+  onDelete: (itemId: string, title: string) => void
 }
 
 function ListItem({ item, searchQuery, urlDescMatch, editMode, appearance, onEdit, onDelete }: ListItemProps & { urlDescMatch?: boolean }) {
