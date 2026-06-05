@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo, useMemo } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import { saveTodoHistory } from '../../utils/supabaseClient'
@@ -58,7 +58,7 @@ function Separator({ label, color }: { label: string; color: string }) {
   )
 }
 
-export default function TodoWidget({ sectionId }: { sectionId: string }) {
+function TodoWidgetImpl({ sectionId }: { sectionId: string }) {
   const { profile } = useAuthStore()
   const rawDesc = useStore(s => {
     const sec = s.personalSections.find(x => x.id === sectionId)
@@ -96,21 +96,29 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
   const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set())
   const undoTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
+  // Cleanup pending timers saat unmount
+  useEffect(() => () => {
+    undoTimers.current.forEach(t => clearTimeout(t))
+    undoTimers.current.clear()
+  }, [])
+
   const toggleTask = (id: string) => {
     const item = items.find(i => i.id === id)
-    if (!item || !profile?.id) return
+    const pid = profile?.id
+    if (!item || !pid) return
     if (checkingIds.has(id)) return
     setCheckingIds(prev => new Set([...prev, id]))
     const timer = setTimeout(async () => {
-      const overdue = isOverdue(item)
-      await saveTodoHistory(
-        profile.id!,
-        [{ ...item, done: true, doneAt: Date.now() }],
-        overdue ? 'overdue' : 'done'
-      )
-      await saveTodoItems(sectionId, items.filter(i => i.id !== id))
-      setCheckingIds(prev => { const s = new Set(prev); s.delete(id); return s })
-      undoTimers.current.delete(id)
+      try {
+        const overdue = isOverdue(item)
+        await saveTodoHistory(pid, [{ ...item, done: true, doneAt: Date.now() }], overdue ? 'overdue' : 'done')
+        await saveTodoItems(sectionId, items.filter(i => i.id !== id))
+      } catch (e) {
+        console.error('Toggle task failed:', e)
+      } finally {
+        setCheckingIds(prev => { const s = new Set(prev); s.delete(id); return s })
+        undoTimers.current.delete(id)
+      }
     }, 1000)
     undoTimers.current.set(id, timer)
   }
@@ -235,8 +243,11 @@ export default function TodoWidget({ sectionId }: { sectionId: string }) {
   )
 }
 
+const TodoWidget = memo(TodoWidgetImpl)
+export default TodoWidget
+
 // Input footer
-export function TodoInputFooter({ sectionId }: { sectionId: string }) {
+export const TodoInputFooter = memo(function TodoInputFooter({ sectionId }: { sectionId: string }) {
   const rawDesc = useStore(s => {
     const sec = s.personalSections.find(x => x.id === sectionId)
     return sec?.items?.[0]?.desc ?? ''
@@ -401,4 +412,4 @@ export function TodoInputFooter({ sectionId }: { sectionId: string }) {
       )}
     </div>
   )
-}
+})

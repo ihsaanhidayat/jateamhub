@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../utils/supabaseClient'
 
 interface Props { sectionId: string }
 
-export default function NotesWidget({ sectionId }: Props) {
+function NotesWidgetImpl({ sectionId }: Props) {
   const { personalSections, updateItem, addItem, syncPersonalToDb } = useStore()
   const setNotesLockActive = useStore(s => (s as any).setNotesLockActive)
   const { profile } = useAuthStore()
@@ -21,6 +21,15 @@ export default function NotesWidget({ sectionId }: Props) {
 
   const [mode,   setMode]         = useState<'lock'|'open'>(readMode)
   const [locked, setLockedState]  = useState<boolean>(readLocked)
+
+  // Re-read saat profile load (profile null saat mount → key pakai 'u' → salah)
+  useEffect(() => {
+    if (!profile?.username) return
+    const m = (localStorage.getItem(`notes-mode-${profile.username}-${sectionId}`) as 'lock'|'open') ?? 'open'
+    const l = localStorage.getItem(`notes-locked-${profile.username}-${sectionId}`) === 'true'
+    setMode(m)
+    setLockedState(l)
+  }, [profile?.username, sectionId])
   const [text,   setText]         = useState(noteItem?.desc ?? '')
   const [saved,  setSaved]        = useState(true)
   const [showPw, setShowPw]       = useState(false)
@@ -200,3 +209,5 @@ export default function NotesWidget({ sectionId }: Props) {
     </div>
   )
 }
+
+export default memo(NotesWidgetImpl)

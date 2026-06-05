@@ -128,7 +128,7 @@ input, textarea, select { font-family: var(--font); }
   gap: 14px; align-items: start;
 }
 .dashboard-grid {
-  padding: 20px;
+  padding: 16px 20px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   grid-auto-rows: min-content;
@@ -579,6 +579,18 @@ mark.hl { background: var(--accent-soft); color: var(--accent); border-radius: 3
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes loginSpin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+
+/* ══════════════════════════════════════════════════════════
+   Z-INDEX HIERARCHY (consistent)
+   - Header sticky: 100
+   - Profile dropdown: 200
+   - Tooltip portal: 9999
+   - Modal overlay: 9500
+   - Onboarding overlay: 9000
+   - Profile modal (lock): 9000
+   - Reminder modal: 9500
+══════════════════════════════════════════════════════════ */
 
 /* ══════════════════════════════════════════════════════════
    SKELETON LOADING

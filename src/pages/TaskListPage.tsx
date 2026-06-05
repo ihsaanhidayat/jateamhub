@@ -30,6 +30,11 @@ export default function TaskListPage({ onClose }: Props) {
   const [loading,  setLoading]  = useState(true)
   const [filter,   setFilter]   = useState<Filter>('all')
   const [search,   setSearch]   = useState('')
+  const [searchDebounced, setSearchDebounced] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(search), 200)
+    return () => clearTimeout(t)
+  }, [search])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
   const [undoing,  setUndoing]  = useState(false)
@@ -48,16 +53,17 @@ export default function TaskListPage({ onClose }: Props) {
   }
 
   useEffect(() => { loadHistory() }, [profile?.id])
-  useEffect(() => { setPage(1); setSelected(new Set()) }, [filter, search, dateFrom, dateTo])
+  useEffect(() => { setPage(1); setSelected(new Set()); setConfirmDelete(false) }, [filter, searchDebounced, dateFrom, dateTo])
+  useEffect(() => { setConfirmDelete(false) }, [selected])
 
   const filtered = useMemo(() => history.filter(h => {
     if (filter === 'done'    && h.status !== 'done')    return false
     if (filter === 'overdue' && h.status !== 'overdue') return false
     if (dateFrom && h.date < dateFrom) return false
     if (dateTo   && h.date > dateTo)   return false
-    if (search && !h.task_text.toLowerCase().includes(search.toLowerCase())) return false
+    if (searchDebounced && !h.task_text.toLowerCase().includes(searchDebounced.toLowerCase())) return false
     return true
-  }), [history, filter, search, dateFrom, dateTo])
+  }), [history, filter, searchDebounced, dateFrom, dateTo])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const CATEGORIES: { label: string; emojis: string[] }[] = [
   { label: '⭐ Umum', emojis: ['📋','📁','🔗','⭐','❤️','🎯','🔥','✅','📌','💡','🏠','⚡','🎨','🔒','📝','🗂️','📊','📈','🛠️','💼'] },
@@ -17,9 +17,24 @@ interface Props {
 
 export default function EmojiPicker({ value, onChange, onClose }: Props) {
   const [cat, setCat] = useState(0)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Close on outside click + Escape
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [onClose])
 
   return (
-    <div style={{
+    <div ref={ref} style={{
       position: 'absolute', top: '100%', left: 0, zIndex: 100, marginTop: 4,
       background: 'var(--card-bg)', border: '1px solid var(--border2)',
       borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.15)',

@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from "react"
 
 const DAYS = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu']
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
 
-export default function ClockWidget() {
+function ClockWidgetImpl() {
   const [now, setNow]       = useState(new Date())
   const [is24h, setIs24h]   = useState(true)
 
@@ -70,3 +70,5 @@ export default function ClockWidget() {
     </div>
   )
 }
+
+export default memo(ClockWidgetImpl)
