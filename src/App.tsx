@@ -17,6 +17,7 @@ const ImportLinksModal         = lazy(() => import('./components/ui/ImportLinksM
 const ForceChangePasswordModal = lazy(() => import('./components/ui/ForceChangePasswordModal'))
 const InstallPrompt             = lazy(() => import('./components/ui/InstallPrompt'))
 const TodoReminderModal         = lazy(() => import('./components/ui/TodoReminderModal'))
+const IdleSessionGuard          = lazy(() => import('./components/ui/IdleSessionGuard'))
 const TaskListPage              = lazy(() => import('./pages/TaskListPage'))
 import DashboardSkeleton from './components/ui/DashboardSkeleton'
 const OnboardingOverlay        = lazy(() => import('./components/ui/OnboardingOverlay'))
@@ -38,7 +39,18 @@ export default function App() {
   const [addSectionOpen, setAddSectionOpen] = useState(false)
   const [importLinksOpen, setImportLinksOpen] = useState(false)
   const [coffeeOpen,     setCoffeeOpen]     = useState(false)
-  const [taskListOpen,  setTaskListOpen]  = useState(false)
+  // Hash-based routing — persist across refresh
+  const [taskListOpen, setTaskListOpen] = useState(() => window.location.hash === '#tasks')
+
+  const openTaskList = () => { window.location.hash = 'tasks'; setTaskListOpen(true) }
+  const closeTaskList = () => { window.location.hash = ''; setTaskListOpen(false) }
+
+  // Listen to browser back/forward
+  useEffect(() => {
+    const handleHash = () => setTaskListOpen(window.location.hash === '#tasks')
+    window.addEventListener('hashchange', handleHash)
+    return () => window.removeEventListener('hashchange', handleHash)
+  }, [])
 
   // Edit state dari store
   const editingSection    = useStore(s => s.editingSection)
@@ -62,6 +74,24 @@ export default function App() {
       }
     } catch { /* ignore */ }
   }
+
+  // Force sync saat app background/close (mobile)
+  useEffect(() => {
+    const handleHide = () => {
+      const store = useStore.getState()
+      if (store.isDirty && !store.isSyncing) {
+        store.syncPersonalToDb().catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') handleHide()
+    })
+    window.addEventListener('pagehide', handleHide)
+    return () => {
+      document.removeEventListener('visibilitychange', handleHide)
+      window.removeEventListener('pagehide', handleHide)
+    }
+  }, [])
 
   // Init auth
   useEffect(() => { init() }, [])
@@ -166,20 +196,31 @@ export default function App() {
     }
   }, [profile?.id])
 
-  // Reset dashboardStore saat logout
+  // Reset dashboardStore saat logout (via state OR event broadcast)
   useEffect(() => {
     if (!profile) {
       const store = useStore.getState()
-      // Reset semua state dashboard
       store.setCurrentUserId('')
-      // Clear sync timer
-      if (store.isSyncing) {
-        useStore.setState({ isSyncing: false, isDirty: false, syncStatus: 'idle', isDataInitialized: false, personalSections: [], sharedSections: [] })
-      } else {
-        useStore.setState({ isDataInitialized: false, personalSections: [], sharedSections: [] })
-      }
+      useStore.setState({
+        isSyncing: false, isDirty: false, syncStatus: 'idle',
+        isDataInitialized: false, personalSections: [], sharedSections: [],
+        currentUserId: '', currentUserRole: '', currentRegion: 'global', currentUnit: 'general',
+      })
     }
   }, [profile])
+
+  // Listen logout broadcast — pastikan reset full
+  useEffect(() => {
+    const onLogout = () => {
+      useStore.setState({
+        isSyncing: false, isDirty: false, syncStatus: 'idle',
+        isDataInitialized: false, personalSections: [], sharedSections: [],
+        currentUserId: '', currentUserRole: '', currentRegion: 'global', currentUnit: 'general',
+      })
+    }
+    window.addEventListener('jateamhub-logout', onLogout)
+    return () => window.removeEventListener('jateamhub-logout', onLogout)
+  }, [])
 
   // Sync theme ke DOM
   // tema ditangani oleh Header theme toggle
@@ -241,7 +282,7 @@ export default function App() {
         onOpenAdvanced={() => setProfileOpen(true)}
         onAddSection={() => setAddSectionOpen(true)}
         onImportLinks={() => setImportLinksOpen(true)}
-        onOpenTaskList={() => setTaskListOpen(true)}
+        onOpenTaskList={openTaskList}
       />
 
       {/* Edit mode topbar — slim, di bawah header */}
@@ -329,9 +370,14 @@ export default function App() {
       </Suspense>
       {taskListOpen && (
         <Suspense fallback={null}>
-          <TaskListPage onClose={() => setTaskListOpen(false)} />
+          <TaskListPage onClose={closeTaskList} />
         </Suspense>
       )}
+      <Suspense fallback={null}>
+        <TodoReminderModal />
+        <IdleSessionGuard />
+        <InstallPrompt />
+      </Suspense>
       <ToastContainer />
     </div>
   )

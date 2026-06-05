@@ -49,22 +49,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   init: async () => {
     set({ loading: true })
 
-    // Safety timeout
     const safetyTimer = setTimeout(() => {
       if (!get().initialized) {
         set({ profile: null, loading: false, initialized: true })
       }
-    }, 5000)
+    }, 8000)
 
     try {
-      const { data: { session }, error } = await supabase.auth.getSession()
+      let { data: { session }, error } = await supabase.auth.getSession()
+
+      // Jika session ada tapi expired → coba refresh dulu
+      if (session && error) {
+        const { data: refreshData } = await supabase.auth.refreshSession()
+        session = refreshData.session
+      }
+
+      // Tidak ada session sama sekali → jangan langsung logout,
+      // coba ambil user aktif dulu (handles mobile reopen)
+      if (!session) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: refreshData } = await supabase.auth.refreshSession()
+          session = refreshData.session
+        }
+      }
+
       clearTimeout(safetyTimer)
 
-      if (error || !session?.user) {
+      if (!session?.user) {
         set({ profile: null, loading: false, initialized: true })
       } else {
         const profile = await getProfile(session.user.id)
-        set({ profile, loading: false, initialized: true })
+        set({ profile: profile ?? null, loading: false, initialized: true })
       }
     } catch {
       clearTimeout(safetyTimer)
@@ -133,6 +149,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Reset state — initialized tetap true agar langsung ke login page
     set({ profile: null, users: [], _usersLoaded: false })
     localStorage.removeItem('jateamhub-personal')
+    // Dispatch event untuk reset dashboardStore + components lain
+    window.dispatchEvent(new Event('jateamhub-logout'))
     // Sign out Supabase + re-setup listener
     signOut().catch(() => {}).finally(() => {
       // Setup listener baru untuk login berikutnya
