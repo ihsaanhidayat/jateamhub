@@ -339,7 +339,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                 style={{
                   opacity: sectionMatches(section) ? 1 : 0.2,
                   transition: 'opacity 200ms',
-                  gridColumn: expandedWidgetId === section.id ? 'span 2' : undefined,
+                  gridColumn: (expandedWidgetId === section.id && !isMobile) ? 'span 2' : undefined,
                 }}
               >
                 <SortableSectionCard
@@ -385,6 +385,48 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
         </DragOverlay>
       </DndContext>
 
+      {/* Mobile full-screen expand modal */}
+      {isMobile && expandedWidgetId && (() => {
+        const sec = personalSections.find(s => s.id === expandedWidgetId)
+        if (!sec) return null
+        const isTodo  = (sec as any).widgetType === 'todo'
+        const isNotes = (sec as any).widgetType === 'notes'
+        return (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 300,
+            background: 'var(--card-bg)',
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideUp 250ms cubic-bezier(0.16,1,0.3,1)',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '12px 16px', borderBottom: '1px solid var(--border)',
+              flexShrink: 0,
+            }}>
+              <button onClick={() => setExpandedWidgetId(null)} style={{
+                width: 34, height: 34, borderRadius: 8,
+                background: 'var(--bg4)', border: '1px solid var(--border2)',
+                cursor: 'pointer', color: 'var(--silver3)', fontSize: 18,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>←</button>
+              <span style={{ fontSize: 20 }}>{sec.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {sec.title}
+                </div>
+                {sec.subtitle && (
+                  <div style={{ fontSize: 11, color: 'var(--silver3)', marginTop: 1 }}>{sec.subtitle}</div>
+                )}
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+              {isTodo  && <TodoWidget  sectionId={expandedWidgetId} />}
+              {isNotes && <NotesWidget sectionId={expandedWidgetId} />}
+            </div>
+            {isTodo && <TodoInputFooter sectionId={expandedWidgetId} />}
+          </div>
+        )
+      })()}
     </div>
   )
 }
