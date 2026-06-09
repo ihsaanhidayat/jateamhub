@@ -258,10 +258,10 @@ export const TodoInputFooter = memo(function TodoInputFooter({ sectionId }: { se
   const [newText,    setNewText]    = useState('')
   const [newDueDate, setNewDueDate] = useState('')
   const [newDueTime, setNewDueTime] = useState('')
-  const [showDate,   setShowDate]   = useState(false)
-  const [showTime,   setShowTime]   = useState(false)
   const [escConfirm, setEscConfirm] = useState(false)
-  const taRef  = useRef<HTMLTextAreaElement>(null)
+  const taRef      = useRef<HTMLTextAreaElement>(null)
+  const dateInputRef = useRef<HTMLInputElement>(null)
+  const timeInputRef = useRef<HTMLInputElement>(null)
   const escRef = useRef<ReturnType<typeof setTimeout>|null>(null)
 
   const addTask = () => {
@@ -278,7 +278,7 @@ export const TodoInputFooter = memo(function TodoInputFooter({ sectionId }: { se
 
   const reset = () => {
     setNewText(''); setNewDueDate(''); setNewDueTime('')
-    setShowDate(false); setShowTime(false); setEscConfirm(false)
+    setEscConfirm(false)
     if (taRef.current) { taRef.current.style.height = '32px' }
   }
 
@@ -292,7 +292,6 @@ export const TodoInputFooter = memo(function TodoInputFooter({ sectionId }: { se
   const autoGrow = (el: HTMLTextAreaElement) => {
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 80) + 'px'
-    const isWide = el.scrollHeight > 38 || el.value.length > 30
   }
 
   const iBtnSt: React.CSSProperties = {
@@ -302,19 +301,7 @@ export const TodoInputFooter = memo(function TodoInputFooter({ sectionId }: { se
     justifyContent: 'center', fontSize: 15, transition: 'all 150ms',
   }
 
-  // Format time input — validate HH:MM 24h
-  const handleTimeChange = (val: string) => {
-    // Allow typing: filter non-numeric except ':'
-    const clean = val.replace(/[^0-9:]/g, '').slice(0, 5)
-    // Auto-insert colon after 2 digits
-    let formatted = clean
-    if (clean.length === 2 && !clean.includes(':') && newDueTime.length < 2) {
-      formatted = clean + ':'
-    }
-    setNewDueTime(formatted)
-  }
-
-  const timeValid = /^([01]\d|2[0-3]):([0-5]\d)$/.test(newDueTime)
+  const timeValid = newDueTime.length > 0
 
   return (
     <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border)', background: 'var(--card-bg)' }}>
@@ -350,48 +337,39 @@ export const TodoInputFooter = memo(function TodoInputFooter({ sectionId }: { se
           }}
         />
 
-        {/* 📅 Calendar */}
+        {/* 📅 Calendar — instant native picker */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          <button onClick={() => { setShowDate(v => !v); setShowTime(false) }}
-            style={{ ...iBtnSt, color: newDueDate ? 'var(--accent)' : 'var(--silver4)', background: newDueDate ? 'var(--accent-light)' : 'var(--bg4)', border: `1px solid ${newDueDate ? 'var(--accent-soft)' : 'var(--border2)'}` }}
-            title="Pilih tanggal">📅</button>
-          {showDate && (
-            <div style={{ position: 'absolute', bottom: 36, right: 0, zIndex: 30, background: 'var(--card-bg)', border: '1px solid var(--border2)', borderRadius: 8, padding: '10px 12px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-              <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', marginBottom: 6 }}>Tanggal</div>
-              <input type="date" value={newDueDate} min={TODAY()}
-                onChange={e => { setNewDueDate(e.target.value); setShowDate(false) }}
-                onKeyDown={e => e.key === 'Escape' && setShowDate(false)}
-                style={{ height: 32, padding: '0 8px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 12, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none' }} />
-              {newDueDate && <button onClick={() => { setNewDueDate(''); setShowDate(false) }} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--silver4)', cursor: 'pointer', fontSize: 11 }}>✕</button>}
-            </div>
-          )}
+          <button
+            onClick={() => dateInputRef.current?.showPicker?.()}
+            style={{ ...iBtnSt, color: newDueDate ? 'var(--accent)' : 'var(--silver3)', background: newDueDate ? 'var(--accent-light)' : 'var(--bg4)', border: `1px solid ${newDueDate ? 'var(--accent-soft)' : 'var(--border2)'}` }}
+            title="Pilih tanggal"
+          >📅</button>
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={newDueDate}
+            min={TODAY()}
+            onChange={e => setNewDueDate(e.target.value)}
+            style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, top: 0, left: 0 }}
+            tabIndex={-1}
+          />
         </div>
 
-        {/* 🕐 Clock — manual HH:MM 24h */}
+        {/* 🕐 Clock — instant native time picker */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          <button onClick={() => { setShowTime(v => !v); setShowDate(false) }}
-            style={{ ...iBtnSt, color: timeValid ? 'var(--accent)' : 'var(--silver4)', background: timeValid ? 'var(--accent-light)' : 'var(--bg4)', border: `1px solid ${timeValid ? 'var(--accent-soft)' : 'var(--border2)'}` }}
-            title="Pilih jam">🕐</button>
-          {showTime && (
-            <div style={{ position: 'absolute', bottom: 36, right: 0, zIndex: 30, background: 'var(--card-bg)', border: '1px solid var(--border2)', borderRadius: 8, padding: '10px 12px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', width: 140 }}>
-              <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', marginBottom: 6 }}>Jam (HH:MM, 24h)</div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input
-                  value={newDueTime}
-                  onChange={e => handleTimeChange(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') setShowTime(false)
-                    if (e.key === 'Escape') { setNewDueTime(''); setShowTime(false) }
-                  }}
-                  placeholder="14:30"
-                  maxLength={5}
-                  autoFocus
-                  style={{ flex: 1, height: 32, padding: '0 8px', background: 'var(--bg4)', border: `1px solid ${timeValid || !newDueTime ? 'var(--border2)' : 'var(--red)'}`, borderRadius: 6, fontSize: 14, color: 'var(--silver)', fontFamily: 'var(--mono)', outline: 'none', letterSpacing: 1 }} />
-                {newDueTime && <button onClick={() => { setNewDueTime(''); setShowTime(false) }} style={{ background: 'none', border: 'none', color: 'var(--silver4)', cursor: 'pointer', fontSize: 12 }}>✕</button>}
-              </div>
-              {newDueTime && !timeValid && <div style={{ fontSize: 10, color: 'var(--red)', marginTop: 4 }}>Format: HH:MM</div>}
-            </div>
-          )}
+          <button
+            onClick={() => timeInputRef.current?.showPicker?.()}
+            style={{ ...iBtnSt, color: timeValid ? 'var(--accent)' : 'var(--silver3)', background: timeValid ? 'var(--accent-light)' : 'var(--bg4)', border: `1px solid ${timeValid ? 'var(--accent-soft)' : 'var(--border2)'}` }}
+            title="Pilih jam"
+          >🕐</button>
+          <input
+            ref={timeInputRef}
+            type="time"
+            value={newDueTime}
+            onChange={e => setNewDueTime(e.target.value)}
+            style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, top: 0, left: 0 }}
+            tabIndex={-1}
+          />
         </div>
 
         {/* + Add */}
@@ -403,11 +381,21 @@ export const TodoInputFooter = memo(function TodoInputFooter({ sectionId }: { se
         }}>+</button>
       </div>
 
-      {/* Due preview — hanya jika ada nilai */}
+      {/* Due preview — pill tags with clear buttons */}
       {(newDueDate || timeValid) && (
-        <div style={{ fontSize: 10, color: 'var(--accent)', fontFamily: 'var(--mono)', marginTop: 5, display: 'flex', gap: 8 }}>
-          {newDueDate && <span>📅 {newDueDate}</span>}
-          {timeValid && <span>🕐 {newDueTime}</span>}
+        <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {newDueDate && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--accent)', background: 'var(--accent-light)', border: '1px solid var(--accent-soft)', borderRadius: 5, padding: '2px 7px 2px 6px' }}>
+              📅 {fmtDate(newDueDate)}
+              <button onClick={() => setNewDueDate('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 11, padding: 0, lineHeight: 1, opacity: 0.7, display: 'flex', alignItems: 'center' }}>×</button>
+            </span>
+          )}
+          {timeValid && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--accent)', background: 'var(--accent-light)', border: '1px solid var(--accent-soft)', borderRadius: 5, padding: '2px 7px 2px 6px' }}>
+              🕐 {newDueTime}
+              <button onClick={() => setNewDueTime('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 11, padding: 0, lineHeight: 1, opacity: 0.7, display: 'flex', alignItems: 'center' }}>×</button>
+            </span>
+          )}
         </div>
       )}
     </div>
