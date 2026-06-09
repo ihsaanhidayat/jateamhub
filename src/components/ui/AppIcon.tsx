@@ -67,6 +67,11 @@ export default function AppIcon({ item, iconSize, faviconEnabled, className }: P
           alt={item.title}
           style={imgStyle}
           onError={() => setFaviconError(true)}
+          onLoad={e => {
+            // Google returns its globe at 16×16 for unknown domains; treat it as missing
+            const img = e.target as HTMLImageElement
+            if (img.naturalWidth <= 16 && img.naturalHeight <= 16) setFaviconError(true)
+          }}
           loading="lazy"
         />
       </div>
