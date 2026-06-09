@@ -78,12 +78,12 @@ function ChangePwButton({ profileId, username, iconOnly }: { profileId?: string;
             boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
             overflow: 'hidden', animation: 'scaleIn 200ms ease',
           }}>
-            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>🔑 Ganti Password</div>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>Ganti Password</div>
               <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 16 }}>✕</button>
             </div>
-            <div style={{ padding: '16px 20px 20px' }}>
-              <ChangePasswordSection profileId={profileId} username={username} onDone={() => setOpen(false)} defaultOpen={true} />
+            <div style={{ padding: '20px' }}>
+              <ChangePasswordSection profileId={profileId} username={username} onDone={() => setOpen(false)} />
             </div>
           </div>
         </div>
@@ -108,17 +108,16 @@ function ChangePwButton({ profileId, username, iconOnly }: { profileId?: string;
         <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--silver4)' }}>{open ? '▲' : '▼'}</span>
       </button>
       {open && (
-        <div style={{ marginTop: 8, border: '1px solid var(--border2)', borderRadius: 10, overflow: 'hidden' }}>
-          <ChangePasswordSection profileId={profileId} username={username} />
+        <div style={{ marginTop: 12, padding: '0 4px' }}>
+          <ChangePasswordSection profileId={profileId} username={username} onDone={() => setOpen(false)} />
         </div>
       )}
     </div>
   )
 }
 
-// ── Ganti Password Mandiri ────────────────────────────────────
-function ChangePasswordSection({ profileId, username, onDone, defaultOpen }: { profileId?: string, username?: string, onDone?: () => void, defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen ?? false)
+// ── Change Password Form (pure form, no internal toggle) ─────
+function ChangePasswordSection({ profileId, username, onDone }: { profileId?: string, username?: string, onDone?: () => void }) {
   const [oldPw, setOldPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
@@ -130,72 +129,77 @@ function ChangePasswordSection({ profileId, username, onDone, defaultOpen }: { p
   const handleChange = async () => {
     if (!oldPw) return setErr('Masukkan password lama.')
     if (!newPw || newPw.length < 6) return setErr('Password baru minimal 6 karakter.')
-    if (newPw !== confirmPw) return setErr('Konfirmasi password tidak cocok.')
-    if (oldPw === newPw) return setErr('Password baru harus berbeda dari password lama.')
+    if (newPw !== confirmPw) return setErr('Konfirmasi tidak cocok.')
+    if (oldPw === newPw) return setErr('Password baru harus berbeda.')
     setLoading(true); setErr('')
     try {
-      // Verifikasi password lama
       const email = `${username}@jateamhub.app`
       const { error: verifyErr } = await supabase.auth.signInWithPassword({ email, password: oldPw })
       if (verifyErr) { setErr('Password lama salah.'); setLoading(false); return }
-
-      // Ganti password
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('https://qsvrqdnyjywjzxkqwszl.supabase.co/functions/v1/update-user-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
-        },
+        headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}) },
         body: JSON.stringify({ userId: profileId, newPassword: newPw, forceChange: false })
       })
       const data = await res.json()
       if (!res.ok || data.error) { setErr(data.error ?? 'Gagal ganti password.'); setLoading(false); return }
       setDone(true)
-      setTimeout(() => { setOpen(false); setDone(false); setOldPw(''); setNewPw(''); setConfirmPw(''); onDone?.() }, 2000)
+      setTimeout(() => { onDone?.() }, 1800)
     } catch { setErr('Koneksi gagal. Coba lagi.') }
     setLoading(false)
   }
 
   const inputSt: React.CSSProperties = {
-    width: '100%', height: 40, background: 'var(--bg2)',
+    width: '100%', height: 42, background: 'var(--bg4)',
     border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)',
-    padding: '0 14px', color: 'var(--silver)', fontSize: 13,
+    padding: '0 40px 0 14px', color: 'var(--silver)', fontSize: 13,
     fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box',
   }
 
+  if (done) return (
+    <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--green, #16A34A)', fontSize: 14, fontWeight: 600 }}>
+      ✓ Password berhasil diganti!
+    </div>
+  )
+
   return (
-    <div>
-      {!open ? (
-        <button onClick={() => setOpen(true)} style={{
-          width: '100%', padding: '10px 14px', background: 'none',
-          border: '1px solid var(--border2)', borderRadius: 'var(--radius)',
-          color: 'var(--silver3)', fontSize: 12, cursor: 'pointer',
-          fontFamily: 'var(--font)', textAlign: 'left',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>🔑 Ganti Password</button>
-      ) : (
-        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', padding: 'var(--sp-4)' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--silver)', marginBottom: 12 }}>🔑 Ganti Password</div>
-          {done ? (
-            <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--green, #16A34A)', fontSize: 13, fontWeight: 600 }}>✅ Password berhasil diganti!</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ position: 'relative' }}>
-                <input type={showPw ? 'text' : 'password'} value={oldPw} onChange={e => { setOldPw(e.target.value); setErr('') }} placeholder="Password lama" style={{ ...inputSt, paddingRight: 40 }} />
-                <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)', fontSize: 13 }}>{showPw ? '🙈' : '👁'}</button>
-              </div>
-              <input type={showPw ? 'text' : 'password'} value={newPw} onChange={e => { setNewPw(e.target.value); setErr('') }} placeholder="Password baru (min. 6 karakter)" style={inputSt} />
-              <input type={showPw ? 'text' : 'password'} value={confirmPw} onChange={e => { setConfirmPw(e.target.value); setErr('') }} placeholder="Konfirmasi password baru" style={inputSt} />
-              {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => { setOpen(false); setOldPw(''); setNewPw(''); setConfirmPw(''); setErr('') }} style={{ flex: 1, height: 36, background: 'none', border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)', color: 'var(--silver3)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
-                <button onClick={handleChange} disabled={loading} style={{ flex: 2, height: 36, background: 'var(--accent)', border: 'none', borderRadius: 'var(--radius-sm)', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', opacity: loading ? 0.6 : 1 }}>{loading ? 'Menyimpan...' : 'Simpan'}</button>
-              </div>
-            </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* show/hide toggle applies to all fields */}
+      {[
+        { val: oldPw, set: setOldPw, ph: 'Password lama', auto: true },
+        { val: newPw, set: setNewPw, ph: 'Password baru (min. 6 karakter)', auto: false },
+        { val: confirmPw, set: setConfirmPw, ph: 'Konfirmasi password baru', auto: false },
+      ].map(({ val, set, ph, auto }, i) => (
+        <div key={i} style={{ position: 'relative' }}>
+          <input
+            type={showPw ? 'text' : 'password'}
+            value={val}
+            onChange={e => { set(e.target.value); setErr('') }}
+            placeholder={ph}
+            autoFocus={auto}
+            style={inputSt}
+          />
+          {i === 0 && (
+            <button type="button" onClick={() => setShowPw(v => !v)} style={{
+              position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--silver3)', fontSize: 14, lineHeight: 1,
+            }}>{showPw ? '🙈' : '👁'}</button>
           )}
         </div>
+      ))}
+      {err && (
+        <div style={{ fontSize: 12, color: 'var(--red)', padding: '6px 10px', background: 'color-mix(in srgb, var(--red) 8%, transparent)', borderRadius: 6 }}>
+          {err}
+        </div>
       )}
+      <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+        <button onClick={() => onDone?.()} style={{ flex: 1, height: 38, background: 'none', border: '1px solid var(--border2)', borderRadius: 'var(--radius-sm)', color: 'var(--silver3)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
+        <button onClick={handleChange} disabled={loading || !oldPw || !newPw || !confirmPw} style={{ flex: 2, height: 38, background: 'var(--accent)', border: 'none', borderRadius: 'var(--radius-sm)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', opacity: (loading || !oldPw || !newPw || !confirmPw) ? 0.55 : 1 }}>
+          {loading ? 'Menyimpan...' : 'Simpan'}
+        </button>
+      </div>
     </div>
   )
 }

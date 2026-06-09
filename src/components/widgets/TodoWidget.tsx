@@ -187,12 +187,12 @@ function TodoWidgetImpl({ sectionId }: { sectionId: string }) {
                 onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditId(null) }}
                 onBlur={saveEdit} style={{ ...iSt, width: '100%' }} />
             ) : (
-              <div style={{
+              <div title={item.text} style={{
                 fontSize: 13, lineHeight: 1.5, cursor: 'text',
                 color: checkingIds.has(item.id) ? 'var(--silver4)' : overdue ? 'var(--red)' : 'var(--silver)',
                 fontWeight: overdue ? 600 : 400,
                 textDecoration: checkingIds.has(item.id) ? 'line-through' : 'none',
-                wordBreak: 'break-word', whiteSpace: 'normal',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 transition: 'all 300ms',
               }} onDoubleClick={() => startEdit(item)}>{item.text}</div>
             )}

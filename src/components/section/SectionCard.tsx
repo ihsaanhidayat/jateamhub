@@ -696,7 +696,7 @@ function ListItem({ item, searchQuery, urlDescMatch, editMode, appearance, onEdi
     : ''
 
   return (
-    <div className="item-card" onClick={handleClick} title={matchContext || undefined}>
+    <div className="item-card" onClick={handleClick} title={item.title}>
       <div style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
         <AppIcon item={item} iconSize="small" faviconEnabled={appearance.faviconEnabled} />
         {urlDescMatch && searchQuery && (
