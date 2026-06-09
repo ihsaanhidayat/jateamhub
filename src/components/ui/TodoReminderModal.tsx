@@ -18,6 +18,20 @@ function getPendingTasks(sections: any[]): TodoItem[] {
 
 type ModalType = 'login' | 'hourly' | 'upcoming'
 
+function sendBrowserNotif(title: string, body: string) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+  try {
+    const n = new Notification(title, {
+      body,
+      icon:   '/icon-192.png',
+      badge:  '/icon-192.png',
+      tag:    'jateamhub-todo',
+      silent: false,
+    })
+    n.onclick = () => { window.focus(); n.close() }
+  } catch { /* SSR or unsupported */ }
+}
+
 export default function TodoReminderModal() {
   const [show,      setShow]      = useState(false)
   const [items,     setItems]     = useState<TodoItem[]>([])
@@ -38,6 +52,7 @@ export default function TodoReminderModal() {
       const pending = getPendingTasks(useStore.getState().personalSections)
       if (pending.length > 0) {
         setItems(pending); setModalType('login'); setShow(true)
+        sendBrowserNotif('📋 Todo Hari Ini', `${pending.length} task belum selesai`)
       }
     }, 3000)
     return () => clearTimeout(timer)
@@ -70,6 +85,7 @@ export default function TodoReminderModal() {
       })
       if (soon && !show) {
         setUpcoming(soon); setModalType('upcoming'); setShow(true)
+        sendBrowserNotif('⏰ Todo Segera', `30 menit lagi: ${soon.text}`)
       }
     }, 60 * 1000) // cek tiap menit
     return () => clearInterval(check)

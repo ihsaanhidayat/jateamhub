@@ -18,6 +18,7 @@ const ForceChangePasswordModal = lazy(() => import('./components/ui/ForceChangeP
 const InstallPrompt             = lazy(() => import('./components/ui/InstallPrompt'))
 const TodoReminderModal         = lazy(() => import('./components/ui/TodoReminderModal'))
 const IdleSessionGuard          = lazy(() => import('./components/ui/IdleSessionGuard'))
+const NotificationBanner        = lazy(() => import('./components/ui/NotificationBanner'))
 const TaskListPage              = lazy(() => import('./pages/TaskListPage'))
 import DashboardSkeleton from './components/ui/DashboardSkeleton'
 const OnboardingOverlay        = lazy(() => import('./components/ui/OnboardingOverlay'))
@@ -395,6 +396,7 @@ export default function App() {
         <TodoReminderModal />
         <IdleSessionGuard />
         <InstallPrompt />
+        {profile && <NotificationBanner userId={profile.id} />}
       </Suspense>
       <ToastContainer />
     </div>

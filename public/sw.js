@@ -78,3 +78,29 @@ self.addEventListener('fetch', e => {
       .catch(() => caches.match(request))
   )
 })
+
+// Notification clicked — focus existing window or open new tab
+self.addEventListener('notificationclick', e => {
+  e.notification.close()
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const client of list) {
+        if ('focus' in client) return client.focus()
+      }
+      return clients.openWindow('/')
+    })
+  )
+})
+
+// Push from server (VAPID) — ready for future backend integration
+self.addEventListener('push', e => {
+  const data = e.data?.json?.() ?? {}
+  e.waitUntil(
+    self.registration.showNotification(data.title ?? 'JateamHub', {
+      body:  data.body  ?? '',
+      icon:  '/icon-192.png',
+      badge: '/icon-192.png',
+      tag:   'jateamhub-push',
+    })
+  )
+})

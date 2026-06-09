@@ -167,7 +167,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
           <div className="header-brand">
 
             <div>
-              <h1 className="header-title" style={{ fontSize: 22, fontWeight: 800 }}>JateamHub</h1>
+              <h1 className="header-title">JateamHub</h1>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
                 <span className="header-sub">
                   Selamat datang, {session?.username ?? ''}{emoji ? ` ${emoji}` : ''}
