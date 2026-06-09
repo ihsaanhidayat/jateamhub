@@ -330,12 +330,22 @@ export const useStore = create<DashboardStore>((set, get) => ({
       set({ appearance: merged })
       if (merged.theme) applyThemeToDOM(merged.theme as string)
     } else {
-      // Terapkan device preset
-      const preset = getDevicePreset()
-      const next = { ...DEFAULT_APPEARANCE, ...preset }
-      saveLocalAppearance(next)
-      set({ appearance: next })
-      setDevicePref()
+      // Tidak ada appearance di DB — prioritaskan localStorage agar tema user tetap terjaga
+      if (localApp && Object.keys(localApp).length > 0) {
+        // User punya tema tersimpan — device preset hanya isi gap layout, bukan timpa tema
+        const preset = getDevicePreset()
+        const next = { ...DEFAULT_APPEARANCE, ...preset, ...localApp }
+        saveLocalAppearance(next)
+        set({ appearance: next })
+        if (next.theme) applyThemeToDOM(next.theme as string)
+      } else {
+        // Benar-benar login pertama — tidak ada localStorage maupun DB → pakai device preset
+        const preset = getDevicePreset()
+        const next = { ...DEFAULT_APPEARANCE, ...preset }
+        saveLocalAppearance(next)
+        set({ appearance: next })
+        setDevicePref()
+      }
     }
   },
 
