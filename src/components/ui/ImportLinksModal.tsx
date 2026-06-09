@@ -64,7 +64,7 @@ export default function ImportLinksModal({ open, onClose }: Props) {
   const [edits,           setEdits]           = useState<ParsedLink[]>([])
   const [previewing,      setPreviewing]      = useState(false)
 
-  const { personalSections, addItem, syncPersonalToDb, toast } = useStore()
+  const personalSections = useStore(s => s.personalSections)
   const sectionOptions = personalSections.filter(s => s.type === 'section')
 
   const parsed = useMemo(() => parseLinks(text), [text])
@@ -80,18 +80,19 @@ export default function ImportLinksModal({ open, onClose }: Props) {
   const removeEdit = (i: number) =>
     setEdits(prev => prev.filter((_, idx) => idx !== i))
 
-  const handleImport = async () => {
+  const handleImport = () => {
     if (!selectedSection || !edits.length) return
     setImporting(true)
+    const store = useStore.getState()
     for (const link of edits) {
       if (!link.url.trim() || !link.title.trim()) continue
-      addItem(selectedSection, {
+      store.addItem(selectedSection, {
         title: link.title.trim(), url: link.url.trim(),
         desc: link.popup.trim(), icon: '', newTab: true,
       } as any)
     }
-    await syncPersonalToDb()
-    toast(`${edits.length} link berhasil diimport.`, 'success')
+    store.syncPersonalToDb()
+    store.toast(`${edits.length} link berhasil diimport.`, 'success')
     setImporting(false)
     setText(''); setEdits([]); setPreviewing(false); setSelectedSection('')
     onClose()
@@ -108,7 +109,7 @@ export default function ImportLinksModal({ open, onClose }: Props) {
     a.href     = URL.createObjectURL(blob)
     a.download = `${section.title.toLowerCase().replace(/\s+/g, '-')}-links.txt`
     a.click()
-    toast(`${section.items.length} link diekspor.`, 'success')
+    useStore.getState().toast(`${section.items.length} link diekspor.`, 'success')
   }
 
   const tabSt = (id: 'import'|'export'): React.CSSProperties => ({

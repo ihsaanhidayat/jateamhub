@@ -361,9 +361,10 @@ body {
    MODAL
 ══════════════════════════════════════════════════════════ */
 .modal-overlay {
-  position: fixed; inset: 0; z-index: 500;
+  position: fixed; inset: 0; z-index: 8000;
   background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center; padding: 16px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px env(safe-area-inset-right, 16px) 16px env(safe-area-inset-left, 16px);
   animation: fadeIn 150ms cubic-bezier(0.16,1,0.3,1);
 }
 .modal-box {
@@ -479,10 +480,6 @@ html, body {
 /* ══════════════════════════════════════════════════════════
    SKELETON
 ══════════════════════════════════════════════════════════ */
-.skeleton {
-  background: linear-gradient(90deg, var(--bg4) 25%, var(--bg3) 50%, var(--bg4) 75%);
-  background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px;
-}
 mark.hl { background: var(--accent-soft); color: var(--accent); border-radius: 3px; padding: 0 2px; }
 
 /* ══════════════════════════════════════════════════════════
@@ -563,59 +560,49 @@ mark.hl { background: var(--accent-soft); color: var(--accent); border-radius: 3
 /* ══════════════════════════════════════════════════════════
    ANIMATIONS
 ══════════════════════════════════════════════════════════ */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes scaleIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-@keyframes slideDown { from { transform: translateY(-8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes loginSpin { to { transform: rotate(360deg); } }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes fadeUp   { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn  { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+@keyframes slideUp  { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer  { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes spin     { to { transform: rotate(360deg); } }
+@keyframes pulse    { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes editPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.4); } }
+@keyframes shake    { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-8px); } 40%,80% { transform: translateX(8px); } }
 
 
 /* ══════════════════════════════════════════════════════════
-   Z-INDEX HIERARCHY (consistent)
-   - Header sticky: 100
-   - Profile dropdown: 200
-   - Tooltip portal: 9999
-   - Modal overlay: 9500
-   - Onboarding overlay: 9000
-   - Profile modal (lock): 9000
-   - Reminder modal: 9500
+   Z-INDEX HIERARCHY (fixed, no conflicts)
+   100   — Header sticky
+   200   — Profile dropdown
+   90    — Edit mode bar
+   8000  — Modal overlay (.modal-overlay)
+   9000  — Profile page, Onboarding, ConfirmDialog
+   9500  — Todo reminder, Session warning
+   9700  — Idle guard
+   9999  — Toast container
 ══════════════════════════════════════════════════════════ */
-
-/* ══════════════════════════════════════════════════════════
-   SKELETON LOADING
-══════════════════════════════════════════════════════════ */
-.skeleton {
-  background: linear-gradient(90deg, var(--bg4) 25%, var(--border) 50%, var(--bg4) 75%);
-  background-size: 400% 100%;
-  animation: shimmer 1.5s infinite;
-}
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
 
 /* ══════════════════════════════════════════════════════════
    DARK MODE CONTRAST FIXES
 ══════════════════════════════════════════════════════════ */
-[data-theme="slate"] .section-subtitle { color: var(--silver2) !important; }
-[data-theme="slate"] .section-title    { color: var(--silver) !important; }
-[data-theme="slate"] .header-sub       { color: var(--silver2) !important; }
-[data-theme="slate"] .section-empty-text { color: var(--silver3) !important; }
-[data-theme="slate"] .item-title       { color: var(--silver) !important; }
-[data-theme="slate"] .folder-item      { color: var(--silver) !important; }
-[data-theme="slate"] input::placeholder { color: var(--silver3) !important; }
-[data-theme="slate"] textarea::placeholder { color: var(--silver3) !important; }
+[data-theme="slate"],
+[data-theme="midnight"] {
+  .section-subtitle   { color: var(--silver2) !important; }
+  .section-title      { color: var(--silver) !important; }
+  .header-sub         { color: var(--silver2) !important; }
+  .section-empty-text { color: var(--silver3) !important; }
+  .item-title         { color: var(--silver) !important; }
+  .folder-item-label  { color: var(--silver2) !important; }
+  input::placeholder  { color: var(--silver3) !important; }
+  textarea::placeholder { color: var(--silver3) !important; }
+}
+[data-theme="midnight"] .badge-pending  { background: #2D1F06; color: #FCD34D; }
+[data-theme="midnight"] .badge-approved { background: #052E16; color: #4ADE80; }
+[data-theme="midnight"] .badge-rejected { background: #2D0808; color: #FCA5A5; }
 
 /* ══════════════════════════════════════════════════════════
    MOBILE TASK LIST — cards instead of table

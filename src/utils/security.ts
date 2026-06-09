@@ -10,12 +10,15 @@ export const isSafeUrl = (url: string): boolean => {
   for (const scheme of BLOCKED_SCHEMES) {
     if (lower.startsWith(scheme)) return false
   }
+  // Block protocol-relative URLs like //evil.com
+  if (lower.startsWith('//')) return false
   try {
     const u = new URL(url)
     return u.protocol === 'http:' || u.protocol === 'https:'
   } catch {
-    // Relative URL atau anchor — aman
-    return url.startsWith('/') || url.startsWith('#') || url.startsWith('.')
+    // Relative path or anchor — safe (but not protocol-relative)
+    return (url.startsWith('/') && !url.startsWith('//')) ||
+           url.startsWith('#') || url.startsWith('.')
   }
 }
 

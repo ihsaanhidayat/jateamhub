@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useStore } from '../../store/dashboardStore'
+import { useStore, applyThemeToDOM } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import { canEdit, canSeeOptions, getDisplayBadge, isAdmin, isAdminGlobal } from '../../utils/roles'
 import { sanitizePage } from '../../utils/security'
@@ -16,10 +16,8 @@ interface Props {
 }
 
 export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks, onOpenTaskList }: Props) {
-  const {
-    editMode, toggleEditMode,
-    searchQuery, setSearch,
-  } = useStore()
+  const editMode    = useStore(s => s.editMode)
+  const searchQuery = useStore(s => s.searchQuery)
   const { profile: session } = useAuthStore()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
@@ -34,13 +32,12 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       // Escape — close search
-      if (e.key === 'Escape') { setSearchOpen(false); setSearch('') }
-      // Ctrl+K / Cmd+K — toggle search
+      if (e.key === 'Escape') { setSearchOpen(false); useStore.getState().setSearch('') }
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
         setSearchOpen(v => {
           if (!v) setTimeout(() => searchRef.current?.focus(), 280)
-          else setSearch('')
+          else useStore.getState().setSearch('')
           return !v
         })
       }
@@ -52,7 +49,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
     }
     const clickOutside = (e: MouseEvent) => {
       if (searchOpen && searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
-        setSearchOpen(false); setSearch('')
+        setSearchOpen(false); useStore.getState().setSearch('')
       }
     }
     window.addEventListener('keydown', h)
@@ -69,24 +66,36 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const clockStr = clockNow.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) +
     '  ·  ' + clockNow.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
-  // Theme toggle — baca dari DOM aktual untuk sinkron sempurna
-  const getIsDark = () => document.documentElement.getAttribute('data-theme') === 'slate'
-  const [isDark, setIsDarkState] = useState(getIsDark)
+  // Theme toggle — derive dari appearance store agar reaktif setelah initUser
+  const DARK_THEMES = ['midnight', 'slate', 'obsidian', 'dark-mint', 'dark-soft', 'enterprise',
+    'aurora-dark', 'sand-dark', 'slate-dark', 'pearl-dark', 'ivory-dark', 'sage-dark', 'dark']
+  const appearanceTheme = useStore(s => s.appearance.theme as string)
+  const [isDark, setIsDarkState] = useState(() =>
+    DARK_THEMES.includes(document.documentElement.getAttribute('data-theme') ?? '')
+  )
+
+  useEffect(() => {
+    setIsDarkState(DARK_THEMES.includes(appearanceTheme))
+  }, [appearanceTheme])
 
   const setIsDark = (dark: boolean) => {
-    const theme = dark ? 'slate' : 'pearl'
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('jateamhub-theme', theme)
+    const theme = dark ? 'midnight' : 'parchment'
+    applyThemeToDOM(theme)
     setIsDarkState(dark)
-    // Update status bar color
-    const color = dark ? '#0F1117' : '#F5F6FA'
+    useStore.getState().setAppearance({ theme }) // persists to localStorage + DB
+    const color = dark ? '#0A0D1A' : '#F7F3EE'
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', color)
   }
 
   // Sync saat tab lain mengubah tema
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'jateamhub-theme') setIsDarkState(e.newValue === 'slate')
+      if (e.key === 'jateamhub-appearance') {
+        try {
+          const app = JSON.parse(e.newValue ?? '{}')
+          if (app.theme) setIsDarkState(DARK_THEMES.includes(app.theme))
+        } catch {}
+      }
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
@@ -150,16 +159,6 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
     }
   }
 
-  const PREVIEW_OPTS = [
-    { value: null,    label: 'Admin View' },
-    { value: '',      label: 'User Umum'  },
-    { value: 'pro',   label: 'PRO'        },
-    { value: 'cro',   label: 'CRO'        },
-    { value: 'klaim', label: 'Klaim'      },
-    { value: 'ae',    label: 'AE'         },
-  ]
-
-
   return (
     <>
       <header className="header" role="banner">
@@ -203,7 +202,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                     <button onClick={() => {
                       setSearchOpen(v => !v)
                       if (!searchOpen) setTimeout(() => searchRef.current?.focus(), 280)
-                      else { setSearch('') }
+                      else { useStore.getState().setSearch('') }
                     }} style={{
                       width: 34, height: 34, flexShrink: 0,
                       background: 'none', border: 'none', cursor: 'pointer',
@@ -214,7 +213,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                     <input
                       ref={searchRef}
                       value={searchQuery}
-                      onChange={e => setSearch(e.target.value)}
+                      onChange={e => useStore.getState().setSearch(e.target.value)}
                       placeholder="Cari link..."
                       autoComplete="off"
                       spellCheck={false}
@@ -232,7 +231,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                       }}
                     />
                     {searchOpen && searchQuery && (
-                      <button onClick={() => setSearch('')} style={{
+                      <button onClick={() => useStore.getState().setSearch('')} style={{
                         width: 20, height: 20, flexShrink: 0, marginRight: 6,
                         background: 'var(--border2)', border: 'none', borderRadius: '50%',
                         cursor: 'pointer', color: 'var(--silver3)', fontSize: 10,
@@ -245,7 +244,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
               <button className="icon-btn desktop-only" onClick={onImportLinks}
                 title="Import / Export Links" aria-label="Import / Export Links"
                 style={{ fontSize: 15 }}>📥</button>
-              <button className="icon-btn desktop-only" onClick={toggleEditMode} title="Edit Mode" aria-label="Edit Mode">✏️</button>
+              <button className="icon-btn desktop-only" onClick={() => useStore.getState().toggleEditMode()} title="Edit Mode" aria-label="Edit Mode">✏️</button>
             </>
           ) : (
             <>
@@ -259,7 +258,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                 onClick={e => {
                   e.stopPropagation()
                   if (optionsOpen) onToggleOptions()
-                  toggleEditMode()
+                  useStore.getState().toggleEditMode()
                 }}
                 title="Selesai Edit" aria-label="Selesai Edit"
                 style={{ fontSize: 11, fontWeight: 700, padding: '0 12px', width: 'auto' }}>
@@ -278,7 +277,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             )}
             {editMode && (
               <button className="icon-btn active"
-                onClick={e => { e.stopPropagation(); if (optionsOpen) onToggleOptions(); toggleEditMode() }}
+                onClick={e => { e.stopPropagation(); if (optionsOpen) onToggleOptions(); useStore.getState().toggleEditMode() }}
                 style={{ fontSize: 11, fontWeight: 700, padding: '0 10px', width: 'auto' }}
                 title="Selesai Edit" aria-label="Selesai Edit">✓ Selesai</button>
             )}
@@ -288,7 +287,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
           <button
             className="theme-toggle"
             onClick={() => setIsDark(!isDark)}
-            title={isDark ? 'Switch ke Pearl (Light)' : 'Switch ke Slate (Dark)'}
+            title={isDark ? 'Switch ke Parchment (Light)' : 'Switch ke Midnight (Dark)'}
             aria-label="Toggle tema"
           >
             {isDark ? '🌙' : '☀️'}
@@ -355,7 +354,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             <input
               ref={searchRef}
               value={searchQuery}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => useStore.getState().setSearch(e.target.value)}
               placeholder="Cari link..."
               autoComplete="off" spellCheck={false}
               autoFocus
@@ -366,7 +365,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                 fontFamily: 'var(--font)', outline: 'none',
               }}
             />
-            <button onClick={() => { setSearchOpen(false); setSearch('') }} style={{
+            <button onClick={() => { setSearchOpen(false); useStore.getState().setSearch('') }} style={{
               width: 36, height: 36, borderRadius: 8, background: 'var(--bg4)',
               border: '1px solid var(--border2)', cursor: 'pointer',
               color: 'var(--silver3)', fontSize: 12,

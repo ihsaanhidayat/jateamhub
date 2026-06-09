@@ -48,8 +48,9 @@ export function useUserManagement() {
   const [newUnitId,    setNewUnitId]    = useState('')
   const [newEmail,     setNewEmail]     = useState('')
 
-  const [saving, setSaving] = useState(false)
-  const [err,    setErr]    = useState('')
+  const [saving,          setSaving]          = useState(false)
+  const [err,             setErr]             = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const canManage    = profile?.role === 'admin' || profile?.role === 'superadmin'
   const isSuperAdmin = profile?.role === 'superadmin'
@@ -141,10 +142,10 @@ export function useUserManagement() {
   }
 
   const handleDeleteUser = async (userId: string, username: string) => {
-    if (!confirm(`Hapus user "${username}"? Tindakan ini tidak dapat dibatalkan.`)) return
     const error = await removeUser(userId)
     if (error) { toast(error, 'error'); return }
     toast(`User "${username}" dihapus.`, 'success')
+    setConfirmDeleteId(null)
     loadUsers(true)
   }
 
@@ -167,6 +168,8 @@ export function useUserManagement() {
     newEmail, setNewEmail,
     // Actions
     openEdit, handleSaveUser, handleAddUser, handleDeleteUser,
+    // Delete confirmation
+    confirmDeleteId, setConfirmDeleteId,
     // Status
     saving, err, setErr, getBadge, isMe,
     // Permissions

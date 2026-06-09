@@ -34,6 +34,8 @@ interface AuthState {
 
 // Simpan subscription di luar store agar bisa cleanup
 let authSubscription: { unsubscribe: () => void } | null = null
+// Track pending signOut — login() harus tunggu ini selesai sebelum signIn()
+let pendingSignOut: Promise<void> | null = null
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   profile:      null,
@@ -111,6 +113,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (username, password) => {
     set({ loading: true })
     try {
+      // Tunggu signOut selesai dulu — mencegah race condition di mana
+      // signOut() menghapus sesi baru yang baru saja dibuat oleh signIn()
+      if (pendingSignOut) await pendingSignOut
+
       const email = `${username}@jateamhub.app`
       const { data, error } = await signIn(email, password)
 
@@ -147,19 +153,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       authSubscription = null
     }
     // Reset state — initialized tetap true agar langsung ke login page
-    set({ profile: null, users: [], _usersLoaded: false })
+    set({ profile: null, users: [], _usersLoaded: false, loading: false })
     localStorage.removeItem('jateamhub-personal')
     // Dispatch event untuk reset dashboardStore + components lain
     window.dispatchEvent(new Event('jateamhub-logout'))
-    // Sign out Supabase + re-setup listener
-    signOut().catch(() => {}).finally(() => {
+    // Track promise sehingga login() bisa menunggu signOut selesai
+    // sebelum memanggil signIn() — mencegah signOut menghapus sesi baru
+    pendingSignOut = signOut().then(() => {}).catch(() => {}).finally(() => {
+      pendingSignOut = null
       // Setup listener baru untuk login berikutnya
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'TOKEN_REFRESHED' && session?.user) {
           const profile = await getProfile(session.user.id)
           if (profile) set({ profile })
         } else if (event === 'SIGNED_OUT') {
-          set({ profile: null, users: [], _usersLoaded: false })
+          set({ profile: null, users: [], _usersLoaded: false, loading: false })
         }
       })
       authSubscription = subscription

@@ -204,7 +204,7 @@ interface Props { onClose: () => void }
 
 export default function ProfilePage({ onClose }: Props) {
   const { profile } = useAuthStore()
-  const { toast } = useStore()
+  const toast = useStore.getState().toast
 
   const um = useUserManagement()
   const { canManage, isSuperAdmin } = um
@@ -617,11 +617,20 @@ export default function ProfilePage({ onClose }: Props) {
                           onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border2)')}>Edit</button>
                       )}
                       {canEdit_ && u.role !== 'superadmin' && !isMe && (
-                        <button onClick={async () => {
-                          um.handleDeleteUser(u.id, u.username)
-                        }} style={{ background: 'none', border: 'none', color: 'var(--silver3)', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}
-                          onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
-                          onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>🗑</button>
+                        um.confirmDeleteId === u.id ? (
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <span style={{ fontSize: 10, color: 'var(--red)', fontWeight: 600 }}>Yakin?</span>
+                            <button onClick={() => um.handleDeleteUser(u.id, u.username)}
+                              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid var(--red)', borderRadius: 4, color: 'var(--red)', cursor: 'pointer', fontSize: 10, fontWeight: 700, padding: '2px 7px' }}>Ya</button>
+                            <button onClick={() => um.setConfirmDeleteId(null)}
+                              style={{ background: 'none', border: '1px solid var(--border2)', borderRadius: 4, color: 'var(--silver3)', cursor: 'pointer', fontSize: 10, padding: '2px 7px' }}>Batal</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => um.setConfirmDeleteId(u.id)}
+                            style={{ background: 'none', border: 'none', color: 'var(--silver3)', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}
+                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>🗑</button>
+                        )
                       )}
                     </div>
                   )

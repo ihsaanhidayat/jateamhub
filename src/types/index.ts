@@ -120,7 +120,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   tooltipEnabled:  true,
   faviconEnabled:  true,
   colorMode:       'light',
-  theme:           'pearl',
+  theme:           'parchment',
   isDarkMode:      false,
 }
 

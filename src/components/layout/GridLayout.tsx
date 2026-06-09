@@ -137,15 +137,12 @@ const useIsMobile = () => {
 
 // ── Main component ───────────────────────────────────────────
 export default function GridLayout({ onAddSection }: { onAddSection?: () => void }) {
-  const {
-    personalSections, sharedSections,
-    editMode, searchQuery, isDataInitialized,
-    reorderPersonalSections,
-    addItem, deletePersonalSection,
-    syncPersonalToDb, syncPersonalToDbNow,
-    toggleCollapse,
-    updateItem, deleteItem,
-  } = useStore()
+  // Granular selectors — hanya re-render saat data ini berubah
+  const personalSections  = useStore(s => s.personalSections)
+  const sharedSections    = useStore(s => s.sharedSections)
+  const editMode          = useStore(s => s.editMode)
+  const searchQuery       = useStore(s => s.searchQuery)
+  const isDataInitialized = useStore(s => s.isDataInitialized)
   const { profile } = useAuthStore()
   const isMobile = useIsMobile()
 
@@ -175,12 +172,13 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
     setIsDraggingActive(false)
     const { active, over } = e
     if (!over || active.id === over.id) return
-    const oldIdx = personalSections.findIndex(s => s.id === active.id)
-    const newIdx = personalSections.findIndex(s => s.id === over.id)
+    const store = useStore.getState()
+    const secs = store.personalSections
+    const oldIdx = secs.findIndex(s => s.id === active.id)
+    const newIdx = secs.findIndex(s => s.id === over.id)
     if (oldIdx === -1 || newIdx === -1) return
-    const reordered = arrayMove(personalSections, oldIdx, newIdx)
-    reorderPersonalSections(reordered)
-  }, [personalSections, reorderPersonalSections])
+    store.reorderPersonalSections(arrayMove(secs, oldIdx, newIdx))
+  }, [])
 
   // Handlers
   const handleEditSection = useCallback((s: Section) => {
@@ -193,12 +191,13 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
     useStore.getState().setAddingItem(sectionId)
   }, [])
   const handleDeleteSection = useCallback((id: string) => {
-    deletePersonalSection(id)
-    syncPersonalToDb()
-  }, [deletePersonalSection, syncPersonalToDb])
+    const store = useStore.getState()
+    store.deletePersonalSection(id)
+    store.syncPersonalToDb()
+  }, [])
   const handleSave = useCallback(() => {
-    syncPersonalToDb()
-  }, [syncPersonalToDb])
+    useStore.getState().syncPersonalToDb()
+  }, [])
   const handleCancel = useCallback(() => {
     useStore.getState().setEditingSection(null)
     useStore.getState().setEditingItem(null)
@@ -225,7 +224,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
       setIsRefreshing(true); setPullY(PULL_THRESHOLD)
       const safety = setTimeout(() => { setIsRefreshing(false); setPullY(0) }, 5000)
       try {
-        await syncPersonalToDbNow()
+        await useStore.getState().syncPersonalToDbNow()
         if (useStore.getState().loadSharedSections) await useStore.getState().loadSharedSections()
       } catch {} finally { clearTimeout(safety); setIsRefreshing(false); setPullY(0) }
     } else { setPullY(0) }

@@ -12,11 +12,11 @@ interface Props {
 }
 
 export default function ItemModal({ open, sectionId, item, onClose }: Props) {
-  const { addItem, updateItem, deleteItem, toast, appearance } = useStore()
-  const [title,   setTitle]   = useState('')
-  const [url,     setUrl]     = useState('https://')
-  const [desc,    setDesc]    = useState('')
-  const [iconUrl, setIconUrl] = useState('')
+  const [title,      setTitle]      = useState('')
+  const [url,        setUrl]        = useState('https://')
+  const [desc,       setDesc]       = useState('')
+  const [iconUrl,    setIconUrl]    = useState('')
+  const [confirmDel, setConfirmDel] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -24,10 +24,12 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
       setUrl(item?.url ?? 'https://')
       setDesc(item?.desc ?? '')
       setIconUrl(item?.iconUrl ?? '')
+      setConfirmDel(false)
     }
   }, [open, item])
 
   const handleSave = () => {
+    const { addItem, updateItem, toast } = useStore.getState()
     if (!title.trim()) { toast('Nama link wajib diisi.', 'error'); return }
     if (!url.trim() || url === 'https://') { toast('URL wajib diisi.', 'error'); return }
     const data: Omit<LinkItem, 'id'> = {
@@ -41,7 +43,8 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
   }
 
   const handleDelete = () => {
-    if (!item || !confirm('Hapus link ini?')) return
+    if (!item) return
+    const { deleteItem, toast } = useStore.getState()
     deleteItem(sectionId, item.id)
     toast('Link dihapus.', 'success')
     onClose()
@@ -80,7 +83,15 @@ export default function ItemModal({ open, sectionId, item, onClose }: Props) {
             </span>
           </div>
           {item && (
-            <button className="btn btn-danger" style={{ height: 34, padding: '0 10px' }} onClick={handleDelete}>🗑</button>
+            confirmDel ? (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600, whiteSpace: 'nowrap' }}>Hapus?</span>
+                <button className="btn btn-danger" style={{ height: 30, padding: '0 8px', fontSize: 11 }} onClick={handleDelete}>Ya</button>
+                <button className="btn btn-secondary" style={{ height: 30, padding: '0 8px', fontSize: 11 }} onClick={() => setConfirmDel(false)}>Tidak</button>
+              </div>
+            ) : (
+              <button className="btn btn-danger" style={{ height: 34, padding: '0 10px' }} onClick={() => setConfirmDel(true)}>🗑</button>
+            )
           )}
           <button className="btn btn-secondary" style={{ height: 34 }} onClick={onClose}>Batal</button>
           <button className="btn btn-primary" style={{ height: 34 }} onClick={handleSave}>Simpan</button>

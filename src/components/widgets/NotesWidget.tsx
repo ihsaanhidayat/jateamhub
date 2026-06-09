@@ -6,11 +6,11 @@ import { supabase } from '../../utils/supabaseClient'
 interface Props { sectionId: string }
 
 function NotesWidgetImpl({ sectionId }: Props) {
-  const { personalSections, updateItem, addItem, syncPersonalToDb } = useStore()
+  // Granular selector — hanya re-render saat section ini berubah
+  const section   = useStore(s => s.personalSections.find(sec => sec.id === sectionId))
+  const noteItem  = section?.items?.[0]
   const setNotesLockActive = useStore(s => (s as any).setNotesLockActive)
   const { profile } = useAuthStore()
-  const section  = personalSections.find(s => s.id === sectionId)
-  const noteItem = section?.items?.[0]
 
   const modeKey   = `notes-mode-${profile?.username ?? 'u'}-${sectionId}`
   const lockedKey = `notes-locked-${profile?.username ?? 'u'}-${sectionId}`
@@ -20,13 +20,14 @@ function NotesWidgetImpl({ sectionId }: Props) {
   const readLocked = () => localStorage.getItem(lockedKey) === 'true'
 
   const [mode,   setMode]         = useState<'lock'|'open'>(readMode)
-  const [locked, setLockedState]  = useState<boolean>(readLocked)
+  // Always start locked when mode is 'lock' — prevents showing unlocked state on login
+  const [locked, setLockedState]  = useState<boolean>(() => readMode() === 'lock' ? true : readLocked())
 
-  // Re-read saat profile load (profile null saat mount → key pakai 'u' → salah)
+  // Re-read saat profile load; mode 'lock' selalu mulai terkunci di setiap sesi baru
   useEffect(() => {
     if (!profile?.username) return
     const m = (localStorage.getItem(`notes-mode-${profile.username}-${sectionId}`) as 'lock'|'open') ?? 'open'
-    const l = localStorage.getItem(`notes-locked-${profile.username}-${sectionId}`) === 'true'
+    const l = m === 'lock' ? true : localStorage.getItem(`notes-locked-${profile.username}-${sectionId}`) === 'true'
     setMode(m)
     setLockedState(l)
   }, [profile?.username, sectionId])
@@ -83,12 +84,11 @@ function NotesWidgetImpl({ sectionId }: Props) {
     return () => { if (lockTimer.current) clearTimeout(lockTimer.current) }
   }, [mode])
 
-  // Idle timer — 30 menit tanpa aktivitas → auto-lock (KEDUA mode)
+  // Idle timer — 30 menit tanpa aktivitas → auto-lock (hanya mode 'lock')
   const startIdleTimer = (currentMode?: string) => {
     if (lockTimer.current) clearTimeout(lockTimer.current)
     const m = currentMode ?? mode
-    // Hanya jalankan jika belum locked
-    if (m === 'lock' || m === 'open') {
+    if (m === 'lock') {
       lockTimer.current = setTimeout(() => setLocked(true), 30 * 60 * 1000)
     }
   }
@@ -115,15 +115,16 @@ function NotesWidgetImpl({ sectionId }: Props) {
     setText(val); setSaved(false)
     resetIdleTimer()
     if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(async () => {
-      const s = useStore.getState().personalSections.find(s => s.id === sectionId)
+    timerRef.current = setTimeout(() => {
+      const store = useStore.getState()
+      const s = store.personalSections.find(s => s.id === sectionId)
       if (!s) return
       if (s.items.length > 0) {
-        updateItem(sectionId, s.items[0].id, { ...s.items[0], desc: val, title: val.split('\n')[0]?.slice(0, 50) || 'Catatan' })
+        store.updateItem(sectionId, s.items[0].id, { ...s.items[0], desc: val, title: val.split('\n')[0]?.slice(0, 50) || 'Catatan' })
       } else {
-        addItem(sectionId, { title: val.split('\n')[0]?.slice(0, 50) || 'Catatan', url: '#', icon: '', desc: val, tags: [], newTab: false, useFavicon: false } as any)
+        store.addItem(sectionId, { title: val.split('\n')[0]?.slice(0, 50) || 'Catatan', url: '#', icon: '', desc: val, tags: [], newTab: false, useFavicon: false } as any)
       }
-      await syncPersonalToDb()
+      store.syncPersonalToDb()
       setSaved(true)
     }, 600)
   }

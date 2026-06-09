@@ -173,7 +173,7 @@ interface DashboardStore {
   redo: () => void
 
   // -- Sync --
-  syncPersonalToDb:    () => Promise<void>
+  syncPersonalToDb:    () => void
   syncPersonalToDbNow: () => Promise<void>
 
   // -- Toast --
@@ -198,7 +198,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   currentUserRole:  'user',
   currentRegion:    'global',
   currentUnit:      'general',
-  globalTheme:      'ivory-light' as ThemeId,
+  globalTheme:      'parchment' as ThemeId,
   history:          [],
   presets:          [],
   future:           [],
@@ -213,7 +213,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   // ── Toast: tampilkan notifikasi ───────────────────────────
   toast: (msg, type = 'success') => {
     const id = uid()
-    set(s => ({ toasts: [...s.toasts.slice(-2), { id, msg, type }] }))
+    set(s => ({ toasts: [...s.toasts.slice(-3), { id, msg, type }] }))
     setTimeout(() => get().removeToast(id), 4000)
   },
   removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
@@ -245,15 +245,26 @@ export const useStore = create<DashboardStore>((set, get) => ({
       applyThemeToDOM(localApp.theme as string)
       set({ appearance: { ...DEFAULT_APPEARANCE, ...localApp } })
     } else {
-      applyThemeToDOM('ivory-light')
+      applyThemeToDOM('parchment')
     }
 
     // ── Parallel DB calls ─────────────────────────────────────
-    const [dbSections, shared, dbAppearance] = await Promise.all([
-      getUserLayout(userId),
-      getSharedSections(role, region, unit),
-      loadUserAppearance(userId),
-    ])
+    let dbSections: unknown = null
+    let shared:     unknown = null
+    let dbAppearance: Record<string, unknown> | null = null
+    try {
+      const results = await Promise.all([
+        getUserLayout(userId),
+        getSharedSections(role, region, unit),
+        loadUserAppearance(userId),
+      ])
+      dbSections   = results[0]
+      shared       = results[1]
+      dbAppearance = results[2] as Record<string, unknown> | null
+    } catch {
+      // Jaringan gagal — lanjutkan dengan data localStorage agar app tidak stuck
+      get().toast('Gagal memuat data dari server — menggunakan data lokal.', 'warn')
+    }
 
     // Process personal sections
     if (dbSections && Array.isArray(dbSections) && dbSections.length > 0) {
@@ -266,7 +277,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
       set({ personalSections: withExpanded })
       saveUserLayout(userId, sections).catch(() => {}) // simpan sections tanpa collapsed override
     } else {
-      // DB kosong — cek localStorage (mungkin ada data yang belum sync)
+      // DB kosong atau gagal — cek localStorage (mungkin ada data yang belum sync)
       const localRaw = localStorage.getItem(STORAGE_KEYS.PERSONAL)
       let localSections: Section[] = []
       try { localSections = localRaw ? JSON.parse(localRaw) : [] } catch { localSections = [] }
@@ -303,16 +314,16 @@ export const useStore = create<DashboardStore>((set, get) => ({
     }
 
     // Process shared sections
-    if (shared) set({ sharedSections: shared })
+    if (Array.isArray(shared)) set({ sharedSections: shared })
 
-    // Mark data sebagai selesai di-load
+    // Mark data sebagai selesai di-load — selalu, bahkan jika DB call gagal
     set({ isDataInitialized: true })
 
     // Process appearance dari DB (override localStorage jika ada)
     if (dbAppearance && Object.keys(dbAppearance).length > 0) {
       const merged = { ...DEFAULT_APPEARANCE, ...dbAppearance }
       // Paksa folderGridCols = 5 jika masih pakai default lama
-      if (!dbAppearance.folderGridCols || dbAppearance.folderGridCols < 5) {
+      if (!dbAppearance.folderGridCols || (dbAppearance.folderGridCols as number) < 5) {
         merged.folderGridCols = 5
       }
       saveLocalAppearance(merged)
@@ -342,24 +353,30 @@ export const useStore = create<DashboardStore>((set, get) => ({
     }
   },
 
-  // ── Sync section pribadi ke DB — debounce 300ms ──────────
-  // ── Sync ke DB — LANGSUNG setiap operasi ────────────────
-  syncPersonalToDb: async () => {
-    if (personalSyncTimer) { clearTimeout(personalSyncTimer); personalSyncTimer = null }
+  // ── Sync ke DB — debounce 400ms, localStorage langsung ──
+  syncPersonalToDb: () => {
     const { personalSections, currentUserId } = get()
     if (!currentUserId) return
+    // Simpan ke localStorage seketika — data tidak hilang meski sync gagal
     persistPersonal(personalSections)
-    set({ isSyncing: true, syncStatus: 'saving', isDirty: true })
-    // Safety: jika 10 detik tidak selesai, paksa reset
-    const safety = setTimeout(() => {
-      if (get().syncStatus === 'saving') {
-        set({ isSyncing: false, syncStatus: 'error', isDirty: true })
-      }
-    }, 10000)
-    const ok = await saveUserLayout(currentUserId, personalSections)
-    clearTimeout(safety)
-    set({ isSyncing: false, syncStatus: ok ? 'saved' : 'error', isDirty: !ok })
-    if (ok) setTimeout(() => { if (get().syncStatus === 'saved') set({ syncStatus: 'idle' }) }, 2000)
+    set({ isDirty: true, syncStatus: 'saving' })
+    // Batalkan sync sebelumnya, jadwalkan yang baru
+    if (personalSyncTimer) clearTimeout(personalSyncTimer)
+    personalSyncTimer = setTimeout(async () => {
+      personalSyncTimer = null
+      const { personalSections: latest, currentUserId: uid } = get()
+      if (!uid) return
+      set({ isSyncing: true })
+      const safety = setTimeout(() => {
+        if (get().isSyncing) set({ isSyncing: false, syncStatus: 'error', isDirty: true })
+      }, 10000)
+      const ok = await saveUserLayout(uid, latest)
+      clearTimeout(safety)
+      if (!get().currentUserId) return // user sudah logout saat sync berjalan
+      set({ isSyncing: false, syncStatus: ok ? 'saved' : 'error', isDirty: !ok })
+      if (!ok) get().toast('Gagal menyimpan ke server — data aman di perangkat', 'error')
+      else setTimeout(() => { if (get().syncStatus === 'saved') set({ syncStatus: 'idle' }) }, 2000)
+    }, 400)
   },
 
   // ── Sync langsung (untuk visibility change, pull-to-refresh) ──
@@ -483,8 +500,10 @@ export const useStore = create<DashboardStore>((set, get) => ({
       if (!currentUserId) return
       set({ isSyncing: true, syncStatus: 'saving' })
       const ok = await saveUserLayout(currentUserId, get().personalSections)
+      if (!get().currentUserId) return
       set({ isSyncing: false, syncStatus: ok ? 'saved' : 'error', isDirty: !ok })
-      if (ok) setTimeout(() => set({ syncStatus: 'idle' }), 2000)
+      if (!ok) get().toast('Gagal menyimpan layout — data aman di perangkat', 'error')
+      else setTimeout(() => set({ syncStatus: 'idle' }), 2000)
     }, 800)
   },
 
@@ -629,6 +648,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
     const next = { ...get().appearance, ...o }
     saveLocalAppearance(next) // simpan ke localStorage langsung
     set({ appearance: next })
+    if (o.theme) applyThemeToDOM(o.theme as string) // DOM selalu sinkron
     // Sync ke DB dengan debounce 2 detik
     const userId = get().currentUserId
     if (userId) {
@@ -694,17 +714,16 @@ export const useStore = create<DashboardStore>((set, get) => ({
 }))
 
 // ── Terapkan theme ke DOM ─────────────────────────────────────
-// 2 tema: ivory-light (default) dan obsidian (dark)
+// CSS punya 4 [data-theme]: "midnight"/"slate" (dark) dan "parchment"/"pearl" (light); resolves to midnight/parchment
 export function applyThemeToDOM(theme: string) {
-  // Semua tema gelap → obsidian, semua yang lain → ivory-light
   const darkThemes = ['obsidian', 'dark-mint', 'dark-soft', 'enterprise',
     'aurora-dark', 'sand-dark', 'slate-dark', 'pearl-dark', 'ivory-dark', 'sage-dark',
-    'dark']
-  const resolvedTheme = darkThemes.includes(theme) ? 'obsidian' : 'ivory-light'
+    'dark', 'slate', 'midnight']
+  const resolvedTheme = darkThemes.includes(theme) ? 'midnight' : 'parchment'
 
   document.documentElement.setAttribute('data-theme', resolvedTheme)
 
-  const font = resolvedTheme === 'obsidian'
+  const font = resolvedTheme === 'midnight'
     ? "'Space Grotesk', sans-serif"
     : "'Plus Jakarta Sans', sans-serif"
   document.documentElement.style.setProperty('--font', font)

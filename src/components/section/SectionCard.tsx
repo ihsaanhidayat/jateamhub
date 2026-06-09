@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, memo, useCallback } from 'react'
+import React, { useState, useEffect, useRef, memo, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import { useStore } from '../../store/dashboardStore'
@@ -51,13 +51,17 @@ export default memo(function SectionCard({
   const iconSize        = useStore(s => s.appearance.iconSize)
   const faviconEnabled  = useStore(s => s.appearance.faviconEnabled)
   const isSyncing     = useStore(s => s.isSyncing)
-  const { moveItem, toggleCollapse, deleteItem, toast, syncPersonalToDb } = useStore()
+  // Actions — via getState() untuk hindari subscription re-render
+  const moveItem        = useCallback((...a: Parameters<ReturnType<typeof useStore.getState>['moveItem']>) => useStore.getState().moveItem(...a), [])
+  const toggleCollapse  = useCallback((id: string) => useStore.getState().toggleCollapse(id), [])
+  const deleteItem      = useCallback((...a: Parameters<ReturnType<typeof useStore.getState>['deleteItem']>) => useStore.getState().deleteItem(...a), [])
+  const syncPersonalToDb = useCallback(() => useStore.getState().syncPersonalToDb(), [])
 
   // Build appearance object dari fields (tidak trigger re-render untuk fields lain)
   const appearance = { itemDisplayMode, folderGridCols, iconSize, faviconEnabled } as AppearanceSettings
   const { profile: session } = useAuthStore()
-  const isAdmin  = isShared ? false : true
-  const canFocus  = editMode && !isShared
+  const canEditSection = !isShared
+  const canFocus = editMode && !isShared
 
   // Force re-render saat notes mode toggle dari header
   const [, forceRender] = useState(0)
@@ -115,7 +119,7 @@ export default memo(function SectionCard({
   const handleAddItem = useCallback(() => onAddItem(section.id), [section.id, onAddItem])
 
   const q = searchQuery.toLowerCase()
-  const filteredItems = q
+  const filteredItems = useMemo(() => q
     ? section.items.filter(i =>
         i.title.toLowerCase().includes(q) ||
         (i.desc  && i.desc.toLowerCase().includes(q))  ||
@@ -123,9 +127,10 @@ export default memo(function SectionCard({
         i.tags.some(t => t.toLowerCase().includes(q))
       )
     : section.items
+  , [q, section.items])
 
   // Item yang match via url/desc saja (bukan title) — untuk badge dot
-  const urlDescMatchIds = new Set(
+  const urlDescMatchIds = useMemo(() => new Set(
     q ? section.items
       .filter(i =>
         !i.title.toLowerCase().includes(q) &&
@@ -134,7 +139,7 @@ export default memo(function SectionCard({
       )
       .map(i => i.id)
     : []
-  )
+  ), [q, section.items])
 
   // Auto-expand saat ada search query yang match
   const hasMatch = q && (
@@ -376,7 +381,7 @@ export default memo(function SectionCard({
               />
             ))}
             {/* Ghost add item — saat section focused (desktop edit mode) */}
-            {isFocused && isAdmin && editMode && (
+            {isFocused && canEditSection && editMode && (
               <GhostAddItem onClick={handleAddItem} />
             )}
             {/* Mobile: tombol tambah link selalu tampil untuk personal section */}
@@ -417,7 +422,7 @@ export default memo(function SectionCard({
               />
             ))}
             {/* Poin 12: tombol tambah link di list view saat focused (desktop) */}
-            {!!isFocused && isAdmin && editMode && (
+            {!!isFocused && canEditSection && editMode && (
               <button
                 onMouseDown={e => e.stopPropagation()}
                 onClick={e => { e.stopPropagation(); handleAddItem() }}
@@ -452,7 +457,7 @@ export default memo(function SectionCard({
           </div>
         ))}
       </div>
-      {isFocused && isAdmin && (
+      {isFocused && canEditSection && (
         <div style={{
           display: 'flex', gap: 8, padding: '10px 12px',
           borderTop: '1px solid var(--border)',
@@ -503,7 +508,7 @@ export default memo(function SectionCard({
           onDeleteSection(section.id)
         } else if (confirmDel.type === 'item' && confirmDel.itemId) {
           deleteItem(section.id, confirmDel.itemId)
-          toast('Link dihapus.', 'success')
+          useStore.getState().toast('Link dihapus.', 'success')
         }
         setConfirmDel({ open: false, type: 'section', msg: '' })
       }}

@@ -5,7 +5,9 @@ import { useStore } from '../../store/dashboardStore'
 
 export default function OfflineBar() {
   const { isOnline, wasOffline } = useNetworkStatus()
-  const { isDirty, isSyncing, syncStatus } = useStore()
+  const isDirty    = useStore(s => s.isDirty)
+  const isSyncing  = useStore(s => s.isSyncing)
+  const syncStatus = useStore(s => s.syncStatus)
 
   // Offline
   if (!isOnline) return (

@@ -1,17 +1,33 @@
 {
   "name": "JateamHub",
   "short_name": "JateamHub",
-  "description": "Portal dashboard internal tim",
+  "description": "Portal Dashboard Internal Tim — Kelola link, tugas, dan catatan dalam satu tempat.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F5F6FA",
-  "theme_color": "#2563EB",
+  "background_color": "#F7F3EE",
+  "theme_color": "#D97706",
   "orientation": "any",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Home",
+      "description": "Buka dashboard utama",
+      "url": "/",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "To-do List",
+      "short_name": "Todo",
+      "description": "Buka to-do list",
+      "url": "/#tasks",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
   ],
   "categories": ["productivity", "business"],
   "dir": "ltr",

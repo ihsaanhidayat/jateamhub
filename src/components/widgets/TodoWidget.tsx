@@ -24,7 +24,7 @@ const isDueSoon = (i: TodoItem) => {
   return d > 0 && d < 30 * 60 * 1000
 }
 
-async function saveTodoItems(sectionId: string, next: TodoItem[]) {
+function saveTodoItems(sectionId: string, next: TodoItem[]) {
   const store = useStore.getState()
   const s = store.personalSections.find(s => s.id === sectionId)
   if (!s) return
@@ -45,7 +45,7 @@ async function saveTodoItems(sectionId: string, next: TodoItem[]) {
   } else {
     store.addItem(sectionId, { title: 'todo-data', url: '#', icon: '', desc: json, tags: [], newTab: false, useFavicon: false } as any)
   }
-  await store.syncPersonalToDb()
+  store.syncPersonalToDb()
 }
 
 function Separator({ label, color }: { label: string; color: string }) {
@@ -112,7 +112,7 @@ function TodoWidgetImpl({ sectionId }: { sectionId: string }) {
       try {
         const overdue = isOverdue(item)
         await saveTodoHistory(pid, [{ ...item, done: true, doneAt: Date.now() }], overdue ? 'overdue' : 'done')
-        await saveTodoItems(sectionId, items.filter(i => i.id !== id))
+        saveTodoItems(sectionId, items.filter(i => i.id !== id))
       } catch (e) {
         console.error('Toggle task failed:', e)
       } finally {
@@ -134,9 +134,9 @@ function TodoWidgetImpl({ sectionId }: { sectionId: string }) {
     setTimeout(() => editRef.current?.focus(), 50)
   }
 
-  const saveEdit = async () => {
+  const saveEdit = () => {
     if (!editId || !editText.trim()) { setEditId(null); return }
-    await saveTodoItems(sectionId, items.map(i => i.id === editId ? { ...i, text: editText.trim() } : i))
+    saveTodoItems(sectionId, items.map(i => i.id === editId ? { ...i, text: editText.trim() } : i))
     setEditId(null)
   }
 
@@ -218,7 +218,7 @@ function TodoWidgetImpl({ sectionId }: { sectionId: string }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 34px', background: 'color-mix(in srgb, var(--red) 6%, var(--bg4))', borderBottom: '1px solid var(--border)' }}>
             <span style={{ fontSize: 11, color: 'var(--red)', flex: 1 }}>Hapus tugas ini?</span>
             <button onClick={() => setConfirmId(null)} style={{ height: 20, padding: '0 7px', background: 'none', border: '1px solid var(--border2)', borderRadius: 4, color: 'var(--silver3)', fontSize: 10, cursor: 'pointer', fontFamily: 'var(--font)' }}>Tidak</button>
-            <button onClick={async () => { await saveTodoItems(sectionId, items.filter(i => i.id !== item.id)); setConfirmId(null) }}
+            <button onClick={() => { saveTodoItems(sectionId, items.filter(i => i.id !== item.id)); setConfirmId(null) }}
               style={{ height: 20, padding: '0 7px', background: 'var(--red)', border: 'none', borderRadius: 4, color: 'white', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Hapus</button>
           </div>
         )}
@@ -264,7 +264,7 @@ export const TodoInputFooter = memo(function TodoInputFooter({ sectionId }: { se
   const taRef  = useRef<HTMLTextAreaElement>(null)
   const escRef = useRef<ReturnType<typeof setTimeout>|null>(null)
 
-  const addTask = async () => {
+  const addTask = () => {
     if (!newText.trim()) return
     const task: TodoItem = {
       id: crypto.randomUUID(), text: newText.trim(), done: false,
@@ -272,7 +272,7 @@ export const TodoInputFooter = memo(function TodoInputFooter({ sectionId }: { se
       date: newDueDate || TODAY(),
       dueTime: newDueTime || undefined,
     }
-    await saveTodoItems(sectionId, [...items, task])
+    saveTodoItems(sectionId, [...items, task])
     reset()
   }
 

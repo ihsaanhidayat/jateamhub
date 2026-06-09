@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useId, useRef } from 'react'
 
 interface Props {
   open: boolean
@@ -25,16 +25,27 @@ export default function ConfirmDialog({
     return () => window.removeEventListener('keydown', handler)
   }, [open, onConfirm, onCancel])
 
+  const descId = useId()
+  const confirmRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (open) setTimeout(() => confirmRef.current?.focus(), 50)
+  }, [open])
+
   if (!open) return null
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9000 /* overlay */,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)',
-      padding: 'var(--sp-4)',
-      animation: 'fadeIn 150ms var(--ease)',
-    }} onClick={onCancel}>
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-describedby={descId}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)',
+        padding: 'var(--sp-4)',
+        animation: 'fadeIn 150ms var(--ease)',
+      }} onClick={onCancel}>
       <div
         onClick={e => e.stopPropagation()}
         style={{
@@ -57,7 +68,7 @@ export default function ConfirmDialog({
             {danger ? '⚠️' : 'ℹ️'} {title}
           </div>
         )}
-        <p style={{
+        <p id={descId} style={{
           fontSize: 'var(--text-sm)', color: 'var(--silver2)',
           lineHeight: 1.65, margin: 0,
         }}>
@@ -66,6 +77,7 @@ export default function ConfirmDialog({
         <div style={{ display: 'flex', gap: 'var(--sp-2)', marginTop: 'var(--sp-5)', justifyContent: 'flex-end' }}>
           <button
             onClick={onCancel}
+            aria-label={cancelLabel}
             style={{
               height: 40, padding: '0 var(--sp-4)',
               fontSize: 'var(--text-sm)', fontWeight: 600,
@@ -76,7 +88,9 @@ export default function ConfirmDialog({
             }}
           >{cancelLabel}</button>
           <button
+            ref={confirmRef}
             onClick={onConfirm}
+            aria-label={confirmLabel}
             style={{
               height: 40, padding: '0 var(--sp-4)',
               fontSize: 'var(--text-sm)', fontWeight: 700,

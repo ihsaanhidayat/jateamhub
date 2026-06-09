@@ -29,7 +29,7 @@ const TOAST_STYLES = {
 }
 
 export default function ToastContainer() {
-  const { toasts, removeToast } = useStore()
+  const toasts = useStore(s => s.toasts)
 
   return (
     <div style={{
@@ -48,7 +48,7 @@ export default function ToastContainer() {
         return (
           <div
             key={t.id}
-            onClick={() => removeToast(t.id)}
+            onClick={() => useStore.getState().removeToast(t.id)}
             style={{
               display: 'flex', alignItems: 'center',
               gap: 8, padding: '10px 14px',

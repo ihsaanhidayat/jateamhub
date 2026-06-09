@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../../store/authStore'
+import { useStore } from '../../store/dashboardStore'
 import { supabase } from '../../utils/supabaseClient'
 
 const IDLE_LIMIT_MS    = 30 * 60 * 1000   // 30 menit idle = sesi habis
@@ -8,7 +9,9 @@ const ACTIVITY_EVENTS  = ['mousedown', 'keydown', 'touchstart', 'scroll']
 
 export default function IdleSessionGuard() {
   const { profile, logout } = useAuthStore()
-  const [showWarn, setShowWarn] = useState(false)
+  const showWarnRef  = useRef(false)
+  const [showWarn, setShowWarnState] = useState(false)
+  const setShowWarn  = (v: boolean) => { showWarnRef.current = v; setShowWarnState(v) }
   const [countdown, setCountdown] = useState(WARN_BEFORE_MS / 1000)
   const lastActivity = useRef<number>(Date.now())
   const warnTimer    = useRef<ReturnType<typeof setTimeout>|null>(null)
@@ -24,7 +27,7 @@ export default function IdleSessionGuard() {
 
   // Reset timer setiap aktivitas
   const resetIdleTimer = () => {
-    if (showWarn) return  // sedang ada warning, tunggu user response
+    if (showWarnRef.current) return  // sedang ada warning, tunggu user response
     lastActivity.current = Date.now()
     clearTimers()
     // Schedule warning
@@ -35,10 +38,15 @@ export default function IdleSessionGuard() {
       countTimer.current = setInterval(() => {
         setCountdown(c => c > 0 ? c - 1 : 0)
       }, 1000)
-      // Schedule force logout setelah warning timeout
-      logoutTimer.current = setTimeout(() => {
+      // Schedule force logout setelah warning timeout — pre-save dulu
+      logoutTimer.current = setTimeout(async () => {
         clearTimers()
         setShowWarn(false)
+        const store = useStore.getState()
+        if (store.isDirty) {
+          store.syncPersonalToDb()
+          await new Promise<void>(r => setTimeout(r, 1500))
+        }
         logout()
       }, WARN_BEFORE_MS)
     }, IDLE_LIMIT_MS - WARN_BEFORE_MS)
@@ -71,10 +79,15 @@ export default function IdleSessionGuard() {
     resetIdleTimer()
   }
 
-  // Logout sekarang
-  const logoutNow = () => {
+  // Logout sekarang — simpan dulu, lalu logout
+  const logoutNow = async () => {
     clearTimers()
     setShowWarn(false)
+    const store = useStore.getState()
+    if (store.isDirty) {
+      store.syncPersonalToDb()
+      await new Promise<void>(r => setTimeout(r, 1500))
+    }
     logout()
   }
 

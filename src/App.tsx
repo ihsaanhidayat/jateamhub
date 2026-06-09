@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useAuthStore } from './store/authStore'
-import { useStore } from './store/dashboardStore'
+import { useStore, applyThemeToDOM } from './store/dashboardStore'
 import { supabase } from './utils/supabaseClient'
 import LoginPage    from './components/layout/LoginPage'
 import RegisterPage from './components/layout/RegisterPage'
@@ -33,7 +33,7 @@ export default function App() {
   const isDirty      = useStore(s => s.isDirty)
   const isSyncing    = useStore(s => s.isSyncing)
   const isDataInitialized = useStore(s => s.isDataInitialized)
-  const { toggleEditMode, initUser, toast, setCurrentUserId, syncPersonalToDb } = useStore()
+  const { toggleEditMode, initUser, toast, setCurrentUserId } = useStore()
   const [showRegister,   setShowRegister]   = useState(false)
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [addSectionOpen, setAddSectionOpen] = useState(false)
@@ -61,8 +61,7 @@ export default function App() {
   // Onboarding — tampilkan untuk user baru (dashboard kosong + belum pernah lihat)
   const personalSections = useStore(s => s.personalSections)
 
-  // Apply tema dari localStorage SEKETIKA sebelum apapun dirender
-  // Ini mencegah flash of wrong theme
+  // Apply tema dari localStorage SEKETIKA — mencegah flash of wrong theme sebelum initUser selesai
   const themeApplied = useRef(false)
   if (!themeApplied.current) {
     themeApplied.current = true
@@ -70,7 +69,7 @@ export default function App() {
       const saved = localStorage.getItem('jateamhub-appearance')
       if (saved) {
         const app = JSON.parse(saved)
-        // tema ditangani oleh Header theme toggle
+        if (app.theme) applyThemeToDOM(app.theme as string)
       }
     } catch { /* ignore */ }
   }
@@ -80,15 +79,14 @@ export default function App() {
     const handleHide = () => {
       const store = useStore.getState()
       if (store.isDirty && !store.isSyncing) {
-        store.syncPersonalToDb().catch(() => {})
+        store.syncPersonalToDb()
       }
     }
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') handleHide()
-    })
+    const onHide = () => { if (document.visibilityState === 'hidden') handleHide() }
+    document.addEventListener('visibilitychange', onHide)
     window.addEventListener('pagehide', handleHide)
     return () => {
-      document.removeEventListener('visibilitychange', handleHide)
+      document.removeEventListener('visibilitychange', onHide)
       window.removeEventListener('pagehide', handleHide)
     }
   }, [])
@@ -135,7 +133,11 @@ export default function App() {
         const expiresAt = session.expires_at ?? 0
         const now = Math.floor(Date.now() / 1000)
         if (expiresAt - now < 300) {
-          await supabase.auth.refreshSession()
+          const { error: refreshErr } = await supabase.auth.refreshSession()
+          if (refreshErr) {
+            useAuthStore.getState().logout()
+            return
+          }
         }
 
         // 3. SELALU sync ke DB saat kembali — data di localStorage lebih baru
@@ -184,6 +186,14 @@ export default function App() {
       )
       useAuthStore.getState().setToastFn(toast)
 
+      // Safety: jika 12 detik isDataInitialized masih false, paksa true
+      // (guard jika initUser hang karena jaringan sangat lambat)
+      const safetyInit = setTimeout(() => {
+        if (!useStore.getState().isDataInitialized) {
+          useStore.setState({ isDataInitialized: true })
+        }
+      }, 12000)
+
       // Onboarding untuk user baru
       const onboardingKey = `jateamhub-onboarded-${profile.id}`
       if (!localStorage.getItem(onboardingKey)) {
@@ -193,6 +203,7 @@ export default function App() {
       // Coffee modal — dinonaktifkan sementara
       // const sessionKey = `coffee-shown-${profile.id}`
       // if (!sessionStorage.getItem(sessionKey)) { ... }
+      return () => clearTimeout(safetyInit)
     }
   }, [profile?.id])
 
@@ -222,6 +233,13 @@ export default function App() {
     return () => window.removeEventListener('jateamhub-logout', onLogout)
   }, [])
 
+  // JWT expired saat background (refresh token mati) → paksa logout
+  useEffect(() => {
+    const onExpired = () => useAuthStore.getState().logout()
+    window.addEventListener('jateamhub-session-expired', onExpired)
+    return () => window.removeEventListener('jateamhub-session-expired', onExpired)
+  }, [])
+
   // Sync theme ke DOM
   // tema ditangani oleh Header theme toggle
 
@@ -243,7 +261,7 @@ export default function App() {
       <div style={{
         width: 32, height: 32, border: '3px solid var(--border2)',
         borderTopColor: 'var(--accent)', borderRadius: '50%',
-        animation: 'loginSpin 0.8s linear infinite',
+        animation: 'spin 0.8s linear infinite',
       }} />
       <span style={{ fontSize: 13, color: 'var(--silver3)' }}>Memuat...</span>
     </div>

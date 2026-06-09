@@ -179,9 +179,14 @@ export const saveUserLayout = async (
 
       if (!result.error) return true
 
-      // Auth error → refresh session lalu retry
+      // Auth error → coba refresh session lalu retry
       if (result.error.code === 'PGRST301' || result.error.message?.includes('JWT')) {
-        await supabase.auth.refreshSession()
+        const { error: refreshErr } = await supabase.auth.refreshSession()
+        if (refreshErr) {
+          // Refresh token invalid/expired → paksa logout agar user tidak stuck
+          window.dispatchEvent(new Event('jateamhub-session-expired'))
+          return false
+        }
         continue
       }
 

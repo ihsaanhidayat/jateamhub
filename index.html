@@ -2,24 +2,29 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JateamHub</title>
     <!-- Theme init SEBELUM apapun — mencegah flash -->
     <script>
       (function(){
         try {
-          var t = localStorage.getItem('jateamhub-theme')
-          var d = window.matchMedia('(prefers-color-scheme: dark)').matches
-          var theme = t || (d ? 'slate' : 'pearl')
-          document.documentElement.setAttribute('data-theme', theme)
-          // Update status bar color ikut tema
-          var color = theme === 'slate' ? '#0F1117' : '#F5F6FA'
+          var dark = ['midnight','slate','obsidian','dark-mint','dark-soft','enterprise',
+            'aurora-dark','sand-dark','slate-dark','pearl-dark','ivory-dark','sage-dark','dark']
+          var stored = ''
+          try { var a = JSON.parse(localStorage.getItem('jateamhub-appearance') || '{}'); stored = a.theme || '' } catch(e) {}
+          if (!stored) stored = localStorage.getItem('jateamhub-theme') || ''
+          var isDark = stored ? dark.indexOf(stored) >= 0 : window.matchMedia('(prefers-color-scheme: dark)').matches
+          var resolved = isDark ? 'midnight' : 'parchment'
+          document.documentElement.setAttribute('data-theme', resolved)
+          var color = isDark ? '#0A0D1A' : '#F7F3EE'
           document.querySelector('meta[name="theme-color"]')?.setAttribute('content', color)
         } catch(e) {}
       })()
     </script>
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#F5F6FA" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <meta name="theme-color" content="#F7F3EE" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />

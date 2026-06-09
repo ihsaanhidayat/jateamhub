@@ -10,14 +10,12 @@ interface Props {
 }
 
 export default function AddSectionModal({ open, onClose }: Props) {
-  const { personalSections, addPersonalSectionAuto, addPersonalSectionFirst } = useStore()
-
-  // Cek apakah sudah ada widget jam (hanya boleh 1)
-  const hasClockWidget  = personalSections.some(s => s.type === 'widget' && s.widgetType === 'clock')
-  const hasTodoWidget   = personalSections.some(s => s.type === 'widget' && s.widgetType === 'todo')
+  // Granular selectors — hanya re-render saat sections berubah
+  const hasClockWidget = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'clock'))
+  const hasTodoWidget  = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'todo'))
 
   const addWidget = (widgetType: WidgetType) => {
-    const { addPersonalSection } = useStore.getState()
+    const { addPersonalSection, addPersonalSectionFirst, addPersonalSectionAuto } = useStore.getState()
     const current = useStore.getState().personalSections
     const maxY    = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
     const lastRow = current.filter(s => s.layout.y + s.layout.h >= maxY)
@@ -86,7 +84,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
           <div style={cardBase}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.background = 'var(--accent-light)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'; (e.currentTarget as HTMLElement).style.background = 'var(--bg2)' }}
-            onClick={() => { addPersonalSectionAuto(); onClose() }}>
+            onClick={() => { useStore.getState().addPersonalSectionAuto(); onClose() }}>
             <span style={{ fontSize: 36 }}>📁</span>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)', marginBottom: 4 }}>Section</div>
@@ -138,7 +136,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
               <button
                 onClick={e => {
                   e.stopPropagation()
-                  if (hasTodoWidget) { alert('Todo list sudah ada. Hanya boleh 1 todo list.'); return }
+                  if (hasTodoWidget) { useStore.getState().toast('Todo list sudah ada — hanya boleh 1 todo list.', 'warn'); return }
                   addWidget('todo')
                 }}
                 disabled={hasTodoWidget}

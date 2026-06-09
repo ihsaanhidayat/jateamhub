@@ -7,17 +7,19 @@ import type { Section } from '../../types'
 interface Props { open: boolean; section: Section; onClose: () => void }
 
 export default function SectionEditModal({ open, section, onClose }: Props) {
-  const { updatePersonalSection, syncPersonalToDb, deletePersonalSection, toast } = useStore()
-  const [title,    setTitle]    = useState(section.title)
-  const [icon,     setIcon]     = useState(section.icon ?? '')
-  const [subtitle, setSubtitle] = useState(section.subtitle ?? '')
-  const [showPicker, setShowPicker] = useState(false)
+  const [title,       setTitle]       = useState(section.title)
+  const [icon,        setIcon]        = useState(section.icon ?? '')
+  const [subtitle,    setSubtitle]    = useState(section.subtitle ?? '')
+  const [showPicker,  setShowPicker]  = useState(false)
+  const [confirmDel,  setConfirmDel]  = useState(false)
 
   useEffect(() => {
     setTitle(section.title); setIcon(section.icon ?? ''); setSubtitle(section.subtitle ?? '')
+    setConfirmDel(false)
   }, [section.id])
 
   const handleSave = () => {
+    const { updatePersonalSection, syncPersonalToDb, toast } = useStore.getState()
     updatePersonalSection(section.id, { title: title.trim() || 'Section', icon, subtitle })
     syncPersonalToDb()
     toast('Section diperbarui.', 'success')
@@ -25,7 +27,7 @@ export default function SectionEditModal({ open, section, onClose }: Props) {
   }
 
   const handleDelete = () => {
-    if (!confirm(`Hapus section "${section.title}" dan semua isinya?`)) return
+    const { deletePersonalSection, syncPersonalToDb } = useStore.getState()
     deletePersonalSection(section.id)
     syncPersonalToDb()
     onClose()
@@ -59,7 +61,15 @@ export default function SectionEditModal({ open, section, onClose }: Props) {
           <input className="input" value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Deskripsi singkat" />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
-          <button className="btn btn-danger" onClick={handleDelete}>🗑 Hapus Section</button>
+          {confirmDel ? (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: 'var(--red)', fontWeight: 600 }}>Yakin hapus?</span>
+              <button className="btn btn-danger" onClick={handleDelete} style={{ padding: '0 10px', height: 30, fontSize: 12 }}>Ya</button>
+              <button className="btn btn-secondary" onClick={() => setConfirmDel(false)} style={{ padding: '0 10px', height: 30, fontSize: 12 }}>Batal</button>
+            </div>
+          ) : (
+            <button className="btn btn-danger" onClick={() => setConfirmDel(true)}>🗑 Hapus Section</button>
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-secondary" onClick={onClose}>Batal</button>
             <button className="btn btn-primary" onClick={handleSave}>Simpan</button>

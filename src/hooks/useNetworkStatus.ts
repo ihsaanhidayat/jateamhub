@@ -1,25 +1,23 @@
-// ─────────────────────────────────────────────────────────────
-// useNetworkStatus — deteksi online/offline
-// Data aman di localStorage saat offline, sync saat kembali online
-// ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react'
 import { useStore } from '../store/dashboardStore'
 
 export function useNetworkStatus() {
   const [isOnline,   setIsOnline]   = useState(navigator.onLine)
   const [wasOffline, setWasOffline] = useState(false)
-  const { syncPersonalToDb, isDirty } = useStore()
 
   useEffect(() => {
-    const handleOnline = async () => {
+    const handleOnline = () => {
       setIsOnline(true)
-      if (wasOffline) {
-        setWasOffline(false)
-        // Sync data yang pending saat offline
-        if (isDirty) {
-          setTimeout(() => syncPersonalToDb(), 500)
+      setWasOffline(prev => {
+        if (prev) {
+          // Sync pending data after coming back online
+          setTimeout(() => {
+            const store = useStore.getState()
+            if (store.isDirty) store.syncPersonalToDb()
+          }, 500)
         }
-      }
+        return false
+      })
     }
     const handleOffline = () => {
       setIsOnline(false)
@@ -32,7 +30,7 @@ export function useNetworkStatus() {
       window.removeEventListener('online',  handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [wasOffline, isDirty])
+  }, [])
 
   return { isOnline, wasOffline }
 }

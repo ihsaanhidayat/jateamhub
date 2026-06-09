@@ -30,7 +30,7 @@ const labelSt: React.CSSProperties = {
 
 export default function SuperadminDashboard() {
   const { profile, logout, users, loadUsers, addUser, updateUser, removeUser } = useAuthStore()
-  const { toast } = useStore()
+  const toast = useStore.getState().toast
 
   const [tab, setTab] = useState<'pending' | 'users'>('pending')
   const [pending,     setPending]     = useState<PendingRegistration[]>([])
@@ -59,7 +59,8 @@ export default function SuperadminDashboard() {
   const [newFullName,  setNewFullName]  = useState('')
   const [newEmail,     setNewEmail]     = useState('')
   const [err,          setErr]          = useState('')
-  const [saving,       setSaving]       = useState(false)
+  const [saving,          setSaving]          = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const PAGE_SIZE = 10
 
@@ -314,10 +315,20 @@ export default function SuperadminDashboard() {
                               {isEditing ? 'Tutup' : 'Edit'}
                             </button>
                             {u.id !== profile?.id && u.role !== 'superadmin' && (
-                              <button className="btn btn-danger" style={{ height: 30, fontSize: 11, padding: '0 10px' }}
-                                onClick={async () => { if (confirm(`Hapus ${u.username}?`)) { await removeUser(u.id); loadUsers() } }}>
-                                Hapus
-                              </button>
+                              confirmDeleteId === u.id ? (
+                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                  <span style={{ fontSize: 10, color: 'var(--red)', fontWeight: 600 }}>Yakin hapus?</span>
+                                  <button className="btn btn-danger" style={{ height: 28, fontSize: 10, padding: '0 8px' }}
+                                    onClick={async () => { await removeUser(u.id); loadUsers(); setConfirmDeleteId(null) }}>Ya</button>
+                                  <button className="btn btn-secondary" style={{ height: 28, fontSize: 10, padding: '0 8px' }}
+                                    onClick={() => setConfirmDeleteId(null)}>Batal</button>
+                                </div>
+                              ) : (
+                                <button className="btn btn-danger" style={{ height: 30, fontSize: 11, padding: '0 10px' }}
+                                  onClick={() => setConfirmDeleteId(u.id)}>
+                                  Hapus
+                                </button>
+                              )
                             )}
                           </>
                         )}
