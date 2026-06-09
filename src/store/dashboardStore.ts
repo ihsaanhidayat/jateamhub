@@ -659,11 +659,17 @@ export const useStore = create<DashboardStore>((set, get) => ({
     saveLocalAppearance(next) // simpan ke localStorage langsung
     set({ appearance: next })
     if (o.theme) applyThemeToDOM(o.theme as string) // DOM selalu sinkron
-    // Sync ke DB dengan debounce 2 detik
     const userId = get().currentUserId
     if (userId) {
       if (appearanceSyncTimer) clearTimeout(appearanceSyncTimer)
-      appearanceSyncTimer = setTimeout(() => saveUserAppearance(userId, next), 2000)
+      if (o.theme) {
+        // Tema adalah state kritis — simpan ke DB SEKETIKA agar tidak hilang saat logout
+        appearanceSyncTimer = null
+        saveUserAppearance(userId, next).catch(() => {})
+      } else {
+        // Pengaturan lain (iconSize, folderGridCols, dll.) — debounce 2 detik sudah cukup
+        appearanceSyncTimer = setTimeout(() => saveUserAppearance(userId, next), 2000)
+      }
     }
   },
 
