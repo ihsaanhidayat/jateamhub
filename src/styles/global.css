@@ -584,7 +584,7 @@ mark.hl { background: var(--accent-soft); color: var(--accent); border-radius: 3
 @keyframes slideInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes shimmer  { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @keyframes spin     { to { transform: rotate(360deg); } }
-@keyframes pulse    { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes pulse    { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.72; transform: scale(1.07); } }
 @keyframes editPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.4); } }
 @keyframes shake    { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-8px); } 40%,80% { transform: translateX(8px); } }
 
