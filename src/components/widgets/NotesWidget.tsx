@@ -19,15 +19,26 @@ function NotesWidgetImpl({ sectionId }: Props) {
   const readMode   = () => (localStorage.getItem(modeKey) as 'lock'|'open') ?? 'open'
   const readLocked = () => localStorage.getItem(lockedKey) === 'true'
 
-  const [mode,   setMode]         = useState<'lock'|'open'>(readMode)
-  // Always start locked when mode is 'lock' — prevents showing unlocked state on login
-  const [locked, setLockedState]  = useState<boolean>(() => readMode() === 'lock' ? true : readLocked())
+  // sessionStorage tracks "unlocked in this browser session" so expand modal
+  // inherits unlock state without asking password again
+  const sessionKey = () => `notes-session-${profile?.username ?? useAuthStore.getState().profile?.username ?? 'u'}-${sectionId}`
 
-  // Re-read saat profile load; mode 'lock' selalu mulai terkunci di setiap sesi baru
+  const [mode,   setMode]        = useState<'lock'|'open'>(readMode)
+  const [locked, setLockedState] = useState<boolean>(() => {
+    if (readMode() !== 'lock') return readLocked()
+    // lock mode: respect session unlock so expand modal doesn't re-ask password
+    const sk = `notes-session-${useAuthStore.getState().profile?.username ?? 'u'}-${sectionId}`
+    return sessionStorage.getItem(sk) !== '1'
+  })
+
+  // Re-read saat profile load; mode 'lock' only locks if not already unlocked this session
   useEffect(() => {
     if (!profile?.username) return
     const m = (localStorage.getItem(`notes-mode-${profile.username}-${sectionId}`) as 'lock'|'open') ?? 'open'
-    const l = m === 'lock' ? true : localStorage.getItem(`notes-locked-${profile.username}-${sectionId}`) === 'true'
+    const sk = `notes-session-${profile.username}-${sectionId}`
+    const l = m === 'lock'
+      ? sessionStorage.getItem(sk) !== '1'
+      : localStorage.getItem(`notes-locked-${profile.username}-${sectionId}`) === 'true'
     setMode(m)
     setLockedState(l)
   }, [profile?.username, sectionId])
@@ -48,12 +59,16 @@ function NotesWidgetImpl({ sectionId }: Props) {
   }
   useEffect(() => { autoGrow() }, [text, locked])
 
-  const timerRef   = useRef<ReturnType<typeof setTimeout>|null>(null)
-  const lockTimer  = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const timerRef         = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const lockTimer        = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const modeEffectFirst  = useRef(true)
 
   const setLocked = (val: boolean) => {
     setLockedState(val)
     localStorage.setItem(lockedKey, String(val))
+    // sync session unlock flag
+    if (val) sessionStorage.removeItem(sessionKey())
+    else sessionStorage.setItem(sessionKey(), '1')
   }
 
   // Listen for mode changes from SectionCard header toggle
@@ -76,10 +91,12 @@ function NotesWidgetImpl({ sectionId }: Props) {
     setText(s?.items?.[0]?.desc ?? '')
   }, [sectionId])
 
-  // Saat login — jika mode lock, pastikan terkunci
+  // Lock when mode actively switches to 'lock'; skip first run so expand
+  // modal doesn't re-lock notes the user already unlocked in this session
   useEffect(() => {
-    if (mode === 'lock') setLocked(true)
-    // Start idle timer di kedua mode
+    const isFirst = modeEffectFirst.current
+    modeEffectFirst.current = false
+    if (!isFirst && mode === 'lock') setLocked(true)
     startIdleTimer(mode)
     return () => { if (lockTimer.current) clearTimeout(lockTimer.current) }
   }, [mode])

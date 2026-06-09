@@ -11,10 +11,12 @@ export const getDomainFromUrl = (url: string): string => {
   } catch { return '' }
 }
 
-export const getFaviconUrl = (url: string, size = 64): string => {
+export const getFaviconUrl = (url: string, _size = 64): string => {
   const domain = getDomainFromUrl(url)
   if (!domain) return ''
-  return `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`
+  // DuckDuckGo returns 404 for unknown domains so onError fires cleanly
+  // (Google's s2/favicons returns a globe image instead of 404)
+  return `https://icons.duckduckgo.com/ip3/${domain}.ico`
 }
 
 export const highlight = (text: string, query: string): string => {
