@@ -304,8 +304,8 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
       {/* Shared sections */}
       {sharedAsSections.length > 0 && (
         <div className="shared-sections-row">
-          {sharedAsSections.map(section => (
-            <div key={section.id} style={{ opacity: sectionMatches(section as any) ? 1 : 0.2, transition: 'opacity 200ms' }}>
+          {sharedAsSections.filter(section => sectionMatches(section as any)).map(section => (
+            <div key={section.id}>
               <SectionCard
                 section={section}
                 isShared={true}
@@ -333,12 +333,10 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
       >
         <SortableContext items={personalSections.map(s => s.id)} strategy={rectSortingStrategy}>
           <div className="dashboard-grid">
-            {personalSections.map(section => (
+            {personalSections.filter(section => sectionMatches(section)).map(section => (
               <div
                 key={section.id}
                 style={{
-                  opacity: sectionMatches(section) ? 1 : 0.2,
-                  transition: 'opacity 200ms',
                   gridColumn: (expandedWidgetId === section.id && !isMobile) ? 'span 2' : undefined,
                 }}
               >
