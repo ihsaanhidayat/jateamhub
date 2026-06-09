@@ -339,7 +339,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                 style={{
                   opacity: sectionMatches(section) ? 1 : 0.2,
                   transition: 'opacity 200ms',
-
+                  gridColumn: expandedWidgetId === section.id ? 'span 2' : undefined,
                 }}
               >
                 <SortableSectionCard
@@ -385,61 +385,6 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
         </DragOverlay>
       </DndContext>
 
-      {/* Widget expand overlay — desktop: center modal, mobile: bottom sheet */}
-      {expandedWidgetId && (() => {
-        const sec = personalSections.find(s => s.id === expandedWidgetId)
-        if (!sec) return null
-        const isTodo = (sec as any).widgetType === 'todo'
-        const isNotes = (sec as any).widgetType === 'notes'
-        return (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 300,
-            background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: isMobile ? 'flex-end' : 'center',
-            justifyContent: 'center',
-            animation: 'fadeIn 200ms ease',
-          }} onClick={() => setExpandedWidgetId(null)}>
-            <div onClick={e => e.stopPropagation()} style={{
-              background: 'var(--card-bg)',
-              borderRadius: isMobile ? '16px 16px 0 0' : 16,
-              width: isMobile ? '100%' : '90%',
-              maxWidth: isMobile ? '100%' : 640,
-              maxHeight: isMobile ? '85vh' : '75vh',
-              display: 'flex', flexDirection: 'column',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-              animation: isMobile ? 'slideUp 250ms cubic-bezier(0.16,1,0.3,1)' : 'fadeIn 200ms ease',
-            }}>
-              {/* Handle bar mobile */}
-              {isMobile && (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
-                  <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} />
-                </div>
-              )}
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px 10px', gap: 8, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-                <span style={{ fontSize: 18 }}>{sec.icon}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)' }}>{sec.title}</div>
-                  {sec.subtitle && <div style={{ fontSize: 11, color: 'var(--silver3)' }}>{sec.subtitle}</div>}
-                </div>
-                <button onClick={() => setExpandedWidgetId(null)} style={{
-                  width: 30, height: 30, borderRadius: 8, background: 'var(--bg4)',
-                  border: '1px solid var(--border2)', cursor: 'pointer', color: 'var(--silver3)',
-                  fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>✕</button>
-              </div>
-              {/* Content */}
-              <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-                {isTodo && <TodoWidget sectionId={expandedWidgetId} />}
-                {isNotes && <NotesWidget sectionId={expandedWidgetId} />}
-              </div>
-              {/* Footer — todo input */}
-              {isTodo && <TodoInputFooter sectionId={expandedWidgetId} />}
-            </div>
-          </div>
-        )
-      })()}
     </div>
   )
 }

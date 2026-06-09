@@ -237,6 +237,7 @@ input, textarea, select { font-family: var(--font); }
 }
 .section-body::-webkit-scrollbar { display: none; }
 .section-body.collapsed { display: none; }
+.section-body.expanded  { max-height: none; overflow: visible; }
 
 /* Empty state */
 .section-empty {

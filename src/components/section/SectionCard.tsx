@@ -341,7 +341,7 @@ export default memo(function SectionCard({
       </div>
 
       {/* ── Body ─────────────────────────────────────────── */}
-      <div className={`section-body${effectiveCollapsed ? ' collapsed' : ''}`}>
+      <div className={`section-body${effectiveCollapsed ? ' collapsed' : ''}${isExpanded ? ' expanded' : ''}`}>
         {/* Empty state */}
         {!widgetContent && filteredItems.length === 0 && !editMode && (
           <div className="section-empty">
