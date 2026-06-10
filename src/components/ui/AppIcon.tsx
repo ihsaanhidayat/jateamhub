@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { getFaviconUrl, isValidUrl } from '../../utils/helpers'
 import type { LinkItem, IconSize } from '../../types'
 import { ICON_SIZE_MAP } from '../../types'
@@ -10,7 +10,7 @@ interface Props {
   className?: string
 }
 
-export default function AppIcon({ item, iconSize, faviconEnabled, className }: Props) {
+export default memo(function AppIcon({ item, iconSize, faviconEnabled, className }: Props) {
   const [faviconError, setFaviconError] = useState(false)
   const sizes = ICON_SIZE_MAP[iconSize]
 
@@ -87,4 +87,4 @@ export default function AppIcon({ item, iconSize, faviconEnabled, className }: P
       </svg>
     </div>
   )
-}
+})

@@ -231,12 +231,13 @@ input, textarea, select { font-family: var(--font); }
 .section-body {
   padding: 8px;
   max-height: calc(8 * (44px + 8px + 18px) + 16px);
-  overflow-y: auto;
+  overflow: hidden;
   scrollbar-width: none; -ms-overflow-style: none;
   background: var(--card-bg);
+  transition: max-height 220ms var(--ease), opacity 160ms var(--ease), padding 200ms var(--ease);
 }
 .section-body::-webkit-scrollbar { display: none; }
-.section-body.collapsed { display: none; }
+.section-body.collapsed { max-height: 0; opacity: 0; padding: 0; pointer-events: none; }
 .section-body.expanded  { max-height: none; overflow: visible; }
 
 /* Empty state */
@@ -321,10 +322,12 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .folder-edit-btn, .folder-delete-btn {
-  position: absolute; top: 2px; padding: 1px 3px;
+  position: absolute; top: 2px; padding: 3px;
   background: var(--bg2); border: 1px solid var(--border2);
-  border-radius: 4px; font-size: 9px; cursor: pointer; z-index: 2;
+  border-radius: 4px; cursor: pointer; z-index: 2;
   opacity: 0; transition: opacity 120ms;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--silver3);
 }
 .folder-item:hover .folder-edit-btn,
 .folder-item:hover .folder-delete-btn { opacity: 1; }
@@ -349,13 +352,13 @@ body {
    LIST VIEW
 ══════════════════════════════════════════════════════════ */
 .list-items { display: flex; flex-direction: column; gap: 1px; padding: 4px; }
-.list-item {
+.list-item, .item-card {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 10px; border-radius: 8px;
   cursor: pointer; text-decoration: none; color: inherit;
   transition: background 120ms; position: relative;
 }
-.list-item:hover { background: var(--bg4); }
+.list-item:hover, .item-card:hover { background: var(--bg4); }
 .list-item-icon {
   width: 28px; height: 28px; border-radius: 6px; overflow: hidden;
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
@@ -364,15 +367,44 @@ body {
 .list-item-icon img { width: 100%; height: 100%; object-fit: contain; }
 .list-item-label { font-size: 13px; font-weight: 500; color: var(--silver2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-title { font-size: 13px; font-weight: 500; color: var(--silver2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-action-group, .folder-action-group {
+  display: flex; align-items: center; gap: 2px;
+}
 .item-edit-btn, .item-delete-btn {
-  margin-left: auto; padding: 2px 6px;
+  margin-left: auto; padding: 3px 5px;
   background: none; border: 1px solid transparent;
-  border-radius: 4px; font-size: 11px; cursor: pointer;
+  border-radius: 4px; cursor: pointer;
   color: var(--silver3); opacity: 0; transition: opacity 120ms;
+  display: flex; align-items: center; justify-content: center;
 }
 .list-item:hover .item-edit-btn,
-.list-item:hover .item-delete-btn { opacity: 1; }
+.list-item:hover .item-delete-btn,
+.item-card:hover .item-edit-btn,
+.item-card:hover .item-delete-btn { opacity: 1; }
+.item-action-group .item-edit-btn,
+.item-action-group .item-delete-btn { opacity: 1; }
 .item-delete-btn:hover { color: var(--red); border-color: var(--red-bg); background: var(--red-bg); }
+.folder-edit-btn:hover { background: var(--bg4); }
+.folder-delete-btn:hover { color: var(--red); }
+
+/* Drag overlay — subtle grid during active drag */
+.drag-grid-overlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  opacity: 0; transition: opacity 200ms var(--ease);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--accent) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent) 1px, transparent 1px);
+  background-size: 80px 80px;
+}
+.drag-grid-overlay.visible { opacity: 1; }
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg3) 25%, var(--bg4) 50%, var(--bg3) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
 
 /* ══════════════════════════════════════════════════════════
    MODAL

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { IconX } from './components/ui/icons'
 import { useAuthStore } from './store/authStore'
 import { useStore, applyThemeToDOM } from './store/dashboardStore'
 import { supabase } from './utils/supabaseClient'
@@ -289,7 +290,6 @@ export default function App() {
     <div style={{
       display: 'flex', flexDirection: 'column', minHeight: '100dvh',
       position: 'relative',
-      // Poin 3: border jelas saat edit mode
       boxShadow: editMode
         ? `inset 0 0 0 2px var(--accent), inset 0 0 0 4px var(--mint-bg2)`
         : 'none',
@@ -335,7 +335,8 @@ export default function App() {
               borderRadius: 'var(--radius-sm)', color: 'var(--silver3)',
               fontSize: 10, fontWeight: 700, cursor: 'pointer',
               fontFamily: 'var(--font)',
-            }}>✕ Selesai</button>
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}><IconX size={9} /> Selesai</button>
         </div>
       )}
 

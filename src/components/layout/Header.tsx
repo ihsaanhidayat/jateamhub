@@ -5,6 +5,7 @@ import { canEdit, canSeeOptions, getDisplayBadge, isAdmin, isAdminGlobal } from 
 import { sanitizePage } from '../../utils/security'
 import { uploadAvatar, updateProfile } from '../../utils/supabaseClient'
 import AvatarCropModal from '../ui/AvatarCropModal'
+import { IconSearch, IconX, IconUpload, IconPencil, IconSun, IconMoon } from '../ui/icons'
 
 interface Props {
   onToggleOptions:  () => void
@@ -209,9 +210,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                       width: 34, height: 34, flexShrink: 0,
                       background: 'none', border: 'none', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: searchOpen ? 'var(--accent)' : 'var(--silver3)', fontSize: 15,
+                      color: searchOpen ? 'var(--accent)' : 'var(--silver3)',
                       transition: 'color 150ms',
-                    }}>🔍</button>
+                    }}><IconSearch /></button>
                     <input
                       ref={searchRef}
                       value={searchQuery}
@@ -238,23 +239,23 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                         background: 'var(--border2)', border: 'none', borderRadius: '50%',
                         cursor: 'pointer', color: 'var(--silver3)', fontSize: 10,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>✕</button>
+                      }}><IconX size={9} /></button>
                     )}
                   </div>
                 </div>
               )}
               <button className="icon-btn desktop-only" onClick={onImportLinks}
-                title="Import / Export Links" aria-label="Import / Export Links"
-                style={{ fontSize: 15 }}>📥</button>
-              <button className="icon-btn desktop-only" onClick={() => useStore.getState().toggleEditMode()} title="Edit Mode" aria-label="Edit Mode">✏️</button>
+                title="Import / Export Links" aria-label="Import / Export Links">
+                <IconUpload /></button>
+              <button className="icon-btn desktop-only" onClick={() => useStore.getState().toggleEditMode()} title="Edit Mode" aria-label="Edit Mode"><IconPencil /></button>
             </>
           ) : (
             <>
               <button className="icon-btn desktop-only" onClick={onAddSection}
                 style={{ fontWeight: 700, fontSize: 16 }} title="Tambah Section" aria-label="Tambah Section">＋</button>
               <button className="icon-btn desktop-only" onClick={onImportLinks}
-                title="Import / Export Links" aria-label="Import / Export Links"
-                style={{ fontSize: 15 }}>📥</button>
+                title="Import / Export Links" aria-label="Import / Export Links">
+                <IconUpload /></button>
               <button
                 className="icon-btn desktop-only active"
                 onClick={e => {
@@ -273,8 +274,8 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
           <div className="mobile-only">
             {!editMode && !hideSearch && (
               <button onClick={() => { setSearchOpen(v => !v); if (!searchOpen) setTimeout(() => searchRef.current?.focus(), 100) }}
-                style={{ width: 34, height: 34, background: searchOpen ? 'var(--accent-light)' : 'none', border: '1px solid transparent', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: searchOpen ? 'var(--accent)' : 'var(--silver3)', fontSize: 15 }}>
-                🔍
+                style={{ width: 34, height: 34, background: searchOpen ? 'var(--accent-light)' : 'none', border: '1px solid transparent', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: searchOpen ? 'var(--accent)' : 'var(--silver3)' }}>
+                <IconSearch />
               </button>
             )}
             {editMode && (
@@ -292,7 +293,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             title={isDark ? 'Switch ke Parchment (Light)' : 'Switch ke Midnight (Dark)'}
             aria-label="Toggle tema"
           >
-            {isDark ? '🌙' : '☀️'}
+            {isDark ? <IconMoon /> : <IconSun />}
           </button>
 
           {/* Profile dropdown — lebih besar dari tombol lain */}
@@ -352,7 +353,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
           animation: 'slideDown 200ms ease',
         }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 14, color: 'var(--silver4)' }}>🔍</span>
+            <span style={{ color: 'var(--silver4)', display: 'flex', alignItems: 'center' }}><IconSearch /></span>
             <input
               ref={searchRef}
               value={searchQuery}
@@ -370,9 +371,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
             <button onClick={() => { setSearchOpen(false); useStore.getState().setSearch('') }} style={{
               width: 36, height: 36, borderRadius: 8, background: 'var(--bg4)',
               border: '1px solid var(--border2)', cursor: 'pointer',
-              color: 'var(--silver3)', fontSize: 12,
+              color: 'var(--silver3)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>✕</button>
+            }}><IconX /></button>
           </div>
         </div>
       )}

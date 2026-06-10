@@ -7,6 +7,7 @@ import type { Section, LinkItem, AppearanceSettings } from '../../types'
 import { highlight } from '../../utils/helpers'
 import AppIcon from '../ui/AppIcon'
 import { sanitizeUrl } from '../../utils/security'
+import { IconEdit, IconTrash, IconSettings, IconLock, IconUnlock, IconMaximize, IconMinimize } from '../ui/icons'
 
 interface Props {
   section:              Section
@@ -269,7 +270,7 @@ export default memo(function SectionCard({
                 onMouseDown={e => e.stopPropagation()}
                 onClick={e => { e.stopPropagation(); onEditSection(section) }}
                 title="Edit Section"
-              >⚙️</button>
+              ><IconSettings /></button>
               {/* Hapus section */}
               <button
                 className="sec-action-btn-lg danger"
@@ -280,7 +281,7 @@ export default memo(function SectionCard({
                     msg: `Hapus section "${section.title}" beserta semua item di dalamnya?` })
                 }}
                 title="Hapus Section"
-              >🗑</button>
+              ><IconTrash /></button>
             </div>
           )}
 
@@ -292,7 +293,7 @@ export default memo(function SectionCard({
               onClick={e => { e.stopPropagation(); onExpandTodo() }}
               title={isExpanded ? "Kecilkan" : "Perbesar"}
               style={{ fontSize: 11 }}
-            >{isExpanded ? '⊟' : '⊞'}</button>
+            >{isExpanded ? <IconMinimize /> : <IconMaximize />}</button>
           )}
 
           {/* Notes lock toggle in header */}
@@ -324,7 +325,7 @@ export default memo(function SectionCard({
                 mode === 'open' ? 'Kunci catatan' :
                 !isLocked ? 'Kunci kembali' : 'Terkunci — buka di dalam widget'
               }>
-                {mode === 'lock' ? '🔒' : '🔓'}
+                {mode === 'lock' ? <IconLock /> : <IconUnlock />}
               </button>
             )
           })()}
@@ -425,7 +426,6 @@ export default memo(function SectionCard({
                 onDelete={handleDeleteItem}
               />
             ))}
-            {/* Poin 12: tombol tambah link di list view saat focused (desktop) */}
             {!!isFocused && canEditSection && editMode && (
               <button
                 onMouseDown={e => e.stopPropagation()}
@@ -670,8 +670,8 @@ const FolderItem = memo(function FolderItem({ item, searchQuery, urlDescMatch, e
           onMouseDown={e => e.stopPropagation()}
           style={{ opacity: 1 }}
         >
-          <button className="folder-edit-btn" onClick={e => { e.stopPropagation(); onEdit(item.id) }} title="Edit item" aria-label="Edit item">✏️</button>
-          <button className="folder-delete-btn" onClick={e => { e.stopPropagation(); onDelete(item.id, item.title) }} title="Hapus item" aria-label="Hapus item">🗑</button>
+          <button className="folder-edit-btn" onClick={e => { e.stopPropagation(); onEdit(item.id) }} title="Edit item" aria-label="Edit item"><IconEdit size={10} /></button>
+          <button className="folder-delete-btn" onClick={e => { e.stopPropagation(); onDelete(item.id, item.title) }} title="Hapus item" aria-label="Hapus item"><IconTrash size={10} /></button>
         </div>
       )}
     </div>
@@ -723,8 +723,8 @@ const ListItem = memo(function ListItem({ item, searchQuery, urlDescMatch, editM
       </div>
       {editMode && (
         <div className="item-action-group" style={{ opacity: 1 }} onMouseDown={e => e.stopPropagation()}>
-          <button className="item-edit-btn" onClick={e => { e.stopPropagation(); onEdit(item.id) }}>✏️</button>
-          <button className="item-delete-btn" onClick={e => { e.stopPropagation(); onDelete(item.id, item.title) }}>🗑</button>
+          <button className="item-edit-btn" onClick={e => { e.stopPropagation(); onEdit(item.id) }} title="Edit" aria-label="Edit"><IconEdit size={11} /></button>
+          <button className="item-delete-btn" onClick={e => { e.stopPropagation(); onDelete(item.id, item.title) }} title="Hapus" aria-label="Hapus"><IconTrash size={11} /></button>
         </div>
       )}
     </div>

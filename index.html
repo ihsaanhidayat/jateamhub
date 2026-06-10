@@ -5,22 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JateamHub</title>
     <!-- Theme init SEBELUM apapun — mencegah flash -->
-    <script>
-      (function(){
-        try {
-          var dark = ['midnight','slate','obsidian','dark-mint','dark-soft','enterprise',
-            'aurora-dark','sand-dark','slate-dark','pearl-dark','ivory-dark','sage-dark','dark']
-          var stored = ''
-          try { var a = JSON.parse(localStorage.getItem('jateamhub-appearance') || '{}'); stored = a.theme || '' } catch(e) {}
-          if (!stored) stored = localStorage.getItem('jateamhub-theme') || ''
-          var isDark = stored ? dark.indexOf(stored) >= 0 : window.matchMedia('(prefers-color-scheme: dark)').matches
-          var resolved = isDark ? 'midnight' : 'parchment'
-          document.documentElement.setAttribute('data-theme', resolved)
-          var color = isDark ? '#0A0D1A' : '#F7F3EE'
-          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', color)
-        } catch(e) {}
-      })()
-    </script>
+    <script src="/theme-init.js"></script>
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
@@ -31,17 +16,12 @@
     <meta name="apple-mobile-web-app-title" content="JateamHub" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-        })
-      }
-    </script>
+    <script src="/register-sw.js"></script>
   </body>
 </html>
