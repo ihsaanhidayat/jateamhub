@@ -25,11 +25,12 @@ import DashboardSkeleton from './components/ui/DashboardSkeleton'
 const OnboardingOverlay        = lazy(() => import('./components/ui/OnboardingOverlay'))
 const ItemModal                = lazy(() => import('./components/item/ItemModal'))
 const SectionEditModal         = lazy(() => import('./components/layout/SectionEditModal'))
+const GoogleOnboardingPage     = lazy(() => import('./components/layout/GoogleOnboardingPage'))
 
 import './styles/global.css'
 
 export default function App() {
-  const { profile, initialized, init } = useAuthStore()
+  const { profile, initialized, init, pendingGoogleUser } = useAuthStore()
   const editMode     = useStore(s => s.editMode)
   const globalTheme  = useStore(s => s.globalTheme)
   const isDirty      = useStore(s => s.isDirty)
@@ -269,6 +270,9 @@ export default function App() {
     </div>
   )
 
+  if (!profile && pendingGoogleUser) return (
+    <Suspense fallback={null}><GoogleOnboardingPage /></Suspense>
+  )
   if (!profile && showRegister) return <RegisterPage onBack={() => setShowRegister(false)} />
   if (!profile) return <LoginPage onRegister={() => setShowRegister(true)} />
 

@@ -19,6 +19,7 @@ import type { Section } from '../../types'
 import NotesWidget from '../widgets/NotesWidget'
 import TodoWidget, { TodoInputFooter } from '../widgets/TodoWidget'
 import ClockWidget from '../widgets/ClockWidget'
+import CalendarWidget from '../widgets/CalendarWidget'
 
 // ── Skeleton dashboard ───────────────────────────────────────
 function SkeletonDashboard() {
@@ -91,6 +92,8 @@ function SortableSectionCard({
               ? <ClockWidget />
               : (section as any).widgetType === 'todo'
               ? <TodoWidget sectionId={section.id} />
+              : (section as any).widgetType === 'calendar'
+              ? <CalendarWidget sectionId={section.id} isExpanded={isExpanded} />
               : null
           }
           widgetFooter={
@@ -348,7 +351,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                   focusedId={focusedId}
                   onFocus={(id: string | null) => setFocusedId(prev => prev === id ? null : id)}
                   isExpanded={expandedWidgetId === section.id}
-                  onExpandTodo={((section as any).widgetType === 'todo' || (section as any).widgetType === 'notes') ? () => setExpandedWidgetId(prev => prev === section.id ? null : section.id) : undefined}
+                  onExpandTodo={((section as any).widgetType === 'todo' || (section as any).widgetType === 'notes' || (section as any).widgetType === 'calendar') ? () => setExpandedWidgetId(prev => prev === section.id ? null : section.id) : undefined}
                   onEditSection={handleEditSection}
                   onEditItem={handleEditItem}
                   onAddItem={handleAddItem}
@@ -387,8 +390,9 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
       {isMobile && expandedWidgetId && (() => {
         const sec = personalSections.find(s => s.id === expandedWidgetId)
         if (!sec) return null
-        const isTodo  = (sec as any).widgetType === 'todo'
-        const isNotes = (sec as any).widgetType === 'notes'
+        const isTodo     = (sec as any).widgetType === 'todo'
+        const isNotes    = (sec as any).widgetType === 'notes'
+        const isCalendar = (sec as any).widgetType === 'calendar'
         return (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 300,
@@ -418,8 +422,9 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
               </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              {isTodo  && <TodoWidget  sectionId={expandedWidgetId} />}
-              {isNotes && <NotesWidget sectionId={expandedWidgetId} />}
+              {isTodo     && <TodoWidget     sectionId={expandedWidgetId} />}
+              {isNotes    && <NotesWidget    sectionId={expandedWidgetId} />}
+              {isCalendar && <CalendarWidget sectionId={expandedWidgetId} isExpanded />}
             </div>
             {isTodo && <TodoInputFooter sectionId={expandedWidgetId} />}
           </div>

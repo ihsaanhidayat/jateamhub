@@ -11,8 +11,9 @@ interface Props {
 
 export default function AddSectionModal({ open, onClose }: Props) {
   // Granular selectors — hanya re-render saat sections berubah
-  const hasClockWidget = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'clock'))
-  const hasTodoWidget  = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'todo'))
+  const hasClockWidget    = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'clock'))
+  const hasTodoWidget     = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'todo'))
+  const hasCalendarWidget = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'calendar'))
 
   const addWidget = (widgetType: WidgetType) => {
     const { addPersonalSection, addPersonalSectionFirst, addPersonalSectionAuto } = useStore.getState()
@@ -23,9 +24,10 @@ export default function AddSectionModal({ open, onClose }: Props) {
     const sameRow = maxX + 3 <= 12
 
     const config: Record<WidgetType, { title: string; icon: string; w: number; h: number }> = {
-      clock:     { title: 'Jam',       icon: '🕐', w: 3, h: 3 },
-      notes:     { title: 'Notes',     icon: '📝', w: 4, h: 5 },
-      todo:      { title: 'To-do List', icon: '📋', w: 4, h: 6 },
+      clock:    { title: 'Jam',        icon: '🕐', w: 3, h: 3 },
+      notes:    { title: 'Notes',      icon: '📝', w: 4, h: 5 },
+      todo:     { title: 'To-do List', icon: '📋', w: 4, h: 6 },
+      calendar: { title: 'Kalender',   icon: '📅', w: 4, h: 6 },
     }
     const c = config[widgetType]
 
@@ -149,6 +151,24 @@ export default function AddSectionModal({ open, onClose }: Props) {
                   cursor: hasTodoWidget ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
                 }}>
                 📋 Todo{hasTodoWidget ? ' (aktif)' : ''}
+              </button>
+              {/* Kalender */}
+              <button
+                onClick={e => {
+                  e.stopPropagation()
+                  if (hasCalendarWidget) { useStore.getState().toast('Kalender sudah ada — hanya boleh 1 kalender.', 'warn'); return }
+                  addWidget('calendar')
+                }}
+                disabled={hasCalendarWidget}
+                style={{
+                  flex: 1, padding: '8px 6px', borderRadius: 8,
+                  background: hasCalendarWidget ? 'var(--bg4)' : 'var(--accent-light)',
+                  border: `1px solid ${hasCalendarWidget ? 'var(--border)' : 'var(--accent)'}`,
+                  color: hasCalendarWidget ? 'var(--silver3)' : 'var(--accent)',
+                  fontSize: 11, fontWeight: 700,
+                  cursor: hasCalendarWidget ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
+                }}>
+                📅 Kalender{hasCalendarWidget ? ' (aktif)' : ''}
               </button>
             </div>
           </div>

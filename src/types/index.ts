@@ -62,7 +62,7 @@ export type ThemeId = string  // legacy compat: 'pearl' | 'slate'
 
 // ── Section ───────────────────────────────────
 export type SectionVisibility = 'all' | 'admin' | 'unit'
-export type WidgetType  = 'clock' | 'notes' | 'todo'
+export type WidgetType  = 'clock' | 'notes' | 'todo' | 'calendar'
 export type SectionType = 'section' | 'widget'
 export interface SectionLayout { x: number; y: number; w: number; h: number }
 
@@ -171,6 +171,15 @@ export interface TodoItem {
   doneAt?:   number       // ms timestamp saat selesai
   dueTime?:  string       // 'HH:MM' jam due di hari yang sama
   date:      string       // 'YYYY-MM-DD' tanggal task dibuat
+}
+
+export interface CalendarEvent {
+  id:        string
+  date:      string            // 'YYYY-MM-DD'
+  title:     string
+  time?:     string            // 'HH:MM' optional
+  color?:    'accent' | 'red' | 'green' | 'yellow'
+  createdAt: number
 }
 
 export interface TodoHistory {

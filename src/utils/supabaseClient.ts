@@ -14,7 +14,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: {
     persistSession:     true,  // simpan sesi di localStorage
     autoRefreshToken:   true,  // perbarui token otomatis sebelum expired
-    detectSessionInUrl: false, // jangan cek token di URL (bukan OAuth redirect)
+    detectSessionInUrl: true,  // aktifkan untuk OAuth redirect (Google Sign-In)
   },
 })
 
@@ -32,6 +32,8 @@ export interface Profile {
   avatar_url:    string   // URL foto profil
   emoji:         string   // emoji tambahan di samping nama (bukan avatar)
   appearance:    Record<string, unknown> // preferensi tampilan per user
+  google_email?: string | null  // Gmail asli untuk user OAuth Google
+  auth_provider?: string        // 'email' (default) | 'google'
   created_at:    string
   updated_at:    string
 }
@@ -63,6 +65,13 @@ export const signIn  = async (email: string, password: string) =>
 
 // Logout dan hapus sesi
 export const signOut = async () => supabase.auth.signOut()
+
+// Login dengan Google OAuth — redirect ke Google consent screen
+export const signInWithGoogle = () =>
+  supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin },
+  })
 
 // ── Fungsi Profil User ────────────────────────────────────────
 

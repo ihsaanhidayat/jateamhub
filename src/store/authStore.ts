@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import { create } from 'zustand'
 import {
-  supabase, getProfile, signIn, signOut,
+  supabase, getProfile, signIn, signOut, signInWithGoogle,
   createUser, getAllProfiles, getProfilesByScope,
   updateProfile, updateUserPassword,
 } from '../utils/supabaseClient'
@@ -13,18 +13,21 @@ import type { Role } from '../types'
 import { canManageUser, canCreateUser, canAssignRole } from '../utils/roles'
 
 interface AuthState {
-  profile:      Profile | null
-  loading:      boolean
-  initialized:  boolean
-  users:        Profile[]
-  _usersLoaded: boolean
+  profile:            Profile | null
+  loading:            boolean
+  initialized:        boolean
+  users:              Profile[]
+  _usersLoaded:       boolean
+  pendingGoogleUser:  { id: string; email: string } | null
 
   _toast: ((msg: string, type?: 'success' | 'error' | 'warn') => void) | null
   setToastFn: (fn: (msg: string, type?: 'success' | 'error' | 'warn') => void) => void
 
-  init:    () => Promise<void>
-  login:   (username: string, password: string) => Promise<string | null>
-  logout:  () => void
+  init:                     () => Promise<void>
+  login:                    (username: string, password: string) => Promise<string | null>
+  loginWithGoogle:          () => Promise<void>
+  completeGoogleOnboarding: (username: string, fullName: string, region: string, unit: string) => Promise<string | null>
+  logout:                   () => void
 
   loadUsers:   (force?: boolean) => Promise<void>
   addUser:     (username: string, password: string, role: Role, unitId: string, regionScope?: string, unitScope?: string) => Promise<string | null>
@@ -38,12 +41,13 @@ let authSubscription: { unsubscribe: () => void } | null = null
 let pendingSignOut: Promise<void> | null = null
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  profile:      null,
-  loading:      false,
-  initialized:  false,
-  users:        [],
-  _toast:       null,
-  _usersLoaded: false,
+  profile:           null,
+  loading:           false,
+  initialized:       false,
+  users:             [],
+  _toast:            null,
+  _usersLoaded:      false,
+  pendingGoogleUser: null,
 
   setToastFn: (fn) => set({ _toast: fn }),
 
@@ -82,7 +86,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ profile: null, loading: false, initialized: true })
       } else {
         const profile = await getProfile(session.user.id)
-        set({ profile: profile ?? null, loading: false, initialized: true })
+        if (profile) {
+          set({ profile, loading: false, initialized: true })
+        } else {
+          // Tidak ada profil — cek apakah Google OAuth user baru
+          const provider = session.user.app_metadata?.provider
+          if (provider === 'google') {
+            set({
+              pendingGoogleUser: { id: session.user.id, email: session.user.email ?? '' },
+              loading: false, initialized: true,
+            })
+          } else {
+            set({ profile: null, loading: false, initialized: true })
+          }
+        }
       }
     } catch {
       clearTimeout(safetyTimer)
@@ -97,13 +114,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // Setup listener baru
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Hanya handle TOKEN_REFRESHED dan SIGNED_OUT
-      // SIGNED_IN di-handle oleh login() langsung — prevent race condition
       if (event === 'TOKEN_REFRESHED' && session?.user) {
         const profile = await getProfile(session.user.id)
         if (profile) set({ profile })
       } else if (event === 'SIGNED_OUT') {
-        set({ profile: null, users: [], _usersLoaded: false })
+        set({ profile: null, users: [], _usersLoaded: false, pendingGoogleUser: null })
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        // Hanya handle Google OAuth — email/password login ditangani oleh login()
+        // Guard: jika init() sudah selesai, jangan double-handle
+        if (get().initialized) return
+        const provider = session.user.app_metadata?.provider
+        if (provider === 'google') {
+          const profile = await getProfile(session.user.id)
+          if (profile) {
+            set({ profile, loading: false, initialized: true })
+          } else {
+            set({ pendingGoogleUser: { id: session.user.id, email: session.user.email ?? '' }, loading: false, initialized: true })
+          }
+        }
       }
     })
     authSubscription = subscription
@@ -145,6 +173,47 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  // ── Login dengan Google ──────────────────────────────────
+  loginWithGoogle: async () => {
+    // Redirect ke Google consent screen — halaman akan navigate away
+    await signInWithGoogle()
+  },
+
+  // ── Selesaikan onboarding Google user baru ───────────────
+  completeGoogleOnboarding: async (username, fullName, region, unit) => {
+    const pending = get().pendingGoogleUser
+    if (!pending) return 'Sesi tidak valid.'
+
+    // Cek keunikan username
+    const { data: existing } = await supabase
+      .from('profiles').select('id').eq('username', username).maybeSingle()
+    if (existing) return 'Username sudah digunakan. Pilih yang lain.'
+
+    // Insert profil langsung — Google sudah verifikasi email
+    const { error } = await supabase.from('profiles').insert({
+      id:           pending.id,
+      username:     username.trim().toLowerCase(),
+      full_name:    fullName.trim(),
+      role:         'user',
+      region_scope: region,
+      unit_scope:   unit,
+      unit_id:      unit,
+      branch_id:    '',
+      avatar_emoji: '',
+      avatar_url:   '',
+      emoji:        '',
+      appearance:   {},
+      google_email: pending.email,
+      auth_provider: 'google',
+    })
+    if (error) return error.message
+
+    const profile = await getProfile(pending.id)
+    if (!profile) return 'Gagal memuat profil. Coba lagi.'
+    set({ profile, pendingGoogleUser: null, loading: false })
+    return null
+  },
+
   // ── Logout ────────────────────────────────────────────────
   logout: () => {
     // Cleanup auth listener
@@ -153,7 +222,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       authSubscription = null
     }
     // Reset state — initialized tetap true agar langsung ke login page
-    set({ profile: null, users: [], _usersLoaded: false, loading: false })
+    set({ profile: null, users: [], _usersLoaded: false, loading: false, pendingGoogleUser: null })
     localStorage.removeItem('jateamhub-personal')
     // Dispatch event untuk reset dashboardStore + components lain
     window.dispatchEvent(new Event('jateamhub-logout'))
