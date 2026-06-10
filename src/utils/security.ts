@@ -59,3 +59,27 @@ export const sanitizePage = (pageId: unknown, validPages: string[]): string => {
   if (typeof pageId === 'string' && validPages.includes(pageId)) return pageId
   return 'beranda'
 }
+
+/**
+ * Hash PIN using PBKDF2-SHA256 (100k iterations) — returns base64 encoded hash
+ */
+export const hashPin = async (pin: string, salt: string): Promise<string> => {
+  const enc  = new TextEncoder()
+  const key  = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveBits'])
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: enc.encode(salt), iterations: 100_000, hash: 'SHA-256' },
+    key, 256
+  )
+  const bytes = new Uint8Array(bits)
+  let b = ''
+  for (let i = 0; i < bytes.length; i++) b += String.fromCharCode(bytes[i])
+  return btoa(b)
+}
+
+/**
+ * Verify PIN against its stored PBKDF2 hash
+ */
+export const verifyPin = async (pin: string, salt: string, storedHash: string): Promise<boolean> => {
+  try { return (await hashPin(pin, salt)) === storedHash }
+  catch { return false }
+}

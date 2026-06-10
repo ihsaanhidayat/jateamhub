@@ -58,18 +58,24 @@ export default memo(function SectionCard({
   const syncPersonalToDb = useCallback(() => useStore.getState().syncPersonalToDb(), [])
 
   // Build appearance object dari fields (tidak trigger re-render untuk fields lain)
-  const appearance = { itemDisplayMode, folderGridCols, iconSize, faviconEnabled } as AppearanceSettings
+  const appearance = useMemo(
+    () => ({ itemDisplayMode, folderGridCols, iconSize, faviconEnabled } as AppearanceSettings),
+    [itemDisplayMode, folderGridCols, iconSize, faviconEnabled]
+  )
   const { profile: session } = useAuthStore()
   const canEditSection = !isShared
   const canFocus = editMode && !isShared
 
-  // Force re-render saat notes mode toggle dari header
+  // Force re-render saat notes mode toggle dari header — hanya untuk section ini
   const [, forceRender] = useState(0)
   useEffect(() => {
-    const h = () => forceRender(n => n + 1)
+    const h = (e: Event) => {
+      const sid = (e as CustomEvent).detail?.sectionId
+      if (!sid || sid === section.id) forceRender(n => n + 1)
+    }
     window.addEventListener('notes-mode-changed', h)
     return () => window.removeEventListener('notes-mode-changed', h)
-  }, [])
+  }, [section.id])
 
   const [confirmDel, setConfirmDel] = useState<{
     open: boolean; type: 'section' | 'item'; itemId?: string; msg: string
@@ -82,30 +88,29 @@ export default memo(function SectionCard({
   // item drag state
   const [itemDragOver, setItemDragOver] = useState<string | null>(null)
 
-  const onItemDragStart = (e: React.DragEvent, item: LinkItem) => {
+  const onItemDragStart = useCallback((e: React.DragEvent, item: LinkItem) => {
     e.stopPropagation()
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', `item:${item.id}:${section.id}`)
-  }
-  const onItemDragOver = (e: React.DragEvent, itemId: string) => {
+  }, [section.id])
+  const onItemDragOver = useCallback((e: React.DragEvent, itemId: string) => {
     e.preventDefault(); e.stopPropagation(); setItemDragOver(itemId)
-  }
-  const onItemDrop = (e: React.DragEvent, tgtItemId: string) => {
+  }, [])
+  const onItemDrop = useCallback((e: React.DragEvent, tgtItemId: string) => {
     e.preventDefault(); e.stopPropagation(); setItemDragOver(null)
     const raw = e.dataTransfer.getData('text/plain')
     if (!raw.startsWith('item:')) return
     const [, srcItemId, srcSectionId] = raw.split(':')
     if (srcItemId === tgtItemId) return
-    // Pass tgtItemId agar item diinsert di posisi yang benar
     moveItem(srcSectionId, srcItemId, section.id, tgtItemId)
-  }
-  const onListDrop = (e: React.DragEvent) => {
+  }, [section.id, moveItem])
+  const onListDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setItemDragOver(null)
     const raw = e.dataTransfer.getData('text/plain')
     if (!raw.startsWith('item:')) return
     const [, srcItemId, srcSectionId] = raw.split(':')
     moveItem(srcSectionId, srcItemId, section.id)
-  }
+  }, [section.id, moveItem])
 
   // Stable callbacks — tidak bikin function baru setiap render
   const handleDragLeave = useCallback(() => setItemDragOver(null), [])
@@ -291,25 +296,24 @@ export default memo(function SectionCard({
           )}
 
           {/* Notes lock toggle in header */}
-          {(section as any).widgetType === 'notes' && !editMode && (() => {
-            const mk = `notes-mode-${session?.username ?? 'u'}-${section.id}`
-            const lk = `notes-locked-${session?.username ?? 'u'}-${section.id}`
+          {(section as any).widgetType === 'notes' && !editMode && session?.username && (() => {
+            const mk = `notes-mode-${session.username}-${section.id}`
+            const lk = `notes-locked-${session.username}-${section.id}`
             const mode = localStorage.getItem(mk) ?? 'open'
             const isLocked = localStorage.getItem(lk) === 'true'
 
             const handleGembok = (e: React.MouseEvent) => {
               e.stopPropagation()
+              const ev = new CustomEvent('notes-mode-changed', { detail: { sectionId: section.id } })
               if (mode === 'open') {
-                // 🔓 → switch ke lock mode, langsung kunci
                 localStorage.setItem(mk, 'lock')
                 localStorage.setItem(lk, 'true')
-                window.dispatchEvent(new Event('notes-mode-changed'))
+                window.dispatchEvent(ev)
               } else if (mode === 'lock' && !isLocked) {
-                // 🔒 tapi sedang unlocked (setelah password) → kunci lagi
                 localStorage.setItem(lk, 'true')
-                window.dispatchEvent(new Event('notes-mode-changed'))
+                window.dispatchEvent(ev)
               }
-              // 🔒 dan locked → TIDAK bisa buka dari sini, harus via password di widget
+              // 🔒 dan locked → buka di dalam widget via PIN
             }
 
             return (
@@ -559,7 +563,7 @@ interface FolderItemProps {
   onDelete:    (itemId: string, title: string) => void
 }
 
-function FolderItem({ item, searchQuery, urlDescMatch, editMode, dragOver, appearance, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete }: FolderItemProps & { urlDescMatch?: boolean }) {
+const FolderItem = memo(function FolderItem({ item, searchQuery, urlDescMatch, editMode, dragOver, appearance, onDragStart, onDragOver, onDrop, onDragLeave, onEdit, onDelete }: FolderItemProps & { urlDescMatch?: boolean }) {
   const [hovered, setHovered] = useState(false)
   const [tipPos, setTipPos]   = useState({ x: 0, y: 0 })
 
@@ -672,7 +676,7 @@ function FolderItem({ item, searchQuery, urlDescMatch, editMode, dragOver, appea
       )}
     </div>
   )
-}
+})
 
 // ── List Item ─────────────────────────────────────────────
 interface ListItemProps {
@@ -684,7 +688,7 @@ interface ListItemProps {
   onDelete:    (itemId: string, title: string) => void
 }
 
-function ListItem({ item, searchQuery, urlDescMatch, editMode, appearance, onEdit, onDelete }: ListItemProps & { urlDescMatch?: boolean }) {
+const ListItem = memo(function ListItem({ item, searchQuery, urlDescMatch, editMode, appearance, onEdit, onDelete }: ListItemProps & { urlDescMatch?: boolean }) {
   const handleClick = () => {
     if (editMode) return
     const url = sanitizeUrl(item.url)
@@ -725,4 +729,4 @@ function ListItem({ item, searchQuery, urlDescMatch, editMode, appearance, onEdi
       )}
     </div>
   )
-}
+})
