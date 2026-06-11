@@ -110,8 +110,11 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const badge        = getDisplayBadge(session as any)
   const emoji        = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
 
-  const chatEnabled  = useChatStore(s => s.enabled)
+  const chatGlobal   = useChatStore(s => s.enabled)
   const unreadTotal  = useChatStore(s => s.unreadTotal)
+  // Chat visible: global switch ON + user punya akses (atau superadmin)
+  const chatEnabled  = chatGlobal &&
+    (session?.role === 'superadmin' || (session as any)?.chat_enabled === true)
 
 
 

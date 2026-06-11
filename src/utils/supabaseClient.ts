@@ -34,6 +34,7 @@ export interface Profile {
   appearance:    Record<string, unknown> // preferensi tampilan per user
   google_email?: string | null  // Gmail asli untuk user OAuth Google
   auth_provider?: string        // 'email' (default) | 'google'
+  chat_enabled?: boolean        // akses fitur chat — diatur oleh superadmin
   created_at:    string
   updated_at:    string
 }
@@ -111,7 +112,8 @@ export const updateProfile = async (
   userId: string,
   updates: Partial<Pick<Profile,
     'role' | 'unit_id' | 'unit_scope' | 'region_scope' | 'branch_id' |
-    'username' | 'full_name' | 'avatar_emoji' | 'avatar_url' | 'emoji' | 'appearance'
+    'username' | 'full_name' | 'avatar_emoji' | 'avatar_url' | 'emoji' | 'appearance' |
+    'chat_enabled'
   >>
 ) => supabase.from('profiles')
     .update({ ...updates, updated_at: new Date().toISOString() })

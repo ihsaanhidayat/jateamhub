@@ -46,14 +46,16 @@ export default function SuperadminDashboard() {
   const [filterRegion, setFilterRegion] = useState('')
   const [filterUnit,   setFilterUnit]   = useState('')
   const [page,         setPage]         = useState(0)
-  const [editTarget,   setEditTarget]   = useState<Profile | null>(null)
-  const [editRole,     setEditRole]     = useState<Role>('user')
-  const [editRegion,   setEditRegion]   = useState('global')
-  const [editUnit,     setEditUnit]     = useState('general')
-  const [editPass,     setEditPass]     = useState('')
-  const [editEmoji,    setEditEmoji]    = useState('')
-  const [editFullName, setEditFullName] = useState('')
-  const [editEmail,    setEditEmail]    = useState('')
+  const [editTarget,    setEditTarget]    = useState<Profile | null>(null)
+  const [editRole,      setEditRole]      = useState<Role>('user')
+  const [editRegion,    setEditRegion]    = useState('global')
+  const [editUnit,      setEditUnit]      = useState('general')
+  const [editPass,      setEditPass]      = useState('')
+  const [editEmoji,     setEditEmoji]     = useState('')
+  const [editFullName,  setEditFullName]  = useState('')
+  const [editEmail,     setEditEmail]     = useState('')
+  const [editChatEnabled, setEditChatEnabled] = useState(false)
+  const [togglingChat, setTogglingChat]   = useState<string | null>(null)
   const [addMode,      setAddMode]      = useState(false)
   const [newUser,      setNewUser]      = useState('')
   const [newPass,      setNewPass]      = useState('')
@@ -90,6 +92,7 @@ export default function SuperadminDashboard() {
     setEditRegion(u.region_scope ?? 'global'); setEditUnit(u.unit_scope ?? 'general')
     setEditPass(''); setEditEmoji(u.emoji ?? u.avatar_emoji ?? '')
     setEditFullName(u.full_name ?? ''); setEditEmail((u as any).email ?? '')
+    setEditChatEnabled(u.chat_enabled ?? false)
     setErr(''); setAddMode(false)
   }
 
@@ -102,7 +105,7 @@ export default function SuperadminDashboard() {
       : editFullName.slice(0, 2).toUpperCase()
     const error = await updateUser(editTarget.id, editRole, editTarget.unit_id ?? '', editPass || undefined, editEmoji, editRegion, editUnit)
     if (!error) {
-      await updateProfile(editTarget.id, { full_name: editFullName, initials } as any)
+      await updateProfile(editTarget.id, { full_name: editFullName, initials, chat_enabled: editChatEnabled } as any)
       if (editEmail !== ((editTarget as any).email ?? ''))
         await supabase.from('profiles').update({ email: editEmail }).eq('id', editTarget.id)
     }
@@ -314,7 +317,38 @@ export default function SuperadminDashboard() {
                           {u.unit_scope && u.unit_scope !== 'general' && <span>🏢 {UNIT_LABELS[u.unit_scope] ?? u.unit_scope}</span>}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                        {/* Quick chat toggle */}
+                        {u.role !== 'superadmin' && (
+                          <button
+                            title={u.chat_enabled ? 'Chat aktif — klik untuk nonaktifkan' : 'Chat nonaktif — klik untuk aktifkan'}
+                            disabled={togglingChat === u.id}
+                            onClick={async () => {
+                              setTogglingChat(u.id)
+                              const newVal = !u.chat_enabled
+                              await updateProfile(u.id, { chat_enabled: newVal })
+                              await loadUsers(true)
+                              setTogglingChat(null)
+                              toast(`Chat ${newVal ? 'diaktifkan' : 'dinonaktifkan'} untuk ${u.full_name || u.username}.`, 'success')
+                            }}
+                            style={{
+                              height: 30, padding: '0 8px',
+                              background: u.chat_enabled ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'var(--bg4)',
+                              border: `1px solid ${u.chat_enabled ? 'var(--accent)' : 'var(--border2)'}`,
+                              borderRadius: 8, cursor: 'pointer', fontSize: 13,
+                              color: u.chat_enabled ? 'var(--accent)' : 'var(--silver4)',
+                              transition: 'all 150ms', display: 'flex', alignItems: 'center', gap: 4,
+                            }}
+                          >
+                            {togglingChat === u.id
+                              ? <span style={{ width: 12, height: 12, border: '2px solid var(--border2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
+                              : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            }
+                            <span style={{ fontSize: 10, fontWeight: 600, fontFamily: 'var(--mono)' }}>
+                              {u.chat_enabled ? 'ON' : 'OFF'}
+                            </span>
+                          </button>
+                        )}
                         {canManageUser(profile as any, u as any) && (
                           <>
                             <button className="btn btn-secondary" style={{ height: 30, fontSize: 11, padding: '0 10px' }}
@@ -368,6 +402,38 @@ export default function SuperadminDashboard() {
                             <input type="password" value={editPass} onChange={e => setEditPass(e.target.value)} placeholder="Password baru min. 6 karakter" style={inputSt} />
                           </div>
                         </div>
+                        {/* Chat toggle (only for non-superadmin) */}
+                        {editTarget?.role !== 'superadmin' && (
+                          <div style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '12px 14px', background: 'var(--bg4)',
+                            border: '1px solid var(--border2)', borderRadius: 10,
+                          }}>
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--silver)' }}>Akses Fitur Chat</div>
+                              <div style={{ fontSize: 11, color: 'var(--silver4)', marginTop: 2 }}>
+                                User ini {editChatEnabled ? 'dapat' : 'tidak dapat'} menggunakan chat internal.
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setEditChatEnabled(v => !v)}
+                              style={{
+                                flexShrink: 0, width: 48, height: 26, borderRadius: 13,
+                                background: editChatEnabled ? 'var(--accent)' : 'var(--border2)',
+                                border: 'none', cursor: 'pointer', position: 'relative',
+                                transition: 'background 200ms',
+                              }}
+                            >
+                              <span style={{
+                                position: 'absolute', top: 3, left: editChatEnabled ? 25 : 3,
+                                width: 20, height: 20, borderRadius: '50%', background: 'white',
+                                boxShadow: '0 1px 3px rgba(0,0,0,.3)',
+                                transition: 'left 200ms',
+                              }} />
+                            </button>
+                          </div>
+                        )}
                         {/* Emoji */}
                         <div>
                           <label style={labelSt}>Emoji</label>
