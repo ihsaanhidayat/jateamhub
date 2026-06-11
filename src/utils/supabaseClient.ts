@@ -465,12 +465,15 @@ export const getConversations = async (userId: string): Promise<ChatConversation
     .from('chat_conversations')
     .select('*')
     .eq('is_active', true)
+    .or(`participant_a.eq.${userId},participant_b.eq.${userId}`)
     .order('last_message_at', { ascending: false, nullsFirst: false })
   if (error) { console.error('getConversations:', error); return [] }
   const convs = (data ?? []) as ChatConversation[]
   if (!convs.length) return []
 
-  // Fetch all participant profiles in one query
+  const convIds = convs.map(c => c.id)
+
+  // Fetch participant profiles
   const pids = [...new Set(convs.flatMap(c => [c.participant_a, c.participant_b]))]
   const { data: profiles } = await supabase
     .from('profiles')
@@ -478,10 +481,24 @@ export const getConversations = async (userId: string): Promise<ChatConversation
     .in('id', pids)
   const pMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
 
+  // Fetch unread counts per conversation
+  const { data: unreadRows } = await supabase
+    .from('chat_messages')
+    .select('conversation_id')
+    .in('conversation_id', convIds)
+    .eq('is_read', false)
+    .neq('sender_id', userId)
+    .is('deleted_at', null)
+  const unreadMap: Record<string, number> = {}
+  for (const row of (unreadRows ?? [])) {
+    unreadMap[row.conversation_id] = (unreadMap[row.conversation_id] ?? 0) + 1
+  }
+
   return convs.map(c => ({
     ...c,
-    profile_a: pMap[c.participant_a] ?? null,
-    profile_b: pMap[c.participant_b] ?? null,
+    profile_a:    pMap[c.participant_a] ?? null,
+    profile_b:    pMap[c.participant_b] ?? null,
+    unread_count: unreadMap[c.id] ?? 0,
   }))
 }
 

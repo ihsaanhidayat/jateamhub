@@ -84,7 +84,7 @@ export default function ConversationList({ currentUserId, onNewChat, onSelectCon
           return (
             <button
               key={conv.id}
-              onClick={() => { selectConv(conv.id, currentUserId); onSelectConv?.(conv.id) }}
+              onClick={() => onSelectConv ? onSelectConv(conv.id) : selectConv(conv.id, currentUserId)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 14px', border: 'none',

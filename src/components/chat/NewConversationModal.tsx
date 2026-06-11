@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { useChatStore } from '../../store/chatStore'
 import type { Profile } from '../../utils/supabaseClient'
@@ -11,12 +11,17 @@ interface Props {
 export default function NewConversationModal({ onClose, onStarted }: Props) {
   const { profile, users, loadUsers } = useAuthStore()
   const { startConv } = useChatStore()
-  const [query,   setQuery]   = useState('')
-  const [busy,    setBusy]    = useState(false)
-  const [err,     setErr]     = useState('')
+  const [query,    setQuery]    = useState('')
+  const [busy,     setBusy]     = useState(false)
+  const [err,      setErr]      = useState('')
+  const [usersLoading, setUsersLoading] = useState(false)
 
-  // Load users if not yet loaded
-  useMemo(() => { if (!users.length) loadUsers() }, [])
+  useEffect(() => {
+    if (!users.length) {
+      setUsersLoading(true)
+      loadUsers().finally(() => setUsersLoading(false))
+    }
+  }, [])
 
   const eligible = useMemo(() =>
     users.filter(u =>
@@ -77,9 +82,15 @@ export default function NewConversationModal({ onClose, onStarted }: Props) {
         )}
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 12px' }}>
-          {eligible.length === 0 && (
+          {usersLoading && (
+            <div style={{ textAlign: 'center', color: 'var(--silver4)', fontSize: 13, padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <span style={{ width: 14, height: 14, border: '2px solid var(--border2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
+              Memuat daftar user...
+            </div>
+          )}
+          {!usersLoading && eligible.length === 0 && (
             <div style={{ textAlign: 'center', color: 'var(--silver4)', fontSize: 13, padding: 24 }}>
-              Tidak ada user ditemukan.
+              {query ? 'Tidak ada hasil.' : 'Tidak ada user tersedia.'}
             </div>
           )}
           {eligible.map(u => (

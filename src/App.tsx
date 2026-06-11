@@ -44,9 +44,9 @@ export default function App() {
   const [addSectionOpen, setAddSectionOpen] = useState(false)
   const [importLinksOpen, setImportLinksOpen] = useState(false)
   const [coffeeOpen,     setCoffeeOpen]     = useState(false)
-  // Hash-based routing — persist across refresh
+  // Hash-based routing — wait for auth to initialize before restoring #chat
   const [taskListOpen, setTaskListOpen] = useState(() => window.location.hash === '#tasks')
-  const [chatOpen,     setChatOpen]     = useState(() => window.location.hash === '#chat')
+  const [chatOpen,     setChatOpen]     = useState(false)
 
   const openTaskList  = () => { window.location.hash = 'tasks'; setTaskListOpen(true) }
   const closeTaskList = () => { window.location.hash = ''; setTaskListOpen(false) }
@@ -62,6 +62,13 @@ export default function App() {
     window.addEventListener('hashchange', handleHash)
     return () => window.removeEventListener('hashchange', handleHash)
   }, [])
+
+  // Restore #chat hash after auth initializes (deferred to avoid enabled=null race)
+  useEffect(() => {
+    if (initialized && profile && window.location.hash === '#chat') {
+      setChatOpen(true)
+    }
+  }, [initialized, !!profile])
 
   // Edit state dari store
   const editingSection    = useStore(s => s.editingSection)
@@ -185,16 +192,17 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
 
-  // Load chat state when user logs in
+  // Load chat state and start realtime subscription when user logs in
   useEffect(() => {
-    if (profile) {
-      useChatStore.getState().loadEnabled().then(() => {
-        const chatEnabled = useChatStore.getState().enabled
-        if (chatEnabled) {
-          useChatStore.getState().subscribeAll(profile.id)
-        }
-      })
-    }
+    if (!profile) return
+    useChatStore.getState().loadEnabled().then(() => {
+      const { enabled } = useChatStore.getState()
+      const hasAccess = profile.role === 'superadmin' || (profile as any).chat_enabled === true
+      if (enabled && hasAccess) {
+        useChatStore.getState().subscribeAll(profile.id)
+      }
+    })
+    return () => { useChatStore.getState().unsubscribeAll() }
   }, [profile?.id])
 
   // Saat user login → init data

@@ -9,8 +9,11 @@ interface Props {
   currentUserId: string
 }
 
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })
+const fmtDate = (iso: string) => {
+  // Parse YYYY-MM-DD as local time (not UTC) to avoid off-by-one in UTC+ timezones
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })
+}
 
 export default function MessageThread({ conv, currentUserId }: Props) {
   const { messages, msgLoading, removeMsg } = useChatStore()

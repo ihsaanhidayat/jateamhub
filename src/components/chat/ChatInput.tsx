@@ -71,17 +71,22 @@ export default function ChatInput({ senderId }: Props) {
         </button>
         <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }} onChange={handleFile} />
 
-        {/* Text area */}
+        {/* Text area — auto-grow */}
         <textarea
           value={text}
-          onChange={e => setText(e.target.value)}
+          onChange={e => {
+            setText(e.target.value)
+            const el = e.target
+            el.style.height = 'auto'
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+          }}
           onKeyDown={handleKey}
           placeholder="Ketik pesan..."
           rows={1}
           disabled={sending}
           style={{
-            flex: 1, minHeight: 38, maxHeight: 120,
-            padding: '9px 12px', resize: 'none',
+            flex: 1, height: 38, maxHeight: 120,
+            padding: '9px 12px', resize: 'none', overflow: 'hidden',
             background: 'var(--bg4)', border: '1px solid var(--border2)',
             borderRadius: 10, fontSize: 14, color: 'var(--silver)',
             fontFamily: 'var(--font)', outline: 'none', lineHeight: 1.45,

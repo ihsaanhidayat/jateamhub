@@ -114,7 +114,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const unreadTotal  = useChatStore(s => s.unreadTotal)
   // Chat visible: global switch ON + user punya akses (atau superadmin)
   const chatEnabled  = chatGlobal &&
-    (session?.role === 'superadmin' || (session as any)?.chat_enabled === true)
+    (session?.role === 'superadmin' || session?.chat_enabled === true)
 
 
 

@@ -11,18 +11,33 @@ interface Props { onClose: () => void }
 export default function ChatPage({ onClose }: Props) {
   const { profile } = useAuthStore()
   const {
-    isLocked, conversations, currentConvId,
-    loadConversations, selectConv, subscribeAll, unsubscribeAll, lock,
+    enabled, isLocked, conversations, currentConvId,
+    loadConversations, selectConv, lock,
   } = useChatStore()
   const [newChatOpen,  setNewChatOpen]  = useState(false)
   const [mobileThread, setMobileThread] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
 
+  // Reactive isMobile
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // Load conversations when unlocked
   useEffect(() => {
     if (!profile || isLocked) return
     loadConversations(profile.id)
-    subscribeAll(profile.id)
-    return () => unsubscribeAll()
   }, [profile?.id, isLocked])
+
+  // Access gate: close if chat disabled after page opened
+  const canAccess = enabled !== false &&
+    (profile?.role === 'superadmin' || profile?.chat_enabled === true)
+
+  useEffect(() => {
+    if (enabled !== null && !canAccess) onClose()
+  }, [enabled, canAccess])
 
   const currentConv = conversations.find(c => c.id === currentConvId)
 
@@ -33,13 +48,20 @@ export default function ChatPage({ onClose }: Props) {
   }
 
   const handleBack = () => {
-    selectConv(null, profile?.id ?? '')
+    if (profile) selectConv(null, profile.id)
     setMobileThread(false)
   }
 
   if (!profile) return null
-
-  const isMobile = window.innerWidth < 768
+  // Show loading state while enabled is still being fetched
+  if (enabled === null) return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 120, background: 'var(--bg)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <span style={{ width: 28, height: 28, border: '3px solid var(--border2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+    </div>
+  )
 
   return (
     <div style={{
@@ -82,7 +104,9 @@ export default function ChatPage({ onClose }: Props) {
         <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--silver)', flex: 1, letterSpacing: '-0.3px' }}>
           {isMobile && mobileThread && currentConv
             ? (() => {
-                const other = currentConv.participant_a === profile.id ? currentConv.profile_b : currentConv.profile_a
+                const other = currentConv.participant_a === profile.id
+                  ? currentConv.profile_b
+                  : currentConv.profile_a
                 return other?.full_name ?? other?.username ?? 'Chat'
               })()
             : '💬 Chat'
@@ -91,15 +115,19 @@ export default function ChatPage({ onClose }: Props) {
 
         {!isLocked && (
           <button
-            onClick={() => lock()}
+            onClick={lock}
             title="Kunci Chat"
             style={{
               width: 34, height: 34, background: 'none', border: 'none',
               cursor: 'pointer', borderRadius: 8, display: 'flex',
               alignItems: 'center', justifyContent: 'center', color: 'var(--silver3)',
-              fontSize: 16,
             }}
-          >🔒</button>
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </button>
         )}
       </div>
 
@@ -107,7 +135,6 @@ export default function ChatPage({ onClose }: Props) {
       {isLocked ? (
         <ChatLockScreen />
       ) : isMobile ? (
-        /* Mobile layout */
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           {!mobileThread ? (
             <ConversationList
@@ -120,7 +147,6 @@ export default function ChatPage({ onClose }: Props) {
           ) : null}
         </div>
       ) : (
-        /* Desktop layout */
         <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
           <ConversationList
             currentUserId={profile.id}
@@ -146,9 +172,7 @@ export default function ChatPage({ onClose }: Props) {
       {newChatOpen && (
         <NewConversationModal
           onClose={() => setNewChatOpen(false)}
-          onStarted={id => {
-            handleSelectConv(id)
-          }}
+          onStarted={handleSelectConv}
         />
       )}
     </div>
