@@ -121,8 +121,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ profile: null, users: [], _usersLoaded: false, pendingGoogleUser: null })
       } else if (event === 'SIGNED_IN' && session?.user) {
         // Hanya handle Google OAuth — email/password login ditangani oleh login()
-        // Guard: jika init() sudah selesai, jangan double-handle
-        if (get().initialized) return
+        // Guard: skip jika sudah ada profile (login biasa sudah selesai)
+        if (get().profile) return
         const provider = session.user.app_metadata?.provider
         if (provider === 'google') {
           const profile = await getProfile(session.user.id)
