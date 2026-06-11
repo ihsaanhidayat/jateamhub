@@ -63,6 +63,16 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
     requestAnimationFrame(() => scrollToBottom(false))
   }, [conv.id])
 
+  // When the keyboard opens (visible viewport shrinks), keep the latest
+  // message in view if the user was already at the bottom.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const onVV = () => { if (atBottom.current) requestAnimationFrame(() => scrollToBottom(false)) }
+    vv.addEventListener('resize', onVV)
+    return () => vv.removeEventListener('resize', onVV)
+  }, [])
+
   const handleClear = async () => {
     if (!confirmClear) { setConfirmClear(true); return }
     await clearConv()

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
 import { ensureNotifyPermission, primeAudio } from '../utils/notify'
@@ -23,6 +23,7 @@ export default function ChatPage({ onClose }: Props) {
   const [newChatOpen,  setNewChatOpen]  = useState(false)
   const [mobileThread, setMobileThread] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   // Reactive isMobile
   useEffect(() => {
@@ -30,6 +31,31 @@ export default function ChatPage({ onClose }: Props) {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  // Size the shell to the *visible* viewport (VisualViewport API).
+  // Fixes the composer hiding behind mobile browser chrome / keyboard, and
+  // keeps the scroll area exactly the visible height so scrolling works.
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const vv = window.visualViewport
+    const apply = () => {
+      const h = vv?.height ?? window.innerHeight
+      el.style.height = `${h}px`
+      el.style.top = `${vv?.offsetTop ?? 0}px`
+    }
+    apply()
+    vv?.addEventListener('resize', apply)
+    vv?.addEventListener('scroll', apply)
+    window.addEventListener('resize', apply)
+    window.addEventListener('orientationchange', apply)
+    return () => {
+      vv?.removeEventListener('resize', apply)
+      vv?.removeEventListener('scroll', apply)
+      window.removeEventListener('resize', apply)
+      window.removeEventListener('orientationchange', apply)
+    }
+  }, [enabled])   // re-run once the real shell mounts (enabled: null → value)
 
   // Cleanup per-conversation broadcast channel on unmount
   useEffect(() => () => { closeConvChannel() }, [])
@@ -82,6 +108,7 @@ export default function ChatPage({ onClose }: Props) {
 
   return (
     <div
+      ref={rootRef}
       className="chat-root"
       style={{
         zIndex: 120, background: 'var(--bg)',
