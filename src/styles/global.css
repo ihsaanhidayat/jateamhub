@@ -3,6 +3,9 @@
 /* ── Reset ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 16px; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+/* Hide native browser password reveal — we provide our own toggle */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; }
 body {
   font-family: var(--font); background: var(--bg); color: var(--silver);
   min-height: 100dvh; transition: background 200ms, color 200ms;

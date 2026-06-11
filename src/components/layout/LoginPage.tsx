@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../store/authStore'
+import { IconEye, IconEyeOff } from '../ui/icons'
 
 interface Props { onRegister?: () => void }
 
@@ -156,7 +157,7 @@ export default function LoginPage({ onRegister }: Props) {
                   background: 'none', border: 'none', cursor: 'pointer',
                   color: 'var(--silver4)', fontSize: 15, padding: 2,
                 }}>
-                {showPw ? '🙈' : '👁'}
+                {showPw ? <IconEyeOff size={16} /> : <IconEye size={16} />}
               </button>
             </div>
           </div>
