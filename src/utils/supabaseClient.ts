@@ -227,10 +227,11 @@ export const getSharedSections = async (
   const sections = (data ?? []) as SharedSection[]
 
   // Filter berdasarkan visibility dan scope user
-  // Tidak ada lagi 'all' — hanya 'region' dan 'unit'
   return sections.filter(s => {
     // Admin dan superadmin lihat semua
     if (role === 'superadmin' || role === 'admin') return true
+    // Global — tampil ke semua user
+    if (s.visibility === 'global') return true
     // Section dari admin regional — tampil ke user di region yang sama
     if (s.visibility === 'region') return s.target_region === regionScope
     // Section dari admin unit — tampil ke user di region+unit yang sama
