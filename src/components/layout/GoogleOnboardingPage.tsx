@@ -11,12 +11,13 @@ export default function GoogleOnboardingPage() {
   const [loading,  setLoading]  = useState(false)
   const [err,      setErr]      = useState('')
 
-  // Pre-fill nama dari Google profile
+  // Pre-fill nama dari OAuth profile (Google atau Microsoft)
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       const meta = data.session?.user?.user_metadata
-      if (meta?.full_name)    setFullName(meta.full_name)
-      else if (meta?.name)    setFullName(meta.name)
+      if (meta?.full_name)        setFullName(meta.full_name)
+      else if (meta?.name)        setFullName(meta.name)
+      else if (meta?.displayName) setFullName(meta.displayName)
     })
   }, [])
 
@@ -73,7 +74,7 @@ export default function GoogleOnboardingPage() {
             Lengkapi Profil
           </h1>
           <p style={{ fontSize: 12, color: 'var(--silver3)', margin: 0 }}>
-            Satu langkah lagi untuk masuk ke JateamHub
+            Lengkapi profil untuk masuk ke JateamHub
           </p>
         </div>
 

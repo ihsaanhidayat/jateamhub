@@ -66,11 +66,18 @@ export const signIn  = async (email: string, password: string) =>
 // Logout dan hapus sesi
 export const signOut = async () => supabase.auth.signOut()
 
-// Login dengan Google OAuth — redirect ke Google consent screen
+// Login dengan Google OAuth
 export const signInWithGoogle = () =>
   supabase.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.origin },
+  })
+
+// Login dengan Microsoft (Azure AD) OAuth
+export const signInWithMicrosoft = () =>
+  supabase.auth.signInWithOAuth({
+    provider: 'azure',
+    options: { redirectTo: window.location.origin, scopes: 'email profile' },
   })
 
 // ── Fungsi Profil User ────────────────────────────────────────
