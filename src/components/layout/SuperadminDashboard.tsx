@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { useStore } from '../../store/dashboardStore'
+import { useChatStore } from '../../store/chatStore'
 import {
   getPendingRegistrations, approveRegistration, rejectRegistration,
   supabase, updateProfile,
@@ -32,7 +33,10 @@ export default function SuperadminDashboard() {
   const { profile, logout, users, loadUsers, addUser, updateUser, removeUser } = useAuthStore()
   const toast = useStore.getState().toast
 
-  const [tab, setTab] = useState<'pending' | 'users'>('pending')
+  const [tab, setTab] = useState<'pending' | 'users' | 'settings'>('pending')
+  const { enabled: chatEnabled, setEnabled: setChatEnabled, loadEnabled } = useChatStore()
+
+  useEffect(() => { loadEnabled() }, [])
   const [pending,     setPending]     = useState<PendingRegistration[]>([])
   const [pendingLoad, setPendingLoad] = useState(false)
   const [rejectId,    setRejectId]    = useState<string | null>(null)
@@ -159,6 +163,9 @@ export default function SuperadminDashboard() {
         </button>
         <button className={`admin-tab${tab === 'users' ? ' active' : ''}`} onClick={() => setTab('users')}>
           👥 Users ({users.length})
+        </button>
+        <button className={`admin-tab${tab === 'settings' ? ' active' : ''}`} onClick={() => setTab('settings')}>
+          ⚙️ Pengaturan
         </button>
       </div>
 
@@ -400,6 +407,52 @@ export default function SuperadminDashboard() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── SETTINGS TAB ── */}
+        {tab === 'settings' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520 }}>
+            <p style={{ fontSize: 13, color: 'var(--silver3)', marginBottom: 4 }}>
+              Konfigurasi fitur global aplikasi.
+            </p>
+
+            {/* Chat Toggle */}
+            <div style={{
+              padding: '16px 20px', background: 'var(--bg3)',
+              border: '1px solid var(--border2)', borderRadius: 14,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+            }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)', marginBottom: 3 }}>
+                  💬 Fitur Chat Internal
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--silver3)' }}>
+                  Aktifkan/nonaktifkan chat untuk semua pengguna. Saat dinonaktifkan, ikon chat akan disembunyikan.
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  const newVal = !chatEnabled
+                  await setChatEnabled(newVal)
+                  toast(`Chat ${newVal ? 'diaktifkan' : 'dinonaktifkan'}.`, 'success')
+                }}
+                style={{
+                  flexShrink: 0, width: 52, height: 28, borderRadius: 14,
+                  background: chatEnabled ? 'var(--accent)' : 'var(--border2)',
+                  border: 'none', cursor: 'pointer', position: 'relative',
+                  transition: 'background 200ms',
+                }}
+                title={chatEnabled ? 'Nonaktifkan Chat' : 'Aktifkan Chat'}
+              >
+                <span style={{
+                  position: 'absolute', top: 4, left: chatEnabled ? 28 : 4,
+                  width: 20, height: 20, borderRadius: '50%', background: 'white',
+                  boxShadow: '0 1px 4px rgba(0,0,0,.3)',
+                  transition: 'left 200ms',
+                }} />
+              </button>
+            </div>
           </div>
         )}
       </div>

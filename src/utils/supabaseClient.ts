@@ -428,3 +428,150 @@ export const getTodoHistory = async (userId: string, limit = 200) => {
     .limit(limit)
   return data ?? []
 }
+
+// ── Chat ──────────────────────────────────────────────────────
+
+export interface ChatConversation {
+  id:               string
+  created_by:       string
+  participant_a:    string
+  participant_b:    string
+  is_active:        boolean
+  last_message_at:  string | null
+  created_at:       string
+  profile_a?:       Pick<Profile, 'id' | 'full_name' | 'username' | 'avatar_url' | 'avatar_emoji' | 'emoji'>
+  profile_b?:       Pick<Profile, 'id' | 'full_name' | 'username' | 'avatar_url' | 'avatar_emoji' | 'emoji'>
+  unread_count?:    number
+}
+
+export interface ChatMessage {
+  id:               string
+  conversation_id:  string
+  sender_id:        string
+  content:          string | null
+  message_type:     'text' | 'image' | 'video' | 'document' | 'audio'
+  file_url:         string | null
+  file_name:        string | null
+  file_size:        number | null
+  is_read:          boolean
+  created_at:       string
+  deleted_at:       string | null
+}
+
+export const getConversations = async (userId: string): Promise<ChatConversation[]> => {
+  const { data, error } = await supabase
+    .from('chat_conversations')
+    .select(`
+      *,
+      profile_a:profiles!chat_conversations_participant_a_fkey(id,full_name,username,avatar_url,avatar_emoji,emoji),
+      profile_b:profiles!chat_conversations_participant_b_fkey(id,full_name,username,avatar_url,avatar_emoji,emoji)
+    `)
+    .eq('is_active', true)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+  if (error) { console.error('getConversations:', error); return [] }
+  return (data ?? []) as unknown as ChatConversation[]
+}
+
+export const getMessages = async (conversationId: string, limit = 50): Promise<ChatMessage[]> => {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) { console.error('getMessages:', error); return [] }
+  return ((data ?? []) as ChatMessage[]).reverse()
+}
+
+export const createConversation = async (
+  createdBy: string,
+  participantB: string,
+): Promise<ChatConversation | null> => {
+  const { data, error } = await supabase
+    .from('chat_conversations')
+    .insert({
+      created_by:    createdBy,
+      participant_a: createdBy,
+      participant_b: participantB,
+    })
+    .select()
+    .single()
+  if (error) { console.error('createConversation:', error); return null }
+  return data as ChatConversation
+}
+
+export const sendMessage = async (
+  conversationId: string,
+  senderId:       string,
+  content:        string | null,
+  type:           ChatMessage['message_type'],
+  fileUrl?:       string,
+  fileName?:      string,
+  fileSize?:      number,
+): Promise<ChatMessage | null> => {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .insert({
+      conversation_id: conversationId,
+      sender_id:       senderId,
+      content,
+      message_type:    type,
+      file_url:        fileUrl  ?? null,
+      file_name:       fileName ?? null,
+      file_size:       fileSize ?? null,
+    })
+    .select()
+    .single()
+  if (error) { console.error('sendMessage:', error); return null }
+  // Update last_message_at on conversation
+  await supabase.from('chat_conversations')
+    .update({ last_message_at: new Date().toISOString() })
+    .eq('id', conversationId)
+  return data as ChatMessage
+}
+
+export const uploadChatFile = async (
+  conversationId: string,
+  file:           File,
+): Promise<{ url: string; name: string; size: number } | null> => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
+  const ext  = file.name.split('.').pop() ?? 'bin'
+  const path = `${session.user.id}/${conversationId}/${Date.now()}_${file.name.replace(/[^a-z0-9._-]/gi, '_')}`
+  const { error } = await supabase.storage
+    .from('chat-files').upload(path, file, { cacheControl: '3600' })
+  if (error) { console.error('uploadChatFile:', error); return null }
+  const { data } = supabase.storage.from('chat-files').getPublicUrl(path)
+  return { url: data.publicUrl, name: file.name, size: file.size }
+}
+
+export const getChatFileUrl = async (path: string): Promise<string | null> => {
+  const { data, error } = await supabase.storage
+    .from('chat-files').createSignedUrl(path, 3600)
+  if (error) return null
+  return data.signedUrl
+}
+
+export const markMessagesRead = async (conversationId: string, userId: string) =>
+  supabase.from('chat_messages')
+    .update({ is_read: true })
+    .eq('conversation_id', conversationId)
+    .eq('is_read', false)
+    .neq('sender_id', userId)
+
+export const deleteMessage = async (messageId: string) =>
+  supabase.from('chat_messages')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', messageId)
+
+export const getChatEnabled = async (): Promise<boolean> => {
+  const { data } = await supabase
+    .from('dashboard_config').select('chat_enabled').eq('id', GLOBAL_CONFIG_ID).single()
+  return (data as any)?.chat_enabled ?? false
+}
+
+export const setChatEnabled = async (enabled: boolean) =>
+  supabase.from('dashboard_config')
+    .update({ chat_enabled: enabled })
+    .eq('id', GLOBAL_CONFIG_ID)

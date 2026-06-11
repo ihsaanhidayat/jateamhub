@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore, applyThemeToDOM } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
+import { useChatStore } from '../../store/chatStore'
 import { canEdit, canSeeOptions, getDisplayBadge, isAdmin, isAdminGlobal } from '../../utils/roles'
 import { sanitizePage } from '../../utils/security'
 import { uploadAvatar, updateProfile } from '../../utils/supabaseClient'
@@ -11,12 +12,13 @@ interface Props {
   onToggleOptions:  () => void
   optionsOpen:      boolean
   onOpenTaskList?:  () => void
+  onOpenChat?:      () => void
   onOpenAdvanced:  () => void
   onAddSection:    () => void
   onImportLinks:   () => void
 }
 
-export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks, onOpenTaskList }: Props) {
+export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks, onOpenTaskList, onOpenChat }: Props) {
   const editMode    = useStore(s => s.editMode)
   const searchQuery = useStore(s => s.searchQuery)
   const { profile: session } = useAuthStore()
@@ -107,6 +109,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
   const isAdminLevel = isAdmin(session as any)
   const badge        = getDisplayBadge(session as any)
   const emoji        = (session as any)?.avatar_emoji ?? (session as any)?.emoji ?? ''
+
+  const chatEnabled  = useChatStore(s => s.enabled)
+  const unreadTotal  = useChatStore(s => s.unreadTotal)
 
 
 
@@ -285,6 +290,31 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                 title="Selesai Edit" aria-label="Selesai Edit">✓ Selesai</button>
             )}
           </div>
+
+          {/* Chat Icon */}
+          {chatEnabled && onOpenChat && (
+            <button
+              className="icon-btn"
+              onClick={onOpenChat}
+              title="Chat"
+              aria-label="Buka Chat"
+              style={{ position: 'relative' }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              {unreadTotal > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  minWidth: 16, height: 16, borderRadius: 8,
+                  background: 'var(--red, #e64545)', color: 'white',
+                  fontSize: 9, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 3px', pointerEvents: 'none',
+                }}>{unreadTotal > 99 ? '99+' : unreadTotal}</span>
+              )}
+            </button>
+          )}
 
           {/* Theme Toggle — ☀️/🌙 */}
           <button

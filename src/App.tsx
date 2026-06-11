@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { IconX } from './components/ui/icons'
 import { useAuthStore } from './store/authStore'
 import { useStore, applyThemeToDOM } from './store/dashboardStore'
+import { useChatStore } from './store/chatStore'
 import { supabase } from './utils/supabaseClient'
 import LoginPage    from './components/layout/LoginPage'
 import RegisterPage from './components/layout/RegisterPage'
@@ -21,6 +22,7 @@ const TodoReminderModal         = lazy(() => import('./components/ui/TodoReminde
 const IdleSessionGuard          = lazy(() => import('./components/ui/IdleSessionGuard'))
 const NotificationBanner        = lazy(() => import('./components/ui/NotificationBanner'))
 const TaskListPage              = lazy(() => import('./pages/TaskListPage'))
+const ChatPage                  = lazy(() => import('./pages/ChatPage'))
 import DashboardSkeleton from './components/ui/DashboardSkeleton'
 const OnboardingOverlay        = lazy(() => import('./components/ui/OnboardingOverlay'))
 const ItemModal                = lazy(() => import('./components/item/ItemModal'))
@@ -44,13 +46,19 @@ export default function App() {
   const [coffeeOpen,     setCoffeeOpen]     = useState(false)
   // Hash-based routing — persist across refresh
   const [taskListOpen, setTaskListOpen] = useState(() => window.location.hash === '#tasks')
+  const [chatOpen,     setChatOpen]     = useState(() => window.location.hash === '#chat')
 
-  const openTaskList = () => { window.location.hash = 'tasks'; setTaskListOpen(true) }
+  const openTaskList  = () => { window.location.hash = 'tasks'; setTaskListOpen(true) }
   const closeTaskList = () => { window.location.hash = ''; setTaskListOpen(false) }
+  const openChat      = () => { window.location.hash = 'chat'; setChatOpen(true) }
+  const closeChat     = () => { window.location.hash = ''; setChatOpen(false) }
 
   // Listen to browser back/forward
   useEffect(() => {
-    const handleHash = () => setTaskListOpen(window.location.hash === '#tasks')
+    const handleHash = () => {
+      setTaskListOpen(window.location.hash === '#tasks')
+      setChatOpen(window.location.hash === '#chat')
+    }
     window.addEventListener('hashchange', handleHash)
     return () => window.removeEventListener('hashchange', handleHash)
   }, [])
@@ -176,6 +184,18 @@ export default function App() {
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
+
+  // Load chat state when user logs in
+  useEffect(() => {
+    if (profile) {
+      useChatStore.getState().loadEnabled().then(() => {
+        const chatEnabled = useChatStore.getState().enabled
+        if (chatEnabled) {
+          useChatStore.getState().subscribeAll(profile.id)
+        }
+      })
+    }
+  }, [profile?.id])
 
   // Saat user login → init data
   useEffect(() => {
@@ -306,6 +326,7 @@ export default function App() {
         onAddSection={() => setAddSectionOpen(true)}
         onImportLinks={() => setImportLinksOpen(true)}
         onOpenTaskList={openTaskList}
+        onOpenChat={openChat}
       />
 
       {/* Edit mode topbar — slim, di bawah header */}
@@ -395,6 +416,11 @@ export default function App() {
       {taskListOpen && (
         <Suspense fallback={null}>
           <TaskListPage onClose={closeTaskList} />
+        </Suspense>
+      )}
+      {chatOpen && (
+        <Suspense fallback={null}>
+          <ChatPage onClose={closeChat} />
         </Suspense>
       )}
       <Suspense fallback={null}>
