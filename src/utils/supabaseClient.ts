@@ -35,6 +35,7 @@ export interface Profile {
   google_email?: string | null  // Gmail asli untuk user OAuth Google
   auth_provider?: string        // 'email' (default) | 'google'
   chat_enabled?: boolean        // akses fitur chat — diatur oleh superadmin
+  last_seen?:    string | null  // presence — terakhir aktif (untuk "last seen")
   created_at:    string
   updated_at:    string
 }
@@ -441,10 +442,13 @@ export interface ChatConversation {
   is_active:        boolean
   last_message_at:  string | null
   created_at:       string
-  profile_a?:       Pick<Profile, 'id' | 'full_name' | 'username' | 'avatar_url' | 'avatar_emoji' | 'emoji'>
-  profile_b?:       Pick<Profile, 'id' | 'full_name' | 'username' | 'avatar_url' | 'avatar_emoji' | 'emoji'>
+  profile_a?:       Pick<Profile, 'id' | 'full_name' | 'username' | 'avatar_url' | 'avatar_emoji' | 'emoji' | 'last_seen'>
+  profile_b?:       Pick<Profile, 'id' | 'full_name' | 'username' | 'avatar_url' | 'avatar_emoji' | 'emoji' | 'last_seen'>
   unread_count?:    number
 }
+
+// Reactions: emoji → array of user ids who reacted
+export type MessageReactions = Record<string, string[]>
 
 export interface ChatMessage {
   id:               string
@@ -456,6 +460,9 @@ export interface ChatMessage {
   file_name:        string | null
   file_size:        number | null
   is_read:          boolean
+  delivered_at:     string | null   // diterima device penerima
+  read_at:          string | null   // dibaca penerima
+  reactions:        MessageReactions
   created_at:       string
   deleted_at:       string | null
 }
@@ -477,7 +484,7 @@ export const getConversations = async (userId: string): Promise<ChatConversation
   const pids = [...new Set(convs.flatMap(c => [c.participant_a, c.participant_b]))]
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id,full_name,username,avatar_url,avatar_emoji,emoji')
+    .select('id,full_name,username,avatar_url,avatar_emoji,emoji,last_seen')
     .in('id', pids)
   const pMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
 
@@ -598,15 +605,56 @@ export const clearConversationMessages = async (conversationId: string) =>
 
 export const markMessagesRead = async (conversationId: string, userId: string) =>
   supabase.from('chat_messages')
-    .update({ is_read: true })
+    .update({ is_read: true, read_at: new Date().toISOString() })
     .eq('conversation_id', conversationId)
-    .eq('is_read', false)
+    .is('read_at', null)
     .neq('sender_id', userId)
+
+// Mark all incoming messages as delivered (recipient device received them).
+export const markMessagesDelivered = async (conversationId: string, userId: string) =>
+  supabase.from('chat_messages')
+    .update({ delivered_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId)
+    .is('delivered_at', null)
+    .neq('sender_id', userId)
+
+// Toggle an emoji reaction on a message for the given user.
+export const toggleReaction = async (
+  messageId: string,
+  userId:    string,
+  emoji:     string,
+): Promise<MessageReactions | null> => {
+  const { data: row, error: readErr } = await supabase
+    .from('chat_messages').select('reactions').eq('id', messageId).single()
+  if (readErr) { console.error('toggleReaction read:', readErr); return null }
+  const reactions: MessageReactions = { ...(row?.reactions ?? {}) }
+  const users = new Set(reactions[emoji] ?? [])
+  if (users.has(userId)) users.delete(userId)
+  else users.add(userId)
+  if (users.size) reactions[emoji] = [...users]
+  else delete reactions[emoji]
+  const { error } = await supabase
+    .from('chat_messages').update({ reactions }).eq('id', messageId)
+  if (error) { console.error('toggleReaction write:', error); return null }
+  return reactions
+}
 
 export const deleteMessage = async (messageId: string) =>
   supabase.from('chat_messages')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', messageId)
+
+// ── Presence: heartbeat last_seen ─────────────────────────────
+export const updateLastSeen = async (userId: string) =>
+  supabase.from('profiles')
+    .update({ last_seen: new Date().toISOString() })
+    .eq('id', userId)
+
+export const getLastSeen = async (userId: string): Promise<string | null> => {
+  const { data } = await supabase
+    .from('profiles').select('last_seen').eq('id', userId).single()
+  return data?.last_seen ?? null
+}
 
 export const getChatEnabled = async (): Promise<boolean> => {
   const { data } = await supabase

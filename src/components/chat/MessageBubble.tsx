@@ -53,6 +53,24 @@ function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClos
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 
+// WhatsApp-style delivery ticks.
+//  · sent      → single check (translucent)
+//  · delivered → double check (translucent)
+//  · read      → double check (blue)
+function Ticks({ delivered, read }: { delivered: boolean; read: boolean }) {
+  const color  = read ? '#53BDEB' : 'rgba(255,255,255,0.72)'
+  const double = delivered || read
+  const check  = (ox: number) =>
+    <path d={`M${ox} 5.6 L${ox + 3.1} 8.7 L${ox + 8.4} 2.1`}
+      stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+  return (
+    <svg width={double ? 17 : 12} height="11" viewBox={`0 0 ${double ? 17 : 12} 11`} style={{ display: 'block' }}>
+      {check(0.6)}
+      {double && check(5.4)}
+    </svg>
+  )
+}
+
 const fmtSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
@@ -71,6 +89,7 @@ const FileIcon = ({ name }: { name: string }) => {
 
 export default function MessageBubble({ msg, isMine, onDelete }: Props) {
   const [showMenu,    setShowMenu]    = useState(false)
+  const [showInfo,    setShowInfo]    = useState(false)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const accent  = isMine ? 'var(--accent)' : 'var(--bg4)'
   const textCol = isMine ? 'white' : 'var(--silver)'
@@ -83,7 +102,7 @@ export default function MessageBubble({ msg, isMine, onDelete }: Props) {
         gap: 8, marginBottom: 4,
         alignItems: 'flex-end',
       }}
-      onClick={() => setShowMenu(false)}
+      onClick={() => { setShowMenu(false); setShowInfo(false) }}
     >
       <div
         style={{
@@ -143,15 +162,37 @@ export default function MessageBubble({ msg, isMine, onDelete }: Props) {
           </a>
         )}
 
-        <div style={{
-          fontSize: 10, opacity: 0.65, marginTop: 4,
-          textAlign: isMine ? 'right' : 'left',
-          display: 'flex', alignItems: 'center', justifyContent: isMine ? 'flex-end' : 'flex-start',
-          gap: 4,
-        }}>
-          {fmtTime(msg.created_at)}
-          {isMine && <span style={{ fontSize: 11 }}>{msg.is_read ? '✓✓' : '✓'}</span>}
+        <div
+          onClick={e => { if (isMine) { e.stopPropagation(); setShowInfo(v => !v) } }}
+          style={{
+            fontSize: 10, opacity: 0.7, marginTop: 4,
+            textAlign: isMine ? 'right' : 'left',
+            display: 'flex', alignItems: 'center', justifyContent: isMine ? 'flex-end' : 'flex-start',
+            gap: 4, cursor: isMine ? 'pointer' : 'default',
+          }}
+        >
+          <span>{fmtTime(msg.created_at)}</span>
+          {isMine && <Ticks delivered={!!msg.delivered_at} read={!!msg.read_at} />}
         </div>
+
+        {showInfo && isMine && (
+          <div style={{
+            position: 'absolute', top: '100%', right: 0, zIndex: 50, marginTop: 4,
+            background: 'var(--bg2)', border: '1px solid var(--border2)',
+            borderRadius: 10, padding: '8px 12px',
+            boxShadow: 'var(--shadow-lg)', minWidth: 150,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 11, color: 'var(--silver3)', padding: '2px 0' }}>
+              <span>Terkirim</span><span style={{ fontFamily: 'var(--mono)' }}>{fmtTime(msg.created_at)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 11, color: msg.delivered_at ? 'var(--silver3)' : 'var(--silver4)', padding: '2px 0' }}>
+              <span>Diterima</span><span style={{ fontFamily: 'var(--mono)' }}>{msg.delivered_at ? fmtTime(msg.delivered_at) : '—'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 11, color: msg.read_at ? '#53BDEB' : 'var(--silver4)', padding: '2px 0' }}>
+              <span>Dibaca</span><span style={{ fontFamily: 'var(--mono)' }}>{msg.read_at ? fmtTime(msg.read_at) : '—'}</span>
+            </div>
+          </div>
+        )}
 
         {showMenu && isMine && onDelete && (
           <div style={{

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useChatStore } from '../../store/chatStore'
 import type { ChatConversation } from '../../utils/supabaseClient'
+import { lastSeenText, ONLINE_WINDOW_MS } from '../../utils/presence'
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
 
@@ -16,7 +17,7 @@ const fmtDate = (iso: string) => {
 }
 
 export default function MessageThread({ conv, currentUserId }: Props) {
-  const { messages, msgLoading, removeMsg, clearConv, resetIdle } = useChatStore()
+  const { messages, msgLoading, removeMsg, clearConv, resetIdle, onlineUsers } = useChatStore()
   const bottomRef = useRef<HTMLDivElement>(null)
   const [confirmClear, setConfirmClear] = useState(false)
 
@@ -31,6 +32,12 @@ export default function MessageThread({ conv, currentUserId }: Props) {
   }
 
   const other = conv.participant_a === currentUserId ? conv.profile_b : conv.profile_a
+  const otherId = other?.id
+  const isOnline = !!otherId && (
+    onlineUsers[otherId] === true ||
+    (!!other?.last_seen && Date.now() - new Date(other.last_seen).getTime() < ONLINE_WINDOW_MS)
+  )
+  const statusText = isOnline ? 'online' : lastSeenText(other?.last_seen)
 
   // Group messages by date
   const groups: Array<{ date: string; msgs: typeof messages }> = []
@@ -72,12 +79,19 @@ export default function MessageThread({ conv, currentUserId }: Props) {
           }
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {other?.full_name ?? other?.username ?? 'Unknown'}
           </div>
-          {other?.username && (
-            <div style={{ fontSize: 11, color: 'var(--silver4)' }}>@{other.username}</div>
-          )}
+          <div style={{
+            fontSize: 11, display: 'flex', alignItems: 'center', gap: 5,
+            color: isOnline ? 'var(--green, #22c55e)' : 'var(--silver4)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {isOnline && (
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green, #22c55e)', flexShrink: 0 }} />
+            )}
+            {statusText || (other?.username ? `@${other.username}` : '')}
+          </div>
         </div>
         {/* Clear chat button */}
         <button
