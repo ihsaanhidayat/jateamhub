@@ -47,7 +47,7 @@ export interface SharedSection {
   subtitle:      string
   items:         unknown[] // daftar link di dalam section
   accent_color:  string
-  visibility:    'all' | 'role' | 'region' | 'unit' // siapa yang bisa lihat
+  visibility:    'all' | 'global' | 'role' | 'region' | 'unit'
   target_role:   string | null   // khusus role tertentu
   target_region: string | null   // khusus wilayah tertentu
   target_unit:   string | null   // khusus unit tertentu
