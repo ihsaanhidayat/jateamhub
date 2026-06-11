@@ -463,15 +463,26 @@ export interface ChatMessage {
 export const getConversations = async (userId: string): Promise<ChatConversation[]> => {
   const { data, error } = await supabase
     .from('chat_conversations')
-    .select(`
-      *,
-      profile_a:profiles!chat_conversations_participant_a_fkey(id,full_name,username,avatar_url,avatar_emoji,emoji),
-      profile_b:profiles!chat_conversations_participant_b_fkey(id,full_name,username,avatar_url,avatar_emoji,emoji)
-    `)
+    .select('*')
     .eq('is_active', true)
     .order('last_message_at', { ascending: false, nullsFirst: false })
   if (error) { console.error('getConversations:', error); return [] }
-  return (data ?? []) as unknown as ChatConversation[]
+  const convs = (data ?? []) as ChatConversation[]
+  if (!convs.length) return []
+
+  // Fetch all participant profiles in one query
+  const pids = [...new Set(convs.flatMap(c => [c.participant_a, c.participant_b]))]
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id,full_name,username,avatar_url,avatar_emoji,emoji')
+    .in('id', pids)
+  const pMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
+
+  return convs.map(c => ({
+    ...c,
+    profile_a: pMap[c.participant_a] ?? null,
+    profile_b: pMap[c.participant_b] ?? null,
+  }))
 }
 
 export const getMessages = async (conversationId: string, limit = 50): Promise<ChatMessage[]> => {
@@ -500,7 +511,20 @@ export const createConversation = async (
     .select()
     .single()
   if (error) { console.error('createConversation:', error); return null }
-  return data as ChatConversation
+  const conv = data as ChatConversation
+
+  // Fetch profiles for both participants
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id,full_name,username,avatar_url,avatar_emoji,emoji')
+    .in('id', [createdBy, participantB])
+  const pMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
+
+  return {
+    ...conv,
+    profile_a: pMap[conv.participant_a] ?? null,
+    profile_b: pMap[conv.participant_b] ?? null,
+  }
 }
 
 export const sendMessage = async (
