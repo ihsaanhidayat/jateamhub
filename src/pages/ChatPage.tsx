@@ -12,7 +12,7 @@ export default function ChatPage({ onClose }: Props) {
   const { profile } = useAuthStore()
   const {
     enabled, isLocked, conversations, currentConvId,
-    loadConversations, selectConv, lock,
+    loadConversations, selectConv, closeConvChannel, lock, resetIdle,
   } = useChatStore()
   const [newChatOpen,  setNewChatOpen]  = useState(false)
   const [mobileThread, setMobileThread] = useState(false)
@@ -24,6 +24,9 @@ export default function ChatPage({ onClose }: Props) {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  // Cleanup per-conversation broadcast channel on unmount
+  useEffect(() => () => { closeConvChannel() }, [])
 
   // Load conversations when unlocked
   useEffect(() => {
@@ -64,12 +67,16 @@ export default function ChatPage({ onClose }: Props) {
   )
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 120,
-      background: 'var(--bg)',
-      display: 'flex', flexDirection: 'column',
-      animation: 'fadeUp 180ms ease',
-    }}>
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 120,
+        background: 'var(--bg)',
+        display: 'flex', flexDirection: 'column',
+        animation: 'fadeUp 180ms ease',
+      }}
+      onPointerMove={resetIdle}
+      onKeyDown={resetIdle}
+    >
       {/* Page header */}
       <div style={{
         height: 56, flexShrink: 0,

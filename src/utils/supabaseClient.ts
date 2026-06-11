@@ -580,21 +580,21 @@ export const uploadChatFile = async (
 ): Promise<{ url: string; name: string; size: number } | null> => {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return null
-  const ext  = file.name.split('.').pop() ?? 'bin'
-  const path = `${session.user.id}/${conversationId}/${Date.now()}_${file.name.replace(/[^a-z0-9._-]/gi, '_')}`
+  const safeName = file.name.replace(/[^a-z0-9._-]/gi, '_').slice(0, 100)
+  const path = `${session.user.id}/${conversationId}/${Date.now()}_${safeName}`
   const { error } = await supabase.storage
-    .from('chat-files').upload(path, file, { cacheControl: '3600' })
+    .from('chat-files').upload(path, file, { cacheControl: '3600', upsert: false })
   if (error) { console.error('uploadChatFile:', error); return null }
+  // Bucket is public — getPublicUrl works for public buckets
   const { data } = supabase.storage.from('chat-files').getPublicUrl(path)
   return { url: data.publicUrl, name: file.name, size: file.size }
 }
 
-export const getChatFileUrl = async (path: string): Promise<string | null> => {
-  const { data, error } = await supabase.storage
-    .from('chat-files').createSignedUrl(path, 3600)
-  if (error) return null
-  return data.signedUrl
-}
+export const clearConversationMessages = async (conversationId: string) =>
+  supabase.from('chat_messages')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId)
+    .is('deleted_at', null)
 
 export const markMessagesRead = async (conversationId: string, userId: string) =>
   supabase.from('chat_messages')

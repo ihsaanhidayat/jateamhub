@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useChatStore } from '../../store/chatStore'
 import type { ChatConversation } from '../../utils/supabaseClient'
 import MessageBubble from './MessageBubble'
@@ -16,12 +16,19 @@ const fmtDate = (iso: string) => {
 }
 
 export default function MessageThread({ conv, currentUserId }: Props) {
-  const { messages, msgLoading, removeMsg } = useChatStore()
+  const { messages, msgLoading, removeMsg, clearConv, resetIdle } = useChatStore()
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [confirmClear, setConfirmClear] = useState(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length])
+
+  const handleClear = async () => {
+    if (!confirmClear) { setConfirmClear(true); return }
+    await clearConv()
+    setConfirmClear(false)
+  }
 
   const other = conv.participant_a === currentUserId ? conv.profile_b : conv.profile_a
 
@@ -35,10 +42,14 @@ export default function MessageThread({ conv, currentUserId }: Props) {
   }
 
   return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0,
-      background: 'var(--bg)',
-    }}>
+    <div
+      style={{
+        flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0,
+        background: 'var(--bg)',
+      }}
+      onPointerMove={resetIdle}
+      onKeyDown={resetIdle}
+    >
       {/* Thread header */}
       <div style={{
         padding: '12px 16px',
@@ -60,7 +71,7 @@ export default function MessageThread({ conv, currentUserId }: Props) {
             : <span>{(other?.full_name?.[0] ?? '?').toUpperCase()}</span>
           }
         </div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>
             {other?.full_name ?? other?.username ?? 'Unknown'}
           </div>
@@ -68,6 +79,22 @@ export default function MessageThread({ conv, currentUserId }: Props) {
             <div style={{ fontSize: 11, color: 'var(--silver4)' }}>@{other.username}</div>
           )}
         </div>
+        {/* Clear chat button */}
+        <button
+          onClick={handleClear}
+          title={confirmClear ? 'Klik lagi untuk konfirmasi' : 'Hapus semua pesan'}
+          style={{
+            background: confirmClear ? 'var(--red)' : 'none',
+            border: '1px solid ' + (confirmClear ? 'var(--red)' : 'var(--border2)'),
+            borderRadius: 8, padding: '5px 10px',
+            fontSize: 11, color: confirmClear ? 'white' : 'var(--silver4)',
+            cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+            transition: 'all 150ms',
+          }}
+          onMouseLeave={() => { if (confirmClear) setTimeout(() => setConfirmClear(false), 2000) }}
+        >
+          {confirmClear ? 'Yakin hapus?' : 'Hapus chat'}
+        </button>
       </div>
 
       {/* Messages */}

@@ -1,10 +1,53 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { ChatMessage } from '../../utils/supabaseClient'
 
 interface Props {
   msg:       ChatMessage
   isMine:    boolean
   onDelete?: (id: string) => void
+}
+
+function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(6px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'zoom-out',
+      }}
+    >
+      <button
+        onClick={onClose}
+        style={{
+          position: 'absolute', top: 16, right: 20,
+          background: 'rgba(255,255,255,0.12)', border: 'none',
+          borderRadius: '50%', width: 38, height: 38,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: 'white', fontSize: 22, lineHeight: 1,
+        }}
+        aria-label="Tutup"
+      >×</button>
+      <img
+        src={src}
+        alt={alt}
+        onClick={e => e.stopPropagation()}
+        style={{
+          maxWidth: 'min(90vw, 1200px)', maxHeight: '90vh',
+          objectFit: 'contain', borderRadius: 12,
+          boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+          cursor: 'default',
+        }}
+      />
+    </div>
+  )
 }
 
 const fmtTime = (iso: string) =>
@@ -27,7 +70,8 @@ const FileIcon = ({ name }: { name: string }) => {
 }
 
 export default function MessageBubble({ msg, isMine, onDelete }: Props) {
-  const [showMenu, setShowMenu] = useState(false)
+  const [showMenu,    setShowMenu]    = useState(false)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const accent  = isMine ? 'var(--accent)' : 'var(--bg4)'
   const textCol = isMine ? 'white' : 'var(--silver)'
 
@@ -57,16 +101,15 @@ export default function MessageBubble({ msg, isMine, onDelete }: Props) {
         {msg.message_type === 'text' && <span>{msg.content}</span>}
 
         {msg.message_type === 'image' && msg.file_url && (
-          <a href={msg.file_url} target="_blank" rel="noreferrer">
-            <img
-              src={msg.file_url}
-              alt={msg.file_name ?? 'image'}
-              style={{
-                maxWidth: '100%', maxHeight: 240, borderRadius: 10,
-                display: 'block', objectFit: 'cover',
-              }}
-            />
-          </a>
+          <img
+            src={msg.file_url}
+            alt={msg.file_name ?? 'image'}
+            onClick={e => { e.stopPropagation(); setLightboxSrc(msg.file_url) }}
+            style={{
+              maxWidth: '100%', maxHeight: 240, borderRadius: 10,
+              display: 'block', objectFit: 'cover', cursor: 'zoom-in',
+            }}
+          />
         )}
 
         {msg.message_type === 'video' && msg.file_url && (
@@ -128,6 +171,14 @@ export default function MessageBubble({ msg, isMine, onDelete }: Props) {
           </div>
         )}
       </div>
+
+      {lightboxSrc && (
+        <ImageLightbox
+          src={lightboxSrc}
+          alt={msg.file_name ?? 'image'}
+          onClose={() => setLightboxSrc(null)}
+        />
+      )}
     </div>
   )
 }
