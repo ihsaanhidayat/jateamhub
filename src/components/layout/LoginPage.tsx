@@ -223,29 +223,6 @@ export default function LoginPage({ onRegister }: Props) {
           Masuk dengan Google
         </button>
 
-        {/* Microsoft Sign-In */}
-        <button
-          type="button"
-          onClick={() => useAuthStore.getState().loginWithMicrosoft()}
-          style={{
-            width: '100%', height: 44, marginTop: 8,
-            background: 'var(--bg4)', border: '1px solid var(--border2)',
-            borderRadius: 10, fontSize: 13, fontWeight: 600,
-            color: 'var(--silver2)', cursor: 'pointer',
-            fontFamily: 'var(--font)', transition: 'all 150ms',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#00a1f1'; (e.currentTarget as HTMLElement).style.background = 'var(--bg3)' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'; (e.currentTarget as HTMLElement).style.background = 'var(--bg4)' }}
-        >
-          <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
-            <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-            <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-            <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-            <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-          </svg>
-          Masuk dengan Microsoft
-        </button>
 
         {onRegister && (
           <div style={{ marginTop: 24, textAlign: 'center', fontSize: 13, color: 'var(--silver3)' }}>

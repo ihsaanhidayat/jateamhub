@@ -73,13 +73,6 @@ export const signInWithGoogle = () =>
     options: { redirectTo: window.location.origin },
   })
 
-// Login dengan Microsoft (Azure AD) OAuth
-export const signInWithMicrosoft = () =>
-  supabase.auth.signInWithOAuth({
-    provider: 'azure',
-    options: { redirectTo: window.location.origin, scopes: 'email profile' },
-  })
-
 // ── Fungsi Profil User ────────────────────────────────────────
 
 // Ambil profil satu user berdasarkan ID

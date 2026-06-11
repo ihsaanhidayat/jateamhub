@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import { create } from 'zustand'
 import {
-  supabase, getProfile, signIn, signOut, signInWithGoogle, signInWithMicrosoft,
+  supabase, getProfile, signIn, signOut, signInWithGoogle,
   createUser, getAllProfiles, getProfilesByScope,
   updateProfile, updateUserPassword,
 } from '../utils/supabaseClient'
@@ -18,7 +18,7 @@ interface AuthState {
   initialized:        boolean
   users:              Profile[]
   _usersLoaded:       boolean
-  pendingGoogleUser:  { id: string; email: string; provider: 'google' | 'azure' } | null
+  pendingGoogleUser:  { id: string; email: string } | null
 
   _toast: ((msg: string, type?: 'success' | 'error' | 'warn') => void) | null
   setToastFn: (fn: (msg: string, type?: 'success' | 'error' | 'warn') => void) => void
@@ -26,7 +26,6 @@ interface AuthState {
   init:                     () => Promise<void>
   login:                    (username: string, password: string) => Promise<string | null>
   loginWithGoogle:          () => Promise<void>
-  loginWithMicrosoft:       () => Promise<void>
   completeGoogleOnboarding: (username: string, fullName: string, region: string, unit: string) => Promise<string | null>
   logout:                   () => void
 
@@ -90,11 +89,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (profile) {
           set({ profile, loading: false, initialized: true })
         } else {
-          // Tidak ada profil — cek apakah OAuth user baru (Google atau Microsoft)
+          // Tidak ada profil — cek apakah Google OAuth user baru
           const provider = session.user.app_metadata?.provider
-          if (provider === 'google' || provider === 'azure') {
+          if (provider === 'google') {
             set({
-              pendingGoogleUser: { id: session.user.id, email: session.user.email ?? '', provider },
+              pendingGoogleUser: { id: session.user.id, email: session.user.email ?? '' },
               loading: false, initialized: true,
             })
           } else {
@@ -121,16 +120,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } else if (event === 'SIGNED_OUT') {
         set({ profile: null, users: [], _usersLoaded: false, pendingGoogleUser: null })
       } else if (event === 'SIGNED_IN' && session?.user) {
-        // Handle OAuth (Google/Microsoft) — email/password login ditangani oleh login()
-        // Guard: skip jika sudah ada profile (login biasa sudah selesai)
+        // Hanya handle Google OAuth — email/password login ditangani oleh login()
         if (get().profile) return
         const provider = session.user.app_metadata?.provider
-        if (provider === 'google' || provider === 'azure') {
+        if (provider === 'google') {
           const profile = await getProfile(session.user.id)
           if (profile) {
             set({ profile, loading: false, initialized: true })
           } else {
-            set({ pendingGoogleUser: { id: session.user.id, email: session.user.email ?? '', provider }, loading: false, initialized: true })
+            set({ pendingGoogleUser: { id: session.user.id, email: session.user.email ?? '' }, loading: false, initialized: true })
           }
         }
       }
@@ -179,22 +177,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await signInWithGoogle()
   },
 
-  // ── Login dengan Microsoft ───────────────────────────────
-  loginWithMicrosoft: async () => {
-    await signInWithMicrosoft()
-  },
-
-  // ── Selesaikan onboarding OAuth user baru (Google/Microsoft) ──
+  // ── Selesaikan onboarding Google user baru ───────────────
   completeGoogleOnboarding: async (username, fullName, region, unit) => {
     const pending = get().pendingGoogleUser
     if (!pending) return 'Sesi tidak valid.'
 
-    // Cek keunikan username
     const { data: existing } = await supabase
       .from('profiles').select('id').eq('username', username).maybeSingle()
     if (existing) return 'Username sudah digunakan. Pilih yang lain.'
-
-    const authProvider = pending.provider === 'azure' ? 'microsoft' : 'google'
 
     const { error } = await supabase.from('profiles').insert({
       id:           pending.id,
@@ -210,7 +200,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       emoji:        '',
       appearance:   {},
       google_email: pending.email,
-      auth_provider: authProvider,
+      auth_provider: 'google',
     })
     if (error) return error.message
 
