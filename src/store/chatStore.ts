@@ -41,10 +41,11 @@ async function ingestIncoming(msg: ChatMessage, userId: string) {
   if (useChatStore.getState().currentConvId !== msg.conversation_id) return
   const key = await getConvKey(msg.conversation_id, msg.sender_id)
   const m = await decryptMsg(msg, key)
+  if (_typingClear) { clearTimeout(_typingClear); _typingClear = null }
   useChatStore.setState(s => {
     if (s.currentConvId !== msg.conversation_id) return s
-    if (s.messages.some(x => x.id === m.id)) return s
-    return { messages: [...s.messages, m] }
+    if (s.messages.some(x => x.id === m.id)) return { peerTyping: false }
+    return { messages: [...s.messages, m], peerTyping: false }
   })
 }
 
@@ -61,6 +62,7 @@ interface ChatState {
   messages:      ChatMessage[]
   unreadTotal:   number
   onlineUsers:   Record<string, boolean>   // userId → online
+  peerTyping:    boolean                    // partner is typing in the open thread
   loading:       boolean
   msgLoading:    boolean
   sending:       boolean
@@ -79,6 +81,7 @@ interface ChatState {
   removeMsg:         (msgId: string) => Promise<void>
   clearConv:         () => Promise<void>
   reactToMsg:        (msgId: string, emoji: string, userId: string) => Promise<void>
+  notifyTyping:      () => void
 
   // Realtime — global channel + presence owned by App.tsx
   _realtimeSub: (() => void) | null
@@ -102,6 +105,8 @@ let _convChannel:     ReturnType<typeof supabase.channel> | null = null
 let _presenceChannel: ReturnType<typeof supabase.channel> | null = null
 let _idleTimer:       ReturnType<typeof setTimeout>  | null = null
 let _heartbeat:       ReturnType<typeof setInterval> | null = null
+let _typingClear:     ReturnType<typeof setTimeout>  | null = null
+let _lastTypingSent   = 0
 let _userId           = ''
 
 function resetIdleTimer() {
@@ -166,6 +171,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages:      [],
   unreadTotal:   0,
   onlineUsers:   {},
+  peerTyping:    false,
   loading:       false,
   msgLoading:    false,
   sending:       false,
@@ -193,6 +199,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   selectConv: async (id, userId) => {
     if (_convChannel) { _convChannel.unsubscribe(); _convChannel = null }
+
+    if (_typingClear) { clearTimeout(_typingClear); _typingClear = null }
+    set({ peerTyping: false })
 
     if (!id) { set({ currentConvId: null, messages: [] }); return }
 
@@ -240,6 +249,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set(s => ({ messages: s.messages.filter(m => m.id !== payload.id) }))
       })
       .on('broadcast', { event: 'clear' }, () => set({ messages: [] }))
+      .on('broadcast', { event: 'typing' }, () => {
+        set({ peerTyping: true })
+        if (_typingClear) clearTimeout(_typingClear)
+        _typingClear = setTimeout(() => set({ peerTyping: false }), 3500)
+      })
       .subscribe()
   },
 
@@ -326,6 +340,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await clearConversationMessages(convId)
     set({ messages: [] })
     _convChannel?.send({ type: 'broadcast', event: 'clear', payload: {} })
+  },
+
+  notifyTyping: () => {
+    const now = Date.now()
+    if (now - _lastTypingSent < 1500) return   // throttle
+    _lastTypingSent = now
+    _convChannel?.send({ type: 'broadcast', event: 'typing', payload: {} })
   },
 
   reactToMsg: async (msgId, emoji, userId) => {

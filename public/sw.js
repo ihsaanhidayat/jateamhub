@@ -1,5 +1,5 @@
-const CACHE = 'jateamhub-v4'
-const STATIC = ['/', '/index.html', '/manifest.json']
+const CACHE = 'jateamhub-v5'
+const STATIC = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)))
@@ -79,15 +79,22 @@ self.addEventListener('fetch', e => {
   )
 })
 
-// Notification clicked — focus existing window or open new tab
+// Notification clicked — focus existing window (navigating to the target
+// hash if provided) or open a new one.
 self.addEventListener('notificationclick', e => {
   e.notification.close()
+  const target = e.notification.data?.url || '/'
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const client of list) {
-        if ('focus' in client) return client.focus()
+        if ('focus' in client) {
+          if (target && target !== '/' && 'navigate' in client) {
+            client.navigate(target).catch(() => {})
+          }
+          return client.focus()
+        }
       }
-      return clients.openWindow('/')
+      return clients.openWindow(target)
     })
   )
 })
@@ -100,7 +107,9 @@ self.addEventListener('push', e => {
       body:  data.body  ?? '',
       icon:  '/icon-192.png',
       badge: '/icon-192.png',
-      tag:   'jateamhub-push',
+      tag:   data.tag ?? 'jateamhub-push',
+      data:  { url: data.url ?? '/#chat' },
+      vibrate: [80, 40, 80],
     })
   )
 })

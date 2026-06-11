@@ -1,6 +1,7 @@
 {
   "name": "JateamHub",
   "short_name": "JateamHub",
+  "id": "/",
   "description": "Portal Dashboard Internal Tim — Kelola link, tugas, dan catatan dalam satu tempat.",
   "start_url": "/",
   "display": "standalone",
@@ -26,6 +27,13 @@
       "short_name": "Todo",
       "description": "Buka to-do list",
       "url": "/#tasks",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Chat",
+      "short_name": "Chat",
+      "description": "Buka chat",
+      "url": "/#chat",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],

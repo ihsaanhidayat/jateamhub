@@ -8,7 +8,7 @@ const MAX_MB = 50
 interface Props { senderId: string }
 
 export default function ChatInput({ senderId }: Props) {
-  const { sendText, sendFile, sending, currentConvId } = useChatStore()
+  const { sendText, sendFile, sending, currentConvId, notifyTyping } = useChatStore()
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
@@ -120,6 +120,7 @@ export default function ChatInput({ senderId }: Props) {
           value={text}
           onChange={e => {
             setText(e.target.value)
+            if (e.target.value.trim()) notifyTyping()
             const el = e.target
             el.style.height = 'auto'
             el.style.height = Math.min(el.scrollHeight, 120) + 'px'

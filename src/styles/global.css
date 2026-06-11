@@ -634,6 +634,7 @@ mark.hl { background: var(--accent-soft); color: var(--accent); border-radius: 3
 @keyframes pulse    { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.72; transform: scale(1.07); } }
 @keyframes editPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.4); } }
 @keyframes shake    { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-8px); } 40%,80% { transform: translateX(8px); } }
+@keyframes typingDot { 0%,60%,100% { transform: translateY(0); opacity: .4; } 30% { transform: translateY(-4px); opacity: 1; } }
 
 
 /* ══════════════════════════════════════════════════════════

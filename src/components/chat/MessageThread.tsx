@@ -17,13 +17,13 @@ const fmtDate = (iso: string) => {
 }
 
 export default function MessageThread({ conv, currentUserId }: Props) {
-  const { messages, msgLoading, removeMsg, clearConv, reactToMsg, resetIdle, onlineUsers, encReady } = useChatStore()
+  const { messages, msgLoading, removeMsg, clearConv, reactToMsg, resetIdle, onlineUsers, encReady, peerTyping } = useChatStore()
   const bottomRef = useRef<HTMLDivElement>(null)
   const [confirmClear, setConfirmClear] = useState(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length])
+  }, [messages.length, peerTyping])
 
   const handleClear = async () => {
     if (!confirmClear) { setConfirmClear(true); return }
@@ -84,13 +84,14 @@ export default function MessageThread({ conv, currentUserId }: Props) {
           </div>
           <div style={{
             fontSize: 11, display: 'flex', alignItems: 'center', gap: 5,
-            color: isOnline ? 'var(--green, #22c55e)' : 'var(--silver4)',
+            color: peerTyping ? 'var(--accent)' : isOnline ? 'var(--green, #22c55e)' : 'var(--silver4)',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            fontWeight: peerTyping ? 600 : 400,
           }}>
-            {isOnline && (
+            {!peerTyping && isOnline && (
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green, #22c55e)', flexShrink: 0 }} />
             )}
-            {statusText || (other?.username ? `@${other.username}` : '')}
+            {peerTyping ? 'mengetik…' : (statusText || (other?.username ? `@${other.username}` : ''))}
           </div>
         </div>
         {/* Clear chat button */}
@@ -160,6 +161,23 @@ export default function MessageThread({ conv, currentUserId }: Props) {
             ))}
           </div>
         ))}
+        {peerTyping && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 4 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              background: 'var(--bg4)', borderRadius: '4px 16px 16px 16px',
+              padding: '11px 14px', boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+            }}>
+              {[0, 1, 2].map(i => (
+                <span key={i} style={{
+                  width: 6, height: 6, borderRadius: '50%', background: 'var(--silver4)',
+                  display: 'inline-block', animation: 'typingDot 1.2s infinite',
+                  animationDelay: `${i * 0.18}s`,
+                }} />
+              ))}
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 

@@ -52,6 +52,7 @@ interface NotifyOpts { tag?: string; onClickHash?: string }
 
 export function showMessageNotification(title: string, body: string, opts: NotifyOpts = {}) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return
+  const url = opts.onClickHash ? `/${opts.onClickHash}` : '/'
   const options: NotificationOptions & { vibrate?: number[]; renotify?: boolean } = {
     body,
     icon:  '/icon-192.png',
@@ -59,6 +60,7 @@ export function showMessageNotification(title: string, body: string, opts: Notif
     tag:   opts.tag ?? 'jateamhub-chat',
     renotify: true,
     vibrate: [80, 40, 80],
+    data:  { url },
   }
   // Prefer the service-worker registration (required on mobile/installed PWA).
   if (navigator.serviceWorker?.getRegistration) {
