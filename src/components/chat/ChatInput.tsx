@@ -76,7 +76,7 @@ export default function ChatInput({ senderId }: Props) {
   })
 
   return (
-    <div style={{ padding: '10px 14px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
+    <div style={{ flexShrink: 0, padding: '10px 14px max(14px, env(safe-area-inset-bottom))', borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
       {fileErr && (
         <div style={{
           padding: '6px 12px', marginBottom: 8,

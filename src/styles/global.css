@@ -639,6 +639,15 @@ mark.hl { background: var(--accent-soft); color: var(--accent); border-radius: 3
 @keyframes popIn     { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
 
 /* ── Chat ─────────────────────────────────────────────────── */
+/* Full-height shell that respects mobile browser chrome (dvh) */
+.chat-root {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 100vh;          /* fallback */
+  height: 100dvh;         /* tracks the visible viewport on mobile */
+  max-height: 100vh;
+  max-height: 100dvh;
+}
 /* Subtle, theme-aware "wallpaper" for the message area */
 .chat-wallpaper {
   background-color: var(--bg);

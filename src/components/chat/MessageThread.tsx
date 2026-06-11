@@ -8,6 +8,7 @@ import ChatInput from './ChatInput'
 interface Props {
   conv:          ChatConversation
   currentUserId: string
+  onBack?:       () => void   // mobile: render a back button + own header
 }
 
 const GROUP_GAP_MS = 5 * 60 * 1000
@@ -22,7 +23,7 @@ const fmtDate = (iso: string) => {
   return date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-export default function MessageThread({ conv, currentUserId }: Props) {
+export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   // Narrow selectors → component only re-renders on what it uses.
   const messages    = useChatStore(s => s.messages)
   const msgLoading  = useChatStore(s => s.msgLoading)
@@ -32,7 +33,7 @@ export default function MessageThread({ conv, currentUserId }: Props) {
   const removeMsg   = useChatStore(s => s.removeMsg)
   const clearConv   = useChatStore(s => s.clearConv)
   const reactToMsg  = useChatStore(s => s.reactToMsg)
-  const resetIdle   = useChatStore(s => s.resetIdle)
+  const lock        = useChatStore(s => s.lock)
 
   const listRef   = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -97,19 +98,32 @@ export default function MessageThread({ conv, currentUserId }: Props) {
   }, [messages])
 
   return (
-    <div
-      style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--bg)', position: 'relative' }}
-      onPointerMove={resetIdle}
-      onKeyDown={resetIdle}
-    >
-      {/* Thread header */}
+    <div style={{
+      flex: 1, display: 'flex', flexDirection: 'column',
+      minWidth: 0, minHeight: 0, background: 'var(--bg)', position: 'relative',
+    }}>
+      {/* Thread header — fixed; only the message list below scrolls */}
       <div style={{
-        padding: '10px 12px 10px 16px',
+        flexShrink: 0,
+        padding: '9px 10px 9px 8px',
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg2)',
-        display: 'flex', alignItems: 'center', gap: 12, position: 'relative',
+        display: 'flex', alignItems: 'center', gap: 10, position: 'relative',
       }}>
-        <div style={{ position: 'relative', flexShrink: 0 }}>
+        {onBack && (
+          <button
+            onClick={onBack}
+            title="Kembali"
+            style={{
+              width: 34, height: 34, flexShrink: 0, background: 'none', border: 'none',
+              cursor: 'pointer', borderRadius: 8, color: 'var(--accent)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+        )}
+        <div style={{ position: 'relative', flexShrink: 0, marginLeft: onBack ? 0 : 6 }}>
           <div style={{
             width: 38, height: 38, borderRadius: '50%',
             background: 'var(--accent-light)',
@@ -183,6 +197,20 @@ export default function MessageThread({ conv, currentUserId }: Props) {
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 {confirmClear ? 'Yakin bersihkan?' : 'Bersihkan chat'}
               </button>
+              <button
+                onClick={() => { setMenuOpen(false); lock() }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '9px 11px', background: 'none', border: 'none',
+                  borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                  color: 'var(--silver)', fontSize: 13, fontFamily: 'var(--font)', fontWeight: 500,
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Kunci chat
+              </button>
             </div>
           </>
         )}
@@ -193,7 +221,10 @@ export default function MessageThread({ conv, currentUserId }: Props) {
         ref={listRef}
         onScroll={onScroll}
         className="chat-msglist chat-wallpaper"
-        style={{ flex: 1, overflowY: 'auto', padding: '14px 16px 10px', position: 'relative' }}
+        style={{
+          flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y', padding: '14px 16px 10px', position: 'relative',
+        }}
       >
         {encReady && (
           <div style={{

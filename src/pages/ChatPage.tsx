@@ -77,18 +77,22 @@ export default function ChatPage({ onClose }: Props) {
     </div>
   )
 
+  // On mobile inside a thread we show a single combined header (in MessageThread).
+  const hidePageHeader = isMobile && mobileThread && !!currentConv && !isLocked
+
   return (
     <div
+      className="chat-root"
       style={{
-        position: 'fixed', inset: 0, zIndex: 120,
-        background: 'var(--bg)',
-        display: 'flex', flexDirection: 'column',
+        zIndex: 120, background: 'var(--bg)',
+        display: 'flex', flexDirection: 'column', minHeight: 0,
         animation: 'fadeUp 180ms ease',
       }}
       onPointerMove={resetIdle}
       onKeyDown={resetIdle}
     >
       {/* Page header */}
+      {!hidePageHeader && (
       <div style={{
         height: 56, flexShrink: 0,
         background: 'var(--bg2)', borderBottom: '1px solid var(--border)',
@@ -151,6 +155,7 @@ export default function ChatPage({ onClose }: Props) {
           </button>
         )}
       </div>
+      )}
 
       {/* Body */}
       {isLocked ? (
@@ -165,7 +170,7 @@ export default function ChatPage({ onClose }: Props) {
               mobile
             />
           ) : currentConv ? (
-            <MessageThread conv={currentConv} currentUserId={profile.id} />
+            <MessageThread conv={currentConv} currentUserId={profile.id} onBack={handleBack} />
           ) : null}
         </div>
       ) : (

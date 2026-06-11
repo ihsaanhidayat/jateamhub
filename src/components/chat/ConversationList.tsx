@@ -71,8 +71,9 @@ export default function ConversationList({ currentUserId, onNewChat, onSelectCon
 
   return (
     <div style={{
-      width: mobile ? '100%' : 312, flexShrink: 0,
-      borderRight: mobile ? 'none' : '1px solid var(--border)',
+      ...(mobile
+        ? { flex: 1, width: '100%' }
+        : { width: 312, flexShrink: 0, borderRight: '1px solid var(--border)' }),
       display: 'flex', flexDirection: 'column', background: 'var(--bg2)', minHeight: 0,
     }}>
       {/* Header */}
@@ -111,7 +112,7 @@ export default function ConversationList({ currentUserId, onNewChat, onSelectCon
       </div>
 
       {/* List */}
-      <div className="chat-msglist" style={{ flex: 1, overflowY: 'auto', padding: '2px 8px 10px' }}>
+      <div className="chat-msglist" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '2px 8px 10px' }}>
         {loading && (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--silver4)', fontSize: 13 }}>
             Memuat...
