@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import type { ChatMessage } from '../../utils/supabaseClient'
 import { QUICK_REACTIONS } from './emojiData'
 
 interface Props {
-  msg:           ChatMessage
-  isMine:        boolean
+  msg:            ChatMessage
+  isMine:         boolean
   currentUserId?: string
-  onDelete?:     (id: string) => void
-  onReact?:      (id: string, emoji: string) => void
+  cont?:          boolean    // continuation of the same sender's group
+  onDelete?:      (id: string) => void
+  onReact?:       (id: string, emoji: string) => void
 }
 
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
@@ -87,23 +88,29 @@ const FileIcon = ({ name }: { name: string }) => {
     ppt: '📑', pptx: '📑', zip: '🗜️', rar: '🗜️', mp3: '🎵',
     mp4: '🎬', webm: '🎬', ogg: '🎵',
   }
-  return <span style={{ fontSize: 20 }}>{icons[ext] ?? '📎'}</span>
+  return <span style={{ fontSize: 22 }}>{icons[ext] ?? '📎'}</span>
 }
 
-export default function MessageBubble({ msg, isMine, currentUserId, onDelete, onReact }: Props) {
-  const [showMenu,    setShowMenu]    = useState(false)
+function MessageBubble({ msg, isMine, currentUserId, cont, onDelete, onReact }: Props) {
   const [showInfo,    setShowInfo]    = useState(false)
   const [showReact,   setShowReact]   = useState(false)
   const [hover,       setHover]       = useState(false)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const accent  = isMine ? 'var(--accent)' : 'var(--bg4)'
+
+  const isMedia = msg.message_type === 'image' || msg.message_type === 'video'
+  const bg      = isMine ? 'var(--accent)' : 'var(--bg2)'
   const textCol = isMine ? 'white' : 'var(--silver)'
+
+  // Corner radii — tail on the first bubble of a group, tighter when continued.
+  const radius = isMine
+    ? (cont ? '16px 8px 8px 16px' : '16px 5px 16px 16px')
+    : (cont ? '8px 16px 16px 8px' : '5px 16px 16px 16px')
 
   const reactions = msg.reactions ?? {}
   const reactionEntries = Object.entries(reactions).filter(([, u]) => u.length > 0)
 
-  const doReact = (emoji: string) => { onReact?.(msg.id, emoji); setShowReact(false); setShowMenu(false) }
+  const doReact = (emoji: string) => { onReact?.(msg.id, emoji); setShowReact(false) }
 
   const startLongPress = () => {
     if (!onReact) return
@@ -113,28 +120,33 @@ export default function MessageBubble({ msg, isMine, currentUserId, onDelete, on
 
   return (
     <div
+      className="chat-bubble-in"
       style={{
         display: 'flex',
         flexDirection: isMine ? 'row-reverse' : 'row',
-        gap: 8, marginBottom: reactionEntries.length ? 16 : 4,
+        gap: 6, marginTop: cont ? 2 : 9,
+        marginBottom: reactionEntries.length ? 14 : 0,
         alignItems: 'flex-end',
       }}
-      onClick={() => { setShowMenu(false); setShowInfo(false); setShowReact(false) }}
+      onClick={() => { setShowInfo(false); setShowReact(false) }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => { setHover(false); setShowReact(false) }}
     >
       <div
         style={{
-          maxWidth: '72%', minWidth: 80,
-          background: accent, color: textCol,
-          borderRadius: isMine ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-          padding: msg.message_type === 'text' ? '9px 14px' : '6px',
-          fontSize: 14, lineHeight: 1.5,
-          boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+          maxWidth: '74%', minWidth: 72,
+          background: bg, color: textCol,
+          borderRadius: radius,
+          padding: isMedia ? 4 : msg.message_type === 'text' ? '7px 11px 6px' : 5,
+          fontSize: 14, lineHeight: 1.45,
+          boxShadow: isMine
+            ? '0 1px 1.5px rgba(0,0,0,.12)'
+            : '0 1px 2px rgba(0,0,0,.10)',
+          border: isMine ? 'none' : '1px solid var(--border)',
           position: 'relative', cursor: 'default',
           wordBreak: 'break-word',
         }}
-        onContextMenu={e => { e.preventDefault(); if (onReact) setShowReact(v => !v); else if (isMine && onDelete) setShowMenu(v => !v) }}
+        onContextMenu={e => { e.preventDefault(); if (onReact) setShowReact(v => !v) }}
         onTouchStart={startLongPress}
         onTouchEnd={cancelLongPress}
         onTouchMove={cancelLongPress}
@@ -144,12 +156,12 @@ export default function MessageBubble({ msg, isMine, currentUserId, onDelete, on
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              position: 'absolute', bottom: '100%', marginBottom: 6,
+              position: 'absolute', bottom: '100%', marginBottom: 7,
               [isMine ? 'right' : 'left']: 0,
               display: 'flex', alignItems: 'center', gap: 2, padding: 4,
               background: 'var(--bg2)', border: '1px solid var(--border2)',
               borderRadius: 22, boxShadow: 'var(--shadow-lg)', zIndex: 55,
-              animation: 'fadeUp 130ms ease',
+              animation: 'popIn 130ms ease',
             }}
           >
             {QUICK_REACTIONS.map(emoji => {
@@ -185,6 +197,7 @@ export default function MessageBubble({ msg, isMine, currentUserId, onDelete, on
             )}
           </div>
         )}
+
         {msg.message_type === 'text' && <span>{msg.content}</span>}
 
         {msg.message_type === 'image' && msg.file_url && (
@@ -193,7 +206,7 @@ export default function MessageBubble({ msg, isMine, currentUserId, onDelete, on
             alt={msg.file_name ?? 'image'}
             onClick={e => { e.stopPropagation(); setLightboxSrc(msg.file_url) }}
             style={{
-              maxWidth: '100%', maxHeight: 240, borderRadius: 10,
+              maxWidth: '100%', maxHeight: 300, borderRadius: 13,
               display: 'block', objectFit: 'cover', cursor: 'zoom-in',
             }}
           />
@@ -203,7 +216,7 @@ export default function MessageBubble({ msg, isMine, currentUserId, onDelete, on
           <video
             src={msg.file_url}
             controls
-            style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 10, display: 'block' }}
+            style={{ maxWidth: '100%', maxHeight: 280, borderRadius: 13, display: 'block' }}
           />
         )}
 
@@ -213,33 +226,47 @@ export default function MessageBubble({ msg, isMine, currentUserId, onDelete, on
             target="_blank"
             rel="noreferrer"
             style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px',
+              display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px',
               color: textCol, textDecoration: 'none',
             }}
           >
-            <FileIcon name={msg.file_name ?? ''} />
+            <span style={{
+              width: 38, height: 38, flexShrink: 0, borderRadius: 10,
+              background: isMine ? 'rgba(255,255,255,0.18)' : 'var(--bg4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <FileIcon name={msg.file_name ?? ''} />
+            </span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 190 }}>
                 {msg.file_name ?? 'File'}
               </div>
               {msg.file_size && (
-                <div style={{ fontSize: 11, opacity: 0.7 }}>{fmtSize(msg.file_size)}</div>
+                <div style={{ fontSize: 11, opacity: 0.7 }}>{fmtSize(msg.file_size)} · Unduh</div>
               )}
             </div>
-            <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 'auto', textDecoration: 'underline' }}>Unduh</span>
           </a>
         )}
 
+        {/* Meta: time + ticks (overlaid on media) */}
         <div
           onClick={e => { if (isMine) { e.stopPropagation(); setShowInfo(v => !v) } }}
           style={{
-            fontSize: 10, opacity: 0.7, marginTop: 4,
-            textAlign: isMine ? 'right' : 'left',
-            display: 'flex', alignItems: 'center', justifyContent: isMine ? 'flex-end' : 'flex-start',
-            gap: 4, cursor: isMine ? 'pointer' : 'default',
+            display: 'flex', alignItems: 'center', gap: 4,
+            justifyContent: isMine ? 'flex-end' : 'flex-start',
+            cursor: isMine ? 'pointer' : 'default',
+            ...(isMedia ? {
+              position: 'absolute', right: 8, bottom: 8,
+              padding: '2px 7px', borderRadius: 10,
+              background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(2px)',
+              color: 'white',
+            } : {
+              marginTop: 2, color: isMine ? 'rgba(255,255,255,0.85)' : 'var(--silver4)',
+            }),
+            fontSize: 10, lineHeight: 1.4,
           }}
         >
-          <span>{fmtTime(msg.created_at)}</span>
+          <span style={{ opacity: isMedia ? 0.95 : 0.8 }}>{fmtTime(msg.created_at)}</span>
           {isMine && <Ticks delivered={!!msg.delivered_at} read={!!msg.read_at} />}
         </div>
 
@@ -248,7 +275,7 @@ export default function MessageBubble({ msg, isMine, currentUserId, onDelete, on
             position: 'absolute', top: '100%', right: 0, zIndex: 50, marginTop: 4,
             background: 'var(--bg2)', border: '1px solid var(--border2)',
             borderRadius: 10, padding: '8px 12px',
-            boxShadow: 'var(--shadow-lg)', minWidth: 150,
+            boxShadow: 'var(--shadow-lg)', minWidth: 150, animation: 'popIn 120ms ease',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 11, color: 'var(--silver3)', padding: '2px 0' }}>
               <span>Terkirim</span><span style={{ fontFamily: 'var(--mono)' }}>{fmtTime(msg.created_at)}</span>
@@ -259,24 +286,6 @@ export default function MessageBubble({ msg, isMine, currentUserId, onDelete, on
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 11, color: msg.read_at ? '#53BDEB' : 'var(--silver4)', padding: '2px 0' }}>
               <span>Dibaca</span><span style={{ fontFamily: 'var(--mono)' }}>{msg.read_at ? fmtTime(msg.read_at) : '—'}</span>
             </div>
-          </div>
-        )}
-
-        {showMenu && isMine && onDelete && (
-          <div style={{
-            position: 'absolute', top: '100%', right: 0, zIndex: 50,
-            background: 'var(--bg2)', border: '1px solid var(--border2)',
-            borderRadius: 8, padding: '4px 0',
-            boxShadow: 'var(--shadow-lg)', minWidth: 120,
-          }}>
-            <button
-              onClick={() => { onDelete(msg.id); setShowMenu(false) }}
-              style={{
-                width: '100%', padding: '8px 14px', background: 'none',
-                border: 'none', color: 'var(--red)', fontSize: 13, cursor: 'pointer',
-                fontFamily: 'var(--font)', textAlign: 'left',
-              }}
-            >Hapus pesan</button>
           </div>
         )}
 
@@ -296,7 +305,7 @@ export default function MessageBubble({ msg, isMine, currentUserId, onDelete, on
                   style={{
                     display: 'flex', alignItems: 'center', gap: 2,
                     height: 22, padding: '0 6px', borderRadius: 11,
-                    background: mine ? 'var(--accent-light)' : 'var(--bg3)',
+                    background: mine ? 'var(--accent-light)' : 'var(--bg2)',
                     border: '1px solid ' + (mine ? 'var(--accent)' : 'var(--border2)'),
                     cursor: 'pointer', fontSize: 12, lineHeight: 1,
                     boxShadow: '0 1px 3px rgba(0,0,0,.18)',
@@ -340,3 +349,5 @@ export default function MessageBubble({ msg, isMine, currentUserId, onDelete, on
     </div>
   )
 }
+
+export default memo(MessageBubble)

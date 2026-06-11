@@ -11,10 +11,15 @@ interface Props { onClose: () => void }
 
 export default function ChatPage({ onClose }: Props) {
   const { profile } = useAuthStore()
-  const {
-    enabled, isLocked, conversations, currentConvId,
-    loadConversations, selectConv, closeConvChannel, lock, resetIdle,
-  } = useChatStore()
+  const enabled           = useChatStore(s => s.enabled)
+  const isLocked          = useChatStore(s => s.isLocked)
+  const conversations     = useChatStore(s => s.conversations)
+  const currentConvId     = useChatStore(s => s.currentConvId)
+  const loadConversations = useChatStore(s => s.loadConversations)
+  const selectConv        = useChatStore(s => s.selectConv)
+  const closeConvChannel  = useChatStore(s => s.closeConvChannel)
+  const lock              = useChatStore(s => s.lock)
+  const resetIdle         = useChatStore(s => s.resetIdle)
   const [newChatOpen,  setNewChatOpen]  = useState(false)
   const [mobileThread, setMobileThread] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
@@ -114,15 +119,18 @@ export default function ChatPage({ onClose }: Props) {
           </button>
         )}
 
-        <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--silver)', flex: 1, letterSpacing: '-0.3px' }}>
+        <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--silver)', flex: 1, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           {isMobile && mobileThread && currentConv
             ? (() => {
                 const other = currentConv.participant_a === profile.id
                   ? currentConv.profile_b
                   : currentConv.profile_a
-                return other?.full_name ?? other?.username ?? 'Chat'
+                return <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{other?.full_name ?? other?.username ?? 'Chat'}</span>
               })()
-            : '💬 Chat'
+            : <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Chat
+              </>
           }
         </span>
 
@@ -154,6 +162,7 @@ export default function ChatPage({ onClose }: Props) {
               currentUserId={profile.id}
               onNewChat={() => setNewChatOpen(true)}
               onSelectConv={handleSelectConv}
+              mobile
             />
           ) : currentConv ? (
             <MessageThread conv={currentConv} currentUserId={profile.id} />
@@ -169,13 +178,23 @@ export default function ChatPage({ onClose }: Props) {
           {currentConv ? (
             <MessageThread conv={currentConv} currentUserId={profile.id} />
           ) : (
-            <div style={{
+            <div className="chat-wallpaper" style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--silver4)', fontSize: 14, textAlign: 'center', padding: 24,
+              textAlign: 'center', padding: 24,
             }}>
-              <div>
-                <div style={{ fontSize: 40, marginBottom: 14 }}>💬</div>
-                Pilih percakapan untuk membaca pesan.
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, maxWidth: 280 }}>
+                <div style={{
+                  width: 84, height: 84, borderRadius: '50%',
+                  background: 'var(--bg2)', border: '1px solid var(--border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 4px 18px rgba(0,0,0,.06)',
+                }}>
+                  <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)' }}>Chat internal tim</div>
+                <div style={{ fontSize: 13, color: 'var(--silver4)', lineHeight: 1.5 }}>
+                  Pilih percakapan di samping, atau mulai yang baru. Pesan teks diamankan end-to-end.
+                </div>
               </div>
             </div>
           )}

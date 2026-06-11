@@ -8,12 +8,19 @@ const MAX_MB = 50
 interface Props { senderId: string }
 
 export default function ChatInput({ senderId }: Props) {
-  const { sendText, sendFile, sending, currentConvId, notifyTyping } = useChatStore()
+  const sendText      = useChatStore(s => s.sendText)
+  const sendFile      = useChatStore(s => s.sendFile)
+  const sending       = useChatStore(s => s.sending)
+  const currentConvId = useChatStore(s => s.currentConvId)
+  const notifyTyping  = useChatStore(s => s.notifyTyping)
+
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const [fileErr, setFileErr] = useState('')
   const [emojiOpen, setEmojiOpen] = useState(false)
+
+  const resetHeight = () => { if (taRef.current) taRef.current.style.height = '24px' }
 
   const insertEmoji = (emoji: string) => {
     const el = taRef.current
@@ -22,7 +29,6 @@ export default function ChatInput({ senderId }: Props) {
     const end   = el.selectionEnd   ?? text.length
     const next  = text.slice(0, start) + emoji + text.slice(end)
     setText(next)
-    // Restore caret after the inserted emoji
     requestAnimationFrame(() => {
       el.focus()
       const pos = start + emoji.length
@@ -37,7 +43,7 @@ export default function ChatInput({ senderId }: Props) {
     const t = text
     setText('')
     setEmojiOpen(false)
-    if (taRef.current) taRef.current.style.height = '38px'
+    resetHeight()
     await sendText(t, senderId)
   }
 
@@ -60,12 +66,17 @@ export default function ChatInput({ senderId }: Props) {
 
   if (!currentConvId) return null
 
+  const canSend = !!text.trim() && !sending
+  const iconBtn = (active: boolean): React.CSSProperties => ({
+    width: 34, height: 34, flexShrink: 0,
+    background: active ? 'var(--accent-light)' : 'none', border: 'none',
+    borderRadius: '50%', cursor: 'pointer', fontSize: 18,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'var(--silver3)', transition: 'background 150ms',
+  })
+
   return (
-    <div style={{
-      padding: '10px 16px 14px',
-      borderTop: '1px solid var(--border)',
-      background: 'var(--bg2)',
-    }}>
+    <div style={{ padding: '10px 14px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
       {fileErr && (
         <div style={{
           padding: '6px 12px', marginBottom: 8,
@@ -73,89 +84,60 @@ export default function ChatInput({ senderId }: Props) {
           color: 'var(--red)', fontSize: 12,
         }}>{fileErr}</div>
       )}
-      <div style={{
-        display: 'flex', gap: 8, alignItems: 'flex-end', position: 'relative',
-      }}>
-        {emojiOpen && (
-          <EmojiPicker onPick={insertEmoji} onClose={() => setEmojiOpen(false)} />
-        )}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', position: 'relative' }}>
+        {emojiOpen && <EmojiPicker onPick={insertEmoji} onClose={() => setEmojiOpen(false)} />}
 
-        {/* Emoji */}
-        <button
-          onClick={() => setEmojiOpen(v => !v)}
-          disabled={sending}
-          title="Emoji"
-          style={{
-            width: 38, height: 38, flexShrink: 0,
-            background: emojiOpen ? 'var(--accent-light)' : 'var(--bg4)',
-            border: '1px solid var(--border2)',
-            borderRadius: 10, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, transition: 'all 150ms',
-          }}
-        >
-          😊
-        </button>
+        {/* Composer pill: emoji + attachment + textarea */}
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'flex-end', gap: 4,
+          background: 'var(--bg4)', border: '1px solid var(--border2)',
+          borderRadius: 22, padding: '3px 6px 3px 5px', minHeight: 44, boxSizing: 'border-box',
+        }}>
+          <button onClick={() => setEmojiOpen(v => !v)} disabled={sending} title="Emoji" style={iconBtn(emojiOpen)}>😊</button>
+          <button onClick={() => fileRef.current?.click()} disabled={sending} title="Lampirkan file" style={iconBtn(false)}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }} onChange={handleFile} />
 
-        {/* Attachment */}
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={sending}
-          title="Kirim file/gambar"
-          style={{
-            width: 38, height: 38, flexShrink: 0,
-            background: 'var(--bg4)', border: '1px solid var(--border2)',
-            borderRadius: 10, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--silver3)', fontSize: 17, transition: 'all 150ms',
-          }}
-        >
-          📎
-        </button>
-        <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }} onChange={handleFile} />
-
-        {/* Text area — auto-grow */}
-        <textarea
-          ref={taRef}
-          value={text}
-          onChange={e => {
-            setText(e.target.value)
-            if (e.target.value.trim()) notifyTyping()
-            const el = e.target
-            el.style.height = 'auto'
-            el.style.height = Math.min(el.scrollHeight, 120) + 'px'
-          }}
-          onKeyDown={handleKey}
-          placeholder="Ketik pesan..."
-          rows={1}
-          disabled={sending}
-          style={{
-            flex: 1, height: 38, maxHeight: 120,
-            padding: '9px 12px', resize: 'none', overflow: 'hidden',
-            background: 'var(--bg4)', border: '1px solid var(--border2)',
-            borderRadius: 10, fontSize: 14, color: 'var(--silver)',
-            fontFamily: 'var(--font)', outline: 'none', lineHeight: 1.45,
-            transition: 'border-color 150ms', boxSizing: 'border-box',
-          }}
-          onFocus={e => e.target.style.borderColor = 'var(--accent)'}
-          onBlur={e  => e.target.style.borderColor = 'var(--border2)'}
-        />
+          <textarea
+            ref={taRef}
+            value={text}
+            onChange={e => {
+              setText(e.target.value)
+              if (e.target.value.trim()) notifyTyping()
+              const el = e.target
+              el.style.height = 'auto'
+              el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+            }}
+            onKeyDown={handleKey}
+            placeholder="Ketik pesan..."
+            rows={1}
+            disabled={sending}
+            style={{
+              flex: 1, height: 24, maxHeight: 120, padding: '7px 6px',
+              resize: 'none', overflow: 'auto', background: 'none', border: 'none',
+              fontSize: 14, color: 'var(--silver)', fontFamily: 'var(--font)',
+              outline: 'none', lineHeight: 1.4, boxSizing: 'content-box',
+            }}
+          />
+        </div>
 
         {/* Send */}
         <button
           onClick={handleSend}
-          disabled={!text.trim() || sending}
+          disabled={!canSend}
           style={{
-            width: 38, height: 38, flexShrink: 0,
-            background: text.trim() && !sending ? 'var(--accent)' : 'var(--border2)',
-            border: 'none', borderRadius: 10, cursor: text.trim() && !sending ? 'pointer' : 'not-allowed',
+            width: 44, height: 44, flexShrink: 0,
+            background: canSend ? 'var(--accent)' : 'var(--bg4)',
+            border: canSend ? 'none' : '1px solid var(--border2)',
+            borderRadius: '50%', cursor: canSend ? 'pointer' : 'not-allowed',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 150ms',
+            transition: 'background 150ms, transform 100ms',
           }}
         >
           {sending
-            ? <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
-            : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            ? <span style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,0.35)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
+            : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={canSend ? 'white' : 'var(--silver4)'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           }
         </button>
       </div>
