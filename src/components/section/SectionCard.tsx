@@ -312,9 +312,12 @@ export default memo(function SectionCard({
                 window.dispatchEvent(ev)
               } else if (mode === 'lock' && !isLocked) {
                 localStorage.setItem(lk, 'true')
+                sessionStorage.removeItem(`notes-session-${session.username}-${section.id}`)
                 window.dispatchEvent(ev)
+              } else if (mode === 'lock' && isLocked) {
+                // Locked → tell widget to show PIN dialog
+                window.dispatchEvent(new CustomEvent('notes-request-unlock', { detail: { sectionId: section.id } }))
               }
-              // 🔒 dan locked → buka di dalam widget via PIN
             }
 
             return (

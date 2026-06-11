@@ -105,12 +105,40 @@ function NotesWidgetImpl({ sectionId }: Props) {
         window.dispatchEvent(new CustomEvent('notes-mode-changed', { detail: { sectionId } }))
         return
       }
+      const newLocked = readLocked()
+      // Sync sessionStorage so page refresh preserves locked state
+      if (newLocked) sessionStorage.removeItem(getSessionKey())
       setMode(newMode)
-      setLockedState(readLocked())
+      setLockedState(newLocked)
       startIdleTimer(newMode)
     }
     window.addEventListener('notes-mode-changed', handler)
     return () => window.removeEventListener('notes-mode-changed', handler)
+  }, [sectionId])
+
+  // Clear session unlock on logout so next login starts locked
+  useEffect(() => {
+    const onLogout = () => {
+      sessionStorage.removeItem(getSessionKey())
+      if (readMode() === 'lock') {
+        localStorage.setItem(getLockedKey(), 'true')
+        setLockedState(true)
+      }
+    }
+    window.addEventListener('jateamhub-logout', onLogout)
+    return () => window.removeEventListener('jateamhub-logout', onLogout)
+  }, [sectionId])
+
+  // Show PIN dialog when header lock button is clicked on a locked section
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const sid = (e as CustomEvent).detail?.sectionId
+      if (sid && sid !== sectionId) return
+      if (hasPinStored()) setShowPw(true)
+      else setShowSetPin(true)
+    }
+    window.addEventListener('notes-request-unlock', handler)
+    return () => window.removeEventListener('notes-request-unlock', handler)
   }, [sectionId])
 
   // Auto-lock when mode transitions to 'lock' (skip on initial mount)
@@ -152,7 +180,7 @@ function NotesWidgetImpl({ sectionId }: Props) {
   const startIdleTimer = (currentMode?: string) => {
     if (lockTimer.current) clearTimeout(lockTimer.current)
     if ((currentMode ?? mode) === 'lock') {
-      lockTimer.current = setTimeout(() => setLocked(true), 30 * 60_000)
+      lockTimer.current = setTimeout(() => setLocked(true), 5 * 60_000)
     }
   }
   const resetIdleTimer = () => startIdleTimer()
