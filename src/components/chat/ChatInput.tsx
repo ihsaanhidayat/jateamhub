@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useChatStore } from '../../store/chatStore'
+import EmojiPicker from './EmojiPicker'
 
 const ACCEPT = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar'
 const MAX_MB = 50
@@ -10,12 +11,33 @@ export default function ChatInput({ senderId }: Props) {
   const { sendText, sendFile, sending, currentConvId } = useChatStore()
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const taRef = useRef<HTMLTextAreaElement>(null)
   const [fileErr, setFileErr] = useState('')
+  const [emojiOpen, setEmojiOpen] = useState(false)
+
+  const insertEmoji = (emoji: string) => {
+    const el = taRef.current
+    if (!el) { setText(t => t + emoji); return }
+    const start = el.selectionStart ?? text.length
+    const end   = el.selectionEnd   ?? text.length
+    const next  = text.slice(0, start) + emoji + text.slice(end)
+    setText(next)
+    // Restore caret after the inserted emoji
+    requestAnimationFrame(() => {
+      el.focus()
+      const pos = start + emoji.length
+      el.setSelectionRange(pos, pos)
+      el.style.height = 'auto'
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+    })
+  }
 
   const handleSend = async () => {
     if (!text.trim() || sending) return
     const t = text
     setText('')
+    setEmojiOpen(false)
+    if (taRef.current) taRef.current.style.height = '38px'
     await sendText(t, senderId)
   }
 
@@ -52,8 +74,29 @@ export default function ChatInput({ senderId }: Props) {
         }}>{fileErr}</div>
       )}
       <div style={{
-        display: 'flex', gap: 8, alignItems: 'flex-end',
+        display: 'flex', gap: 8, alignItems: 'flex-end', position: 'relative',
       }}>
+        {emojiOpen && (
+          <EmojiPicker onPick={insertEmoji} onClose={() => setEmojiOpen(false)} />
+        )}
+
+        {/* Emoji */}
+        <button
+          onClick={() => setEmojiOpen(v => !v)}
+          disabled={sending}
+          title="Emoji"
+          style={{
+            width: 38, height: 38, flexShrink: 0,
+            background: emojiOpen ? 'var(--accent-light)' : 'var(--bg4)',
+            border: '1px solid var(--border2)',
+            borderRadius: 10, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, transition: 'all 150ms',
+          }}
+        >
+          😊
+        </button>
+
         {/* Attachment */}
         <button
           onClick={() => fileRef.current?.click()}
@@ -73,6 +116,7 @@ export default function ChatInput({ senderId }: Props) {
 
         {/* Text area — auto-grow */}
         <textarea
+          ref={taRef}
           value={text}
           onChange={e => {
             setText(e.target.value)

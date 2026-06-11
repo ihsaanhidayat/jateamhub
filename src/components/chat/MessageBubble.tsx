@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { ChatMessage } from '../../utils/supabaseClient'
+import { QUICK_REACTIONS } from './emojiData'
 
 interface Props {
-  msg:       ChatMessage
-  isMine:    boolean
-  onDelete?: (id: string) => void
+  msg:           ChatMessage
+  isMine:        boolean
+  currentUserId?: string
+  onDelete?:     (id: string) => void
+  onReact?:      (id: string, emoji: string) => void
 }
 
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
@@ -87,22 +90,38 @@ const FileIcon = ({ name }: { name: string }) => {
   return <span style={{ fontSize: 20 }}>{icons[ext] ?? '📎'}</span>
 }
 
-export default function MessageBubble({ msg, isMine, onDelete }: Props) {
+export default function MessageBubble({ msg, isMine, currentUserId, onDelete, onReact }: Props) {
   const [showMenu,    setShowMenu]    = useState(false)
   const [showInfo,    setShowInfo]    = useState(false)
+  const [showReact,   setShowReact]   = useState(false)
+  const [hover,       setHover]       = useState(false)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+  const longPress = useRef<ReturnType<typeof setTimeout> | null>(null)
   const accent  = isMine ? 'var(--accent)' : 'var(--bg4)'
   const textCol = isMine ? 'white' : 'var(--silver)'
+
+  const reactions = msg.reactions ?? {}
+  const reactionEntries = Object.entries(reactions).filter(([, u]) => u.length > 0)
+
+  const doReact = (emoji: string) => { onReact?.(msg.id, emoji); setShowReact(false); setShowMenu(false) }
+
+  const startLongPress = () => {
+    if (!onReact) return
+    longPress.current = setTimeout(() => setShowReact(true), 420)
+  }
+  const cancelLongPress = () => { if (longPress.current) { clearTimeout(longPress.current); longPress.current = null } }
 
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: isMine ? 'row-reverse' : 'row',
-        gap: 8, marginBottom: 4,
+        gap: 8, marginBottom: reactionEntries.length ? 16 : 4,
         alignItems: 'flex-end',
       }}
-      onClick={() => { setShowMenu(false); setShowInfo(false) }}
+      onClick={() => { setShowMenu(false); setShowInfo(false); setShowReact(false) }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => { setHover(false); setShowReact(false) }}
     >
       <div
         style={{
@@ -115,8 +134,57 @@ export default function MessageBubble({ msg, isMine, onDelete }: Props) {
           position: 'relative', cursor: 'default',
           wordBreak: 'break-word',
         }}
-        onContextMenu={e => { e.preventDefault(); if (isMine && onDelete) setShowMenu(v => !v) }}
+        onContextMenu={e => { e.preventDefault(); if (onReact) setShowReact(v => !v); else if (isMine && onDelete) setShowMenu(v => !v) }}
+        onTouchStart={startLongPress}
+        onTouchEnd={cancelLongPress}
+        onTouchMove={cancelLongPress}
       >
+        {/* Quick-reaction bar */}
+        {showReact && onReact && (
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'absolute', bottom: '100%', marginBottom: 6,
+              [isMine ? 'right' : 'left']: 0,
+              display: 'flex', alignItems: 'center', gap: 2, padding: 4,
+              background: 'var(--bg2)', border: '1px solid var(--border2)',
+              borderRadius: 22, boxShadow: 'var(--shadow-lg)', zIndex: 55,
+              animation: 'fadeUp 130ms ease',
+            }}
+          >
+            {QUICK_REACTIONS.map(emoji => {
+              const mine = !!currentUserId && (reactions[emoji]?.includes(currentUserId) ?? false)
+              return (
+                <button
+                  key={emoji}
+                  onClick={() => doReact(emoji)}
+                  style={{
+                    width: 34, height: 34, fontSize: 20, lineHeight: 1,
+                    background: mine ? 'var(--accent-light)' : 'none',
+                    border: 'none', borderRadius: '50%', cursor: 'pointer',
+                    transition: 'transform 100ms, background 100ms',
+                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = 'scale(1.25)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = 'scale(1)'}
+                >{emoji}</button>
+              )
+            })}
+            {isMine && onDelete && (
+              <button
+                onClick={() => { onDelete(msg.id); setShowReact(false) }}
+                title="Hapus pesan"
+                style={{
+                  width: 34, height: 34, marginLeft: 2,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  borderLeft: '1px solid var(--border)', borderRadius: 0,
+                  color: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            )}
+          </div>
+        )}
         {msg.message_type === 'text' && <span>{msg.content}</span>}
 
         {msg.message_type === 'image' && msg.file_url && (
@@ -211,7 +279,56 @@ export default function MessageBubble({ msg, isMine, onDelete }: Props) {
             >Hapus pesan</button>
           </div>
         )}
+
+        {/* Reaction chips — pinned to the bubble's bottom edge */}
+        {reactionEntries.length > 0 && (
+          <div style={{
+            position: 'absolute', bottom: -13, [isMine ? 'right' : 'left']: 6,
+            display: 'flex', gap: 3, zIndex: 2,
+          }}>
+            {reactionEntries.map(([emoji, users]) => {
+              const mine = !!currentUserId && users.includes(currentUserId)
+              return (
+                <button
+                  key={emoji}
+                  onClick={e => { e.stopPropagation(); doReact(emoji) }}
+                  title={`${users.length} reaksi`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 2,
+                    height: 22, padding: '0 6px', borderRadius: 11,
+                    background: mine ? 'var(--accent-light)' : 'var(--bg3)',
+                    border: '1px solid ' + (mine ? 'var(--accent)' : 'var(--border2)'),
+                    cursor: 'pointer', fontSize: 12, lineHeight: 1,
+                    boxShadow: '0 1px 3px rgba(0,0,0,.18)',
+                  }}
+                >
+                  <span>{emoji}</span>
+                  {users.length > 1 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: mine ? 'var(--accent)' : 'var(--silver3)' }}>{users.length}</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Hover trigger (desktop) to open the reaction bar */}
+      {onReact && hover && !showReact && (
+        <button
+          onClick={e => { e.stopPropagation(); setShowReact(true) }}
+          title="Beri reaksi"
+          style={{
+            width: 28, height: 28, flexShrink: 0, alignSelf: 'center',
+            background: 'var(--bg2)', border: '1px solid var(--border2)',
+            borderRadius: '50%', cursor: 'pointer', fontSize: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--silver3)',
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+        </button>
+      )}
 
       {lightboxSrc && (
         <ImageLightbox

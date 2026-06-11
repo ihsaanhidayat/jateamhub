@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
+import { ensureNotifyPermission, primeAudio } from '../utils/notify'
 import ConversationList from '../components/chat/ConversationList'
 import MessageThread from '../components/chat/MessageThread'
 import ChatLockScreen from '../components/chat/ChatLockScreen'
@@ -27,6 +28,11 @@ export default function ChatPage({ onClose }: Props) {
 
   // Cleanup per-conversation broadcast channel on unmount
   useEffect(() => () => { closeConvChannel() }, [])
+
+  // On unlock: unlock audio (gesture-gated) + ask for notification permission
+  useEffect(() => {
+    if (!isLocked) { primeAudio(); ensureNotifyPermission() }
+  }, [isLocked])
 
   // Load conversations when unlocked
   useEffect(() => {

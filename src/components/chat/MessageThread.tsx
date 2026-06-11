@@ -17,7 +17,7 @@ const fmtDate = (iso: string) => {
 }
 
 export default function MessageThread({ conv, currentUserId }: Props) {
-  const { messages, msgLoading, removeMsg, clearConv, resetIdle, onlineUsers } = useChatStore()
+  const { messages, msgLoading, removeMsg, clearConv, reactToMsg, resetIdle, onlineUsers } = useChatStore()
   const bottomRef = useRef<HTMLDivElement>(null)
   const [confirmClear, setConfirmClear] = useState(false)
 
@@ -140,7 +140,9 @@ export default function MessageThread({ conv, currentUserId }: Props) {
                 key={msg.id}
                 msg={msg}
                 isMine={msg.sender_id === currentUserId}
+                currentUserId={currentUserId}
                 onDelete={removeMsg}
+                onReact={(id, emoji) => reactToMsg(id, emoji, currentUserId)}
               />
             ))}
           </div>

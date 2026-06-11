@@ -8,6 +8,16 @@ import {
   type ChatConversation, type ChatMessage,
 } from '../utils/supabaseClient'
 import { hashPin, verifyPin } from '../utils/security'
+import { playPing, showMessageNotification } from '../utils/notify'
+
+// Short preview text for a notification body.
+function previewOf(msg: ChatMessage): string {
+  if (msg.message_type === 'image')    return '📷 Foto'
+  if (msg.message_type === 'video')    return '🎬 Video'
+  if (msg.message_type === 'audio')    return '🎵 Pesan suara'
+  if (msg.message_type === 'document') return '📎 ' + (msg.file_name ?? 'Dokumen')
+  return msg.content ?? ''
+}
 
 const PIN_HASH_KEY  = 'jateamhub-chat-pin-hash'
 const PIN_SALT_KEY  = 'jateamhub-chat-pin-salt'
@@ -300,16 +310,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const msg = payload.new as ChatMessage
           const state = get()
 
-          // I'm the recipient → acknowledge delivery
-          if (msg.sender_id !== userId) markMessagesDelivered(msg.conversation_id, userId)
+          if (msg.sender_id === userId) {
+            // Echo of my own message in the open thread — ignore (already optimistic)
+            return
+          }
 
-          if (state.currentConvId === msg.conversation_id) {
-            if (msg.sender_id === userId) return
+          // I'm the recipient → acknowledge delivery
+          markMessagesDelivered(msg.conversation_id, userId)
+
+          const viewingThread = state.currentConvId === msg.conversation_id
+          const focused       = document.visibilityState === 'visible'
+
+          if (viewingThread) {
             set(s => ({
               messages: s.messages.some(m => m.id === msg.id) ? s.messages : [...s.messages, msg],
             }))
-            if (document.visibilityState === 'visible') markMessagesRead(msg.conversation_id, userId)
-          } else if (msg.sender_id !== userId) {
+            if (focused) markMessagesRead(msg.conversation_id, userId)
+          } else {
             set(s => ({
               unreadTotal: s.unreadTotal + 1,
               conversations: s.conversations.map(c =>
@@ -318,6 +335,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   : c
               ),
             }))
+          }
+
+          // Notify + sound when not actively reading this thread.
+          if (!viewingThread || !focused) {
+            const conv  = state.conversations.find(c => c.id === msg.conversation_id)
+            const other = conv ? (conv.participant_a === userId ? conv.profile_b : conv.profile_a) : null
+            const name  = other?.full_name ?? other?.username ?? 'Pesan baru'
+            const body  = state.isLocked ? 'Anda menerima pesan baru' : previewOf(msg)
+            playPing()
+            showMessageNotification(name, body, { tag: `chat-${msg.conversation_id}`, onClickHash: '#chat' })
           }
         }
       )
