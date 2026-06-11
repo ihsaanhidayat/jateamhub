@@ -401,8 +401,10 @@ export default function ProfilePage({ onClose }: Props) {
                         {badge.label}
                       </span>
                     )}
-                    {/* 🔑 Ganti password inline */}
-                    <ChangePwButton profileId={profile?.id} username={profile?.username} iconOnly />
+                    {/* 🔑 Ganti password — hanya untuk non-Google users */}
+                    {(profile as any)?.auth_provider !== 'google' && (
+                      <ChangePwButton profileId={profile?.id} username={profile?.username} iconOnly />
+                    )}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--silver3)', marginTop: 3 }}>@{profile?.username}</div>
                 </div>
