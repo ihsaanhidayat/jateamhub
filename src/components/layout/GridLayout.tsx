@@ -304,30 +304,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
         </div>
       )}
 
-      {/* Shared sections */}
-      {sharedAsSections.length > 0 && (
-        <div className="shared-sections-row">
-          {sharedAsSections.filter(section => sectionMatches(section as any)).map(section => (
-            <div key={section.id}>
-              <SectionCard
-                section={section}
-                isShared={true}
-                canEdit={false}
-                isMobileView={isMobile}
-                onFocus={() => {}}
-                onEditSection={() => {}}
-                onEditItem={() => {}}
-                onAddItem={() => {}}
-                onDeleteSection={() => {}}
-                onSave={() => {}}
-                onCancel={() => {}}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Personal sections — draggable */}
+      {/* Shared + personal sections — single unified grid */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -336,6 +313,26 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
       >
         <SortableContext items={personalSections.map(s => s.id)} strategy={rectSortingStrategy}>
           <div className="dashboard-grid">
+            {/* Shared sections first — non-draggable */}
+            {sharedAsSections.filter(s => sectionMatches(s as any)).map(section => (
+              <div key={section.id}>
+                <SectionCard
+                  section={section}
+                  isShared={true}
+                  canEdit={false}
+                  isMobileView={isMobile}
+                  onFocus={() => {}}
+                  onEditSection={() => {}}
+                  onEditItem={() => {}}
+                  onAddItem={() => {}}
+                  onDeleteSection={() => {}}
+                  onSave={() => {}}
+                  onCancel={() => {}}
+                />
+              </div>
+            ))}
+
+            {/* Personal sections — draggable */}
             {personalSections.filter(section => sectionMatches(section)).map(section => (
               <div
                 key={section.id}
