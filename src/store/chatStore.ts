@@ -9,6 +9,9 @@ import {
 } from '../utils/supabaseClient'
 import { hashPin, verifyPin } from '../utils/security'
 import { playPing, showMessageNotification } from '../utils/notify'
+import {
+  initKeysOnUnlock, clearCryptoSession, getConvKey, encryptText, decryptText,
+} from '../utils/chatCrypto'
 
 // Short preview text for a notification body.
 function previewOf(msg: ChatMessage): string {
@@ -17,6 +20,32 @@ function previewOf(msg: ChatMessage): string {
   if (msg.message_type === 'audio')    return '🎵 Pesan suara'
   if (msg.message_type === 'document') return '📎 ' + (msg.file_name ?? 'Dokumen')
   return msg.content ?? ''
+}
+
+// The other participant of a conversation, relative to me.
+function partnerOf(conv: ChatConversation | undefined, userId: string): string | null {
+  if (!conv) return null
+  return conv.participant_a === userId ? conv.participant_b : conv.participant_a
+}
+
+// Decrypt one message's content (text only). Fails soft to a placeholder.
+async function decryptMsg(msg: ChatMessage, key: CryptoKey | null): Promise<ChatMessage> {
+  if (!msg.is_encrypted || !msg.content) return msg
+  if (!key) return { ...msg, content: '🔒 Pesan terenkripsi' }
+  try { return { ...msg, content: await decryptText(key, msg.content) } }
+  catch { return { ...msg, content: '🔒 Tidak dapat mendekripsi' } }
+}
+
+// Decrypt + append an incoming message to the open thread (dedup, guarded).
+async function ingestIncoming(msg: ChatMessage, userId: string) {
+  if (useChatStore.getState().currentConvId !== msg.conversation_id) return
+  const key = await getConvKey(msg.conversation_id, msg.sender_id)
+  const m = await decryptMsg(msg, key)
+  useChatStore.setState(s => {
+    if (s.currentConvId !== msg.conversation_id) return s
+    if (s.messages.some(x => x.id === m.id)) return s
+    return { messages: [...s.messages, m] }
+  })
 }
 
 const PIN_HASH_KEY  = 'jateamhub-chat-pin-hash'
@@ -37,6 +66,7 @@ interface ChatState {
   sending:       boolean
   isLocked:      boolean
   hasPinSet:     boolean
+  encReady:      boolean                    // E2EE keypair ready this session
 
   loadEnabled:       () => Promise<void>
   setEnabled:        (v: boolean) => Promise<void>
@@ -117,10 +147,11 @@ window.addEventListener('jateamhub-logout', () => {
   sessionStorage.removeItem(SESSION_KEY)
   stopIdleTimer()
   teardownRealtime()
+  clearCryptoSession()
   _userId = ''
   useChatStore.setState({
     isLocked: true, currentConvId: null, messages: [],
-    conversations: [], unreadTotal: 0, onlineUsers: {}, _realtimeSub: null,
+    conversations: [], unreadTotal: 0, onlineUsers: {}, encReady: false, _realtimeSub: null,
   })
 })
 
@@ -140,6 +171,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sending:       false,
   isLocked:      !sessionStorage.getItem(SESSION_KEY),
   hasPinSet:     !!localStorage.getItem(PIN_HASH_KEY),
+  encReady:      false,
   _realtimeSub:  null,
 
   loadEnabled: async () => {
@@ -166,7 +198,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set({ currentConvId: id, msgLoading: true })
     const msgs = await getMessages(id)
-    set({ messages: msgs, msgLoading: false })
+    // Decrypt any encrypted messages with the per-conversation key.
+    const partnerId = partnerOf(get().conversations.find(c => c.id === id), userId)
+    const key = partnerId && msgs.some(m => m.is_encrypted)
+      ? await getConvKey(id, partnerId) : null
+    const decrypted = key || msgs.some(m => m.is_encrypted)
+      ? await Promise.all(msgs.map(m => decryptMsg(m, key)))
+      : msgs
+    set({ messages: decrypted, msgLoading: false })
 
     // Recipient opened the thread → mark delivered + read (drives sender's ✓✓ blue)
     if (document.visibilityState === 'visible') {
@@ -191,9 +230,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       .on('broadcast', { event: 'msg' }, ({ payload }) => {
         const msg = payload.msg as ChatMessage
         if (msg.sender_id === userId) return
-        set(s => ({
-          messages: s.messages.some(m => m.id === msg.id) ? s.messages : [...s.messages, msg],
-        }))
+        void ingestIncoming(msg, userId)
         if (document.visibilityState === 'visible') {
           markMessagesDelivered(id, userId)
           markMessagesRead(id, userId)
@@ -225,16 +262,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendText: async (text, senderId) => {
     const convId = get().currentConvId
     if (!convId || !text.trim()) return
+    const body = text.trim()
     set({ sending: true })
     get().resetIdle()
-    const msg = await sendMessage(convId, senderId, text.trim(), 'text')
+
+    // Encrypt for storage if a conversation key is available.
+    const partnerId = partnerOf(get().conversations.find(c => c.id === convId), senderId)
+    let stored = body, encrypted = false
+    if (partnerId) {
+      const key = await getConvKey(convId, partnerId)
+      if (key) { try { stored = await encryptText(key, body); encrypted = true } catch { /* fall back to plaintext */ } }
+    }
+
+    const msg = await sendMessage(convId, senderId, stored, 'text', undefined, undefined, undefined, encrypted)
     if (msg) {
+      const localMsg = encrypted ? { ...msg, content: body } : msg   // show plaintext locally
       set(s => ({
-        messages: s.messages.some(m => m.id === msg.id) ? s.messages : [...s.messages, msg],
+        messages: s.messages.some(m => m.id === msg.id) ? s.messages : [...s.messages, localMsg],
         conversations: s.conversations.map(c =>
           c.id === convId ? { ...c, last_message_at: msg.created_at } : c
         ),
       }))
+      // Broadcast the stored (cipher) row so the partner decrypts with their key.
       _convChannel?.send({ type: 'broadcast', event: 'msg', payload: { msg } })
     }
     set({ sending: false })
@@ -322,9 +371,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const focused       = document.visibilityState === 'visible'
 
           if (viewingThread) {
-            set(s => ({
-              messages: s.messages.some(m => m.id === msg.id) ? s.messages : [...s.messages, msg],
-            }))
+            void ingestIncoming(msg, userId)   // decrypts + dedups
             if (focused) markMessagesRead(msg.conversation_id, userId)
           } else {
             set(s => ({
@@ -342,9 +389,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const conv  = state.conversations.find(c => c.id === msg.conversation_id)
             const other = conv ? (conv.participant_a === userId ? conv.profile_b : conv.profile_a) : null
             const name  = other?.full_name ?? other?.username ?? 'Pesan baru'
-            const body  = state.isLocked ? 'Anda menerima pesan baru' : previewOf(msg)
             playPing()
-            showMessageNotification(name, body, { tag: `chat-${msg.conversation_id}`, onClickHash: '#chat' })
+            if (state.isLocked) {
+              showMessageNotification(name, 'Anda menerima pesan baru', { tag: `chat-${msg.conversation_id}`, onClickHash: '#chat' })
+            } else if (msg.is_encrypted && msg.content) {
+              getConvKey(msg.conversation_id, msg.sender_id).then(async key => {
+                let body = '🔒 Pesan baru'
+                if (key) { try { body = await decryptText(key, msg.content!) } catch { /* keep placeholder */ } }
+                showMessageNotification(name, body, { tag: `chat-${msg.conversation_id}`, onClickHash: '#chat' })
+              })
+            } else {
+              showMessageNotification(name, previewOf(msg), { tag: `chat-${msg.conversation_id}`, onClickHash: '#chat' })
+            }
           }
         }
       )
@@ -398,6 +454,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     sessionStorage.setItem(SESSION_KEY, '1')
     set({ hasPinSet: true, isLocked: false })
     resetIdleTimer()
+    // Provision the E2EE keypair (wrapped by this PIN).
+    const ok = await initKeysOnUnlock(pin)
+    set({ encReady: ok })
   },
 
   verifyAndUnlock: async (pin) => {
@@ -414,6 +473,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       sessionStorage.setItem(SESSION_KEY, '1')
       set({ isLocked: false })
       resetIdleTimer()
+      // Unwrap (or provision) the E2EE private key with the same PIN.
+      const keysOk = await initKeysOnUnlock(pin)
+      set({ encReady: keysOk })
     }
     return ok
   },
@@ -421,7 +483,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   lock: () => {
     sessionStorage.removeItem(SESSION_KEY)
     stopIdleTimer()
-    set({ isLocked: true })
+    clearCryptoSession()
+    set({ isLocked: true, encReady: false })
   },
 
   clearPin: () => {
@@ -429,6 +492,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     localStorage.removeItem(PIN_SALT_KEY)
     sessionStorage.removeItem(SESSION_KEY)
     stopIdleTimer()
-    set({ hasPinSet: false, isLocked: true })
+    clearCryptoSession()
+    set({ hasPinSet: false, isLocked: true, encReady: false })
   },
 }))

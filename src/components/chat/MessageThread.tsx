@@ -17,7 +17,7 @@ const fmtDate = (iso: string) => {
 }
 
 export default function MessageThread({ conv, currentUserId }: Props) {
-  const { messages, msgLoading, removeMsg, clearConv, reactToMsg, resetIdle, onlineUsers } = useChatStore()
+  const { messages, msgLoading, removeMsg, clearConv, reactToMsg, resetIdle, onlineUsers, encReady } = useChatStore()
   const bottomRef = useRef<HTMLDivElement>(null)
   const [confirmClear, setConfirmClear] = useState(false)
 
@@ -113,6 +113,19 @@ export default function MessageThread({ conv, currentUserId }: Props) {
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px' }}>
+        {encReady && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
+            margin: '0 auto 12px', maxWidth: 420, padding: '6px 12px',
+            background: 'color-mix(in srgb, var(--accent) 9%, transparent)',
+            borderRadius: 8, fontSize: 10.5, color: 'var(--silver4)', textAlign: 'center',
+          }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Pesan teks diamankan dengan enkripsi end-to-end
+          </div>
+        )}
         {msgLoading && (
           <div style={{ textAlign: 'center', color: 'var(--silver4)', fontSize: 13, padding: 20 }}>
             Memuat pesan...
