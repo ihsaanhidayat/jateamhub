@@ -166,14 +166,16 @@ input, textarea, select { font-family: var(--font); }
   border-radius: var(--r-md);
   box-shadow: var(--card-shadow);
   overflow: hidden;
-  transition: box-shadow 240ms var(--ease), border-color 200ms, transform 200ms var(--ease);
+  /* No transform here — avoids conflict with dnd-kit inline transforms */
+  transition: box-shadow 200ms var(--ease), border-color 180ms;
   align-self: start;
   position: relative;
 }
 .section-card:hover {
   box-shadow: var(--card-shadow-hover);
   border-color: var(--border2);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  transition: box-shadow 180ms var(--ease), border-color 150ms, transform 140ms var(--ease);
 }
 .section-card.is-shared {
   border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
@@ -183,8 +185,16 @@ input, textarea, select { font-family: var(--font); }
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent), var(--card-shadow-hover) !important;
 }
-.section-card.is-blurred { opacity: 0.4; filter: blur(0.3px); transform: none; }
-.section-card.is-dragging { opacity: 0.25; box-shadow: none; transform: scale(1.01); }
+.section-card.is-blurred { opacity: 0.4; filter: blur(0.3px); }
+
+/* Placeholder slot — shown where the dragged card was picked up */
+.drag-placeholder {
+  border-radius: var(--r-md);
+  border: 1.5px dashed var(--border2);
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  min-height: 80px;
+}
+.drag-placeholder > * { visibility: hidden; pointer-events: none; }
 
 /* Section Header */
 .section-header {

@@ -57,18 +57,22 @@ function SortableSectionCard({
   onAddItem: (sid: string) => void, onDeleteSection: (id: string) => void,
   onSave: () => void, onCancel: () => void,
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: section.id,
+    transition: { duration: 180, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' },
+  })
   const isFocused = focusedId === section.id
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
+    transition: isDragging ? 'none' : (transition ?? undefined),
+    willChange: transform ? 'transform' : undefined,
+    opacity: isDragging ? 0 : 1,
   }
 
   // Widget rendering (Notes, Clock)
   if (section.type === 'widget') {
     return (
-      <div ref={setNodeRef} style={style}>
+      <div ref={setNodeRef} style={style} className={isDragging ? 'drag-placeholder' : undefined}>
         <SectionCard
           section={section}
           isShared={false}
@@ -107,7 +111,7 @@ function SortableSectionCard({
   }
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} style={style} className={isDragging ? 'drag-placeholder' : undefined}>
       <SectionCard
         section={section}
         isShared={false}
@@ -362,9 +366,9 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
         </SortableContext>
 
         {/* Drag overlay — ghost card saat drag */}
-        <DragOverlay>
+        <DragOverlay dropAnimation={{ duration: 220, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
           {activeSection ? (
-            <div style={{ opacity: 0.9, transform: 'rotate(2deg) scale(1.02)', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', borderRadius: 16, overflow: 'hidden' }}>
+            <div style={{ opacity: 0.96, transform: 'rotate(1.5deg) scale(1.03)', boxShadow: '0 24px 64px rgba(0,0,0,0.28)', borderRadius: 16, overflow: 'hidden', willChange: 'transform' }}>
               <SectionCard
                 section={activeSection}
                 isShared={false}
