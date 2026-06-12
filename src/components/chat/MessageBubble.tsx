@@ -106,6 +106,9 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
   const [heartFx,     setHeartFx]     = useState(false)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bubbleRef = useRef<HTMLDivElement>(null)
+  const hintRef   = useRef<HTMLDivElement>(null)
+  const touch     = useRef({ x0: 0, y0: 0, dx: 0, active: false, decided: false, horizontal: false })
 
   const emojiCount = msg.message_type === 'text' && msg.content && !msg.reply_to ? emojiOnlyCount(msg.content) : 0
   const isBig   = emojiCount > 0 && emojiCount <= 3
@@ -139,6 +142,45 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
   }
   const cancelLongPress = () => { if (longPress.current) { clearTimeout(longPress.current); longPress.current = null } }
 
+  // Swipe-right-to-reply (mobile)
+  const SWIPE_TRIGGER = 56, SWIPE_MAX = 74
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0]
+    touch.current = { x0: t.clientX, y0: t.clientY, dx: 0, active: true, decided: false, horizontal: false }
+    startLongPress()
+  }
+  const onTouchMove = (e: React.TouchEvent) => {
+    const tc = touch.current
+    if (!tc.active) return
+    const t = e.touches[0]
+    const dx = t.clientX - tc.x0, dy = t.clientY - tc.y0
+    if (!tc.decided) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
+      tc.decided = true
+      tc.horizontal = Math.abs(dx) > Math.abs(dy) && dx > 0 && !!onReply
+    }
+    cancelLongPress()
+    if (!tc.horizontal) return
+    const clamped = Math.max(0, Math.min(dx, SWIPE_MAX))
+    tc.dx = clamped
+    if (bubbleRef.current) bubbleRef.current.style.transform = `translateX(${clamped}px)`
+    if (hintRef.current) hintRef.current.style.opacity = String(Math.min(clamped / SWIPE_TRIGGER, 1))
+  }
+  const onTouchEnd = () => {
+    const tc = touch.current
+    if (tc.horizontal) {
+      if (tc.dx >= SWIPE_TRIGGER && onReply) onReply(msg)
+      if (bubbleRef.current) {
+        bubbleRef.current.style.transition = 'transform 180ms ease'
+        bubbleRef.current.style.transform = 'translateX(0)'
+        setTimeout(() => { if (bubbleRef.current) bubbleRef.current.style.transition = '' }, 200)
+      }
+      if (hintRef.current) hintRef.current.style.opacity = '0'
+    }
+    cancelLongPress()
+    tc.active = false
+  }
+
   return (
     <div
       className="chat-bubble-in"
@@ -147,12 +189,26 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
         flexDirection: isMine ? 'row-reverse' : 'row',
         gap: 6, marginTop: cont ? 2 : 9,
         marginBottom: reactionEntries.length ? 14 : 0,
-        alignItems: 'flex-end',
+        alignItems: 'flex-end', position: 'relative',
       }}
       onClick={() => { setShowInfo(false); setShowReact(false) }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => { setHover(false); setShowReact(false) }}
     >
+      {/* Swipe-to-reply hint */}
+      {onReply && (
+        <div
+          ref={hintRef}
+          style={{
+            position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
+            width: 30, height: 30, borderRadius: '50%', background: 'var(--accent-light)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--accent)', opacity: 0, pointerEvents: 'none', zIndex: 0,
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+        </div>
+      )}
       <div
         style={{
           maxWidth: '74%', minWidth: isBig ? 0 : 72,
@@ -165,11 +221,12 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
           position: 'relative', cursor: 'default',
           wordBreak: 'break-word',
         }}
+        ref={bubbleRef}
         onContextMenu={e => { e.preventDefault(); if (onReact) setShowReact(v => !v) }}
         onDoubleClick={() => heartReact()}
-        onTouchStart={startLongPress}
-        onTouchEnd={cancelLongPress}
-        onTouchMove={cancelLongPress}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        onTouchMove={onTouchMove}
       >
         {heartFx && (
           <div style={{
