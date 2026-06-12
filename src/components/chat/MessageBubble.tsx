@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, memo } from 'react'
 import type { ChatMessage } from '../../utils/supabaseClient'
 import { QUICK_REACTIONS } from './emojiData'
+import { linkify, emojiOnlyCount } from '../../utils/chatText'
 
 interface Props {
   msg:            ChatMessage
@@ -61,8 +62,8 @@ const fmtTime = (iso: string) =>
 //  · sent      → single check (translucent)
 //  · delivered → double check (translucent)
 //  · read      → double check (blue)
-function Ticks({ delivered, read }: { delivered: boolean; read: boolean }) {
-  const color  = read ? '#53BDEB' : 'rgba(255,255,255,0.72)'
+function Ticks({ delivered, read, light }: { delivered: boolean; read: boolean; light?: boolean }) {
+  const color  = read ? '#53BDEB' : light ? 'var(--silver4)' : 'rgba(255,255,255,0.72)'
   const double = delivered || read
   const check  = (ox: number) =>
     <path d={`M${ox} 5.6 L${ox + 3.1} 8.7 L${ox + 8.4} 2.1`}
@@ -95,12 +96,22 @@ function MessageBubble({ msg, isMine, currentUserId, cont, onDelete, onReact }: 
   const [showInfo,    setShowInfo]    = useState(false)
   const [showReact,   setShowReact]   = useState(false)
   const [hover,       setHover]       = useState(false)
+  const [heartFx,     setHeartFx]     = useState(false)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const emojiCount = msg.message_type === 'text' && msg.content ? emojiOnlyCount(msg.content) : 0
+  const isBig   = emojiCount > 0 && emojiCount <= 3
   const isMedia = msg.message_type === 'image' || msg.message_type === 'video'
-  const bg      = isMine ? 'var(--accent)' : 'var(--bg2)'
-  const textCol = isMine ? 'white' : 'var(--silver)'
+  const bg      = isBig ? 'transparent' : isMine ? 'var(--accent)' : 'var(--bg2)'
+  const textCol = isBig ? 'var(--silver)' : isMine ? 'white' : 'var(--silver)'
+
+  const heartReact = () => {
+    if (!onReact) return
+    onReact(msg.id, '❤️')
+    setHeartFx(true)
+    setTimeout(() => setHeartFx(false), 700)
+  }
 
   // Corner radii — tail on the first bubble of a group, tighter when continued.
   const radius = isMine
@@ -134,23 +145,30 @@ function MessageBubble({ msg, isMine, currentUserId, cont, onDelete, onReact }: 
     >
       <div
         style={{
-          maxWidth: '74%', minWidth: 72,
+          maxWidth: '74%', minWidth: isBig ? 0 : 72,
           background: bg, color: textCol,
-          borderRadius: radius,
-          padding: isMedia ? 4 : msg.message_type === 'text' ? '7px 11px 6px' : 5,
+          borderRadius: isBig ? 0 : radius,
+          padding: isBig ? '1px 2px' : isMedia ? 4 : msg.message_type === 'text' ? '7px 11px 6px' : 5,
           fontSize: 14, lineHeight: 1.45,
-          boxShadow: isMine
-            ? '0 1px 1.5px rgba(0,0,0,.12)'
-            : '0 1px 2px rgba(0,0,0,.10)',
-          border: isMine ? 'none' : '1px solid var(--border)',
+          boxShadow: isBig ? 'none' : isMine ? '0 1px 1.5px rgba(0,0,0,.12)' : '0 1px 2px rgba(0,0,0,.10)',
+          border: isBig ? 'none' : isMine ? 'none' : '1px solid var(--border)',
           position: 'relative', cursor: 'default',
           wordBreak: 'break-word',
         }}
         onContextMenu={e => { e.preventDefault(); if (onReact) setShowReact(v => !v) }}
+        onDoubleClick={() => heartReact()}
         onTouchStart={startLongPress}
         onTouchEnd={cancelLongPress}
         onTouchMove={cancelLongPress}
       >
+        {heartFx && (
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            pointerEvents: 'none', zIndex: 10, fontSize: 40,
+            animation: 'heartPop 700ms ease',
+          }}>❤️</div>
+        )}
         {/* Quick-reaction bar */}
         {showReact && onReact && (
           <div
@@ -198,7 +216,11 @@ function MessageBubble({ msg, isMine, currentUserId, cont, onDelete, onReact }: 
           </div>
         )}
 
-        {msg.message_type === 'text' && <span>{msg.content}</span>}
+        {msg.message_type === 'text' && (
+          isBig
+            ? <span style={{ fontSize: emojiCount === 1 ? 48 : emojiCount === 2 ? 40 : 32, lineHeight: 1.15, display: 'block' }}>{msg.content}</span>
+            : <span style={{ whiteSpace: 'pre-wrap' }}>{linkify(msg.content ?? '')}</span>
+        )}
 
         {msg.message_type === 'image' && msg.file_url && (
           <img
@@ -261,13 +283,13 @@ function MessageBubble({ msg, isMine, currentUserId, cont, onDelete, onReact }: 
               background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(2px)',
               color: 'white',
             } : {
-              marginTop: 2, color: isMine ? 'rgba(255,255,255,0.85)' : 'var(--silver4)',
+              marginTop: 2, color: isBig ? 'var(--silver4)' : isMine ? 'rgba(255,255,255,0.85)' : 'var(--silver4)',
             }),
             fontSize: 10, lineHeight: 1.4,
           }}
         >
           <span style={{ opacity: isMedia ? 0.95 : 0.8 }}>{fmtTime(msg.created_at)}</span>
-          {isMine && <Ticks delivered={!!msg.delivered_at} read={!!msg.read_at} />}
+          {isMine && <Ticks delivered={!!msg.delivered_at} read={!!msg.read_at} light={isBig} />}
         </div>
 
         {showInfo && isMine && (

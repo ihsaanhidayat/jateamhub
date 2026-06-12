@@ -637,6 +637,17 @@ mark.hl { background: var(--accent-soft); color: var(--accent); border-radius: 3
 @keyframes typingDot { 0%,60%,100% { transform: translateY(0); opacity: .4; } 30% { transform: translateY(-4px); opacity: 1; } }
 @keyframes bubbleIn  { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes popIn     { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes heartPop  { 0% { transform: scale(0) rotate(-15deg); opacity: 0; } 50% { transform: scale(1.25) rotate(8deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes shimmer   { 0% { background-position: -360px 0; } 100% { background-position: 360px 0; } }
+.chat-skeleton {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--silver4) 12%, transparent) 25%,
+    color-mix(in srgb, var(--silver4) 22%, transparent) 37%,
+    color-mix(in srgb, var(--silver4) 12%, transparent) 63%);
+  background-size: 720px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 14px;
+}
 
 /* ── Chat ─────────────────────────────────────────────────── */
 /* Full-height shell that respects mobile browser chrome (dvh) */

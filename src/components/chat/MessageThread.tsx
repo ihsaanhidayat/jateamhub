@@ -38,12 +38,16 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   const listRef   = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const atBottom  = useRef(true)
+  const prevLen   = useRef(messages.length)
   const [showFab,      setShowFab]      = useState(false)
+  const [newCount,     setNewCount]     = useState(0)
   const [menuOpen,     setMenuOpen]     = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
 
-  const scrollToBottom = (smooth = true) =>
+  const scrollToBottom = (smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
+    setNewCount(0)
+  }
 
   const onScroll = () => {
     const el = listRef.current
@@ -51,15 +55,22 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight
     atBottom.current = dist < 120
     setShowFab(dist > 240)
+    if (atBottom.current) setNewCount(0)
   }
 
-  // Stick to bottom on new content only when the user is already there.
-  useEffect(() => { if (atBottom.current) scrollToBottom(true) }, [messages.length, peerTyping])
+  // Stick to bottom on new content only when the user is already there;
+  // otherwise count the new arrivals for the "N pesan baru" badge.
+  useEffect(() => {
+    const delta = messages.length - prevLen.current
+    prevLen.current = messages.length
+    if (atBottom.current) scrollToBottom(true)
+    else if (delta > 0)   setNewCount(c => c + delta)
+  }, [messages.length, peerTyping])
 
   // Jump to bottom when switching conversations.
   useEffect(() => {
     atBottom.current = true
-    setShowFab(false); setMenuOpen(false); setConfirmClear(false)
+    setShowFab(false); setNewCount(0); setMenuOpen(false); setConfirmClear(false)
     requestAnimationFrame(() => scrollToBottom(false))
   }, [conv.id])
 
@@ -255,8 +266,12 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
         )}
 
         {msgLoading && (
-          <div style={{ textAlign: 'center', color: 'var(--silver4)', fontSize: 13, padding: 20 }}>
-            Memuat pesan...
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0' }}>
+            {[{ m: false, w: 150 }, { m: false, w: 104 }, { m: true, w: 188 }, { m: false, w: 132 }, { m: true, w: 96 }, { m: true, w: 152 }].map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: r.m ? 'flex-end' : 'flex-start' }}>
+                <div className="chat-skeleton" style={{ width: r.w, height: 36, borderRadius: r.m ? '16px 5px 16px 16px' : '5px 16px 16px 16px' }} />
+              </div>
+            ))}
           </div>
         )}
         {!msgLoading && messages.length === 0 && (
@@ -278,12 +293,15 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
         {rows.map(({ msg, day, showDate, cont }) => (
           <div key={msg.id}>
             {showDate && (
-              <div style={{ display: 'flex', justifyContent: 'center', margin: '14px 0 10px' }}>
+              <div style={{
+                display: 'flex', justifyContent: 'center', margin: '14px 0 10px',
+                position: 'sticky', top: 4, zIndex: 3, pointerEvents: 'none',
+              }}>
                 <span style={{
                   fontSize: 11, fontWeight: 600, color: 'var(--silver3)',
                   background: 'var(--bg2)', border: '1px solid var(--border)',
                   padding: '4px 12px', borderRadius: 20, whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 2px rgba(0,0,0,.06)',
+                  boxShadow: '0 2px 6px rgba(0,0,0,.10)',
                 }}>{fmtDate(day)}</span>
               </div>
             )}
@@ -319,21 +337,26 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Scroll-to-bottom FAB */}
-      {showFab && (
+      {/* Scroll-to-bottom FAB (+ new-message badge) */}
+      {(showFab || newCount > 0) && (
         <button
           onClick={() => scrollToBottom(true)}
           title="Ke pesan terbaru"
           style={{
             position: 'absolute', right: 18, bottom: 84, zIndex: 5,
-            width: 40, height: 40, borderRadius: '50%',
-            background: 'var(--bg2)', border: '1px solid var(--border2)',
-            boxShadow: 'var(--shadow-lg)', cursor: 'pointer', color: 'var(--silver2, var(--silver))',
+            height: 40, minWidth: 40, padding: newCount > 0 ? '0 14px 0 12px' : 0,
+            borderRadius: 20, gap: 6,
+            background: newCount > 0 ? 'var(--accent)' : 'var(--bg2)',
+            border: newCount > 0 ? 'none' : '1px solid var(--border2)',
+            boxShadow: 'var(--shadow-lg)', cursor: 'pointer',
+            color: newCount > 0 ? 'white' : 'var(--silver)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
             animation: 'popIn 140ms ease',
           }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          {newCount > 0 && <span>{newCount} pesan baru</span>}
         </button>
       )}
 
