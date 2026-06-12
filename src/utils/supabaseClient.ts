@@ -740,6 +740,45 @@ export const getAuditLogs = async (limit = 200): Promise<AuditLog[]> => {
   return (data ?? []) as AuditLog[]
 }
 
+// ── Announcements (governance) ────────────────────────────────
+export interface Announcement {
+  id:            string
+  created_by:    string | null
+  title:         string
+  body:          string
+  target_role:   string | null
+  target_region: string | null
+  target_unit:   string | null
+  is_active:     boolean
+  created_at:    string
+}
+
+// RLS returns only the announcements targeted to the current user (or all, for superadmin).
+export const getActiveAnnouncements = async (): Promise<Announcement[]> => {
+  const { data } = await supabase
+    .from('announcements').select('*').eq('is_active', true).order('created_at', { ascending: false })
+  return (data ?? []) as Announcement[]
+}
+
+export const getAllAnnouncements = async (): Promise<Announcement[]> => {
+  const { data } = await supabase
+    .from('announcements').select('*').order('created_at', { ascending: false }).limit(100)
+  return (data ?? []) as Announcement[]
+}
+
+export const createAnnouncement = async (
+  a: { title: string; body: string; target_role: string | null; target_region: string | null; target_unit: string | null },
+  createdBy: string,
+) => supabase.from('announcements').insert({ ...a, created_by: createdBy }).select().single()
+
+export const deactivateAnnouncement = async (id: string) =>
+  supabase.from('announcements').update({ is_active: false }).eq('id', id)
+
+export const triggerAnnouncePush = async (announcementId: string) => {
+  try { await supabase.functions.invoke('announce-push', { body: { announcement_id: announcementId } }) }
+  catch { /* best effort */ }
+}
+
 // ── Presence: heartbeat last_seen ─────────────────────────────
 export const updateLastSeen = async (userId: string) =>
   supabase.from('profiles')

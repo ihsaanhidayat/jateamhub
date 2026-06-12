@@ -7,6 +7,7 @@ import { supabase } from './utils/supabaseClient'
 import LoginPage    from './components/layout/LoginPage'
 import RegisterPage from './components/layout/RegisterPage'
 import Header       from './components/layout/Header'
+import AnnouncementBanner from './components/layout/AnnouncementBanner'
 import GridLayout   from './components/layout/GridLayout'
 import OfflineBar   from './components/ui/OfflineBar'
 import ToastContainer from './components/ui/Toast'
@@ -336,6 +337,8 @@ export default function App() {
         onOpenTaskList={openTaskList}
         onOpenChat={openChat}
       />
+
+      <AnnouncementBanner />
 
       {/* Edit mode topbar — slim, di bawah header */}
       {editMode && (

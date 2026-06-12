@@ -8,8 +8,9 @@ import { useChatStore } from '../../store/chatStore'
 import {
   getPendingRegistrations, approveRegistration, rejectRegistration,
   supabase, updateProfile, logAudit, getAuditLogs,
+  getAllAnnouncements, createAnnouncement, deactivateAnnouncement, triggerAnnouncePush,
 } from '../../utils/supabaseClient'
-import type { PendingRegistration, AuditLog } from '../../utils/supabaseClient'
+import type { PendingRegistration, AuditLog, Announcement } from '../../utils/supabaseClient'
 import { REGION_LABELS, UNIT_LABELS, canManageUser, getAllowedRoles, getAllowedRegions, getAllowedUnits, getDisplayBadge } from '../../utils/roles'
 import type { Role } from '../../types'
 import type { Profile } from '../../utils/supabaseClient'
@@ -54,8 +55,40 @@ export default function SuperadminDashboard() {
     setAuditLoad(false)
   }
 
+  // Announcements
+  const [annList,   setAnnList]   = useState<Announcement[]>([])
+  const [annTitle,  setAnnTitle]  = useState('')
+  const [annBody,   setAnnBody]   = useState('')
+  const [annRole,   setAnnRole]   = useState('')
+  const [annRegion, setAnnRegion] = useState('')
+  const [annUnit,   setAnnUnit]   = useState('')
+  const [annSending, setAnnSending] = useState(false)
+  const loadAnnouncements = async () => setAnnList(await getAllAnnouncements())
+
+  const sendAnnouncement = async () => {
+    if (!annTitle.trim() || !annBody.trim() || !profile) return
+    setAnnSending(true)
+    const { data, error } = await createAnnouncement({
+      title: annTitle.trim(), body: annBody.trim(),
+      target_role: annRole || null, target_region: annRegion || null, target_unit: annUnit || null,
+    }, profile.id)
+    setAnnSending(false)
+    if (error || !data) { toast('Gagal mengirim pengumuman.', 'error'); return }
+    void logAudit('announcement.send', { target_type: 'announcement', target_id: data.id, target_label: annTitle.trim(), metadata: { role: annRole || 'semua', region: annRegion || 'semua', unit: annUnit || 'semua' } })
+    void triggerAnnouncePush(data.id)
+    setAnnTitle(''); setAnnBody(''); setAnnRole(''); setAnnRegion(''); setAnnUnit('')
+    toast('Pengumuman terkirim.', 'success')
+    loadAnnouncements()
+  }
+
+  const removeAnnouncement = async (id: string) => {
+    await deactivateAnnouncement(id)
+    loadAnnouncements()
+  }
+
   useEffect(() => { loadEnabled() }, [])
   useEffect(() => { if (tab === 'audit') loadAudit() }, [tab])
+  useEffect(() => { if (tab === 'settings') loadAnnouncements() }, [tab])
   const [pending,     setPending]     = useState<PendingRegistration[]>([])
   const [pendingLoad, setPendingLoad] = useState(false)
   const [rejectId,    setRejectId]    = useState<string | null>(null)
@@ -550,6 +583,59 @@ export default function SuperadminDashboard() {
             <p style={{ fontSize: 13, color: 'var(--silver3)', marginBottom: 4 }}>
               Konfigurasi fitur global aplikasi.
             </p>
+
+            {/* Announcements */}
+            <div style={{ padding: '16px 20px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>📢 Pengumuman</div>
+              <div style={{ fontSize: 12, color: 'var(--silver3)', marginTop: -4 }}>Kirim pengumuman ke pengguna (banner + notifikasi). Bisa ditargetkan.</div>
+              <input value={annTitle} onChange={e => setAnnTitle(e.target.value)} placeholder="Judul pengumuman" maxLength={80} style={inputSt} />
+              <textarea value={annBody} onChange={e => setAnnBody(e.target.value)} placeholder="Isi pengumuman…" rows={3} maxLength={500} style={{ ...inputSt, height: 'auto', padding: '8px 12px', resize: 'vertical', lineHeight: 1.5 }} />
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <select value={annRole} onChange={e => setAnnRole(e.target.value)} style={{ ...inputSt, width: 'auto', flex: 1, minWidth: 110 }}>
+                  <option value="">Semua role</option>
+                  <option value="admin">Admin</option>
+                  <option value="user">User</option>
+                  <option value="guest">Guest</option>
+                </select>
+                <select value={annRegion} onChange={e => setAnnRegion(e.target.value)} style={{ ...inputSt, width: 'auto', flex: 1, minWidth: 110 }}>
+                  <option value="">Semua wilayah</option>
+                  {REGIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+                <select value={annUnit} onChange={e => setAnnUnit(e.target.value)} style={{ ...inputSt, width: 'auto', flex: 1, minWidth: 110 }}>
+                  <option value="">Semua unit</option>
+                  {UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                </select>
+              </div>
+              <button
+                onClick={sendAnnouncement}
+                disabled={annSending || !annTitle.trim() || !annBody.trim()}
+                style={{ height: 40, background: annSending || !annTitle.trim() || !annBody.trim() ? 'var(--border2)' : 'var(--accent)', border: 'none', borderRadius: 10, color: 'white', fontSize: 13, fontWeight: 700, cursor: annSending ? 'wait' : 'pointer', fontFamily: 'var(--font)' }}
+              >
+                {annSending ? 'Mengirim…' : 'Kirim pengumuman'}
+              </button>
+
+              {annList.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                  {annList.map(a => (
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, opacity: a.is_active ? 1 : 0.55 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--silver)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {a.title}{!a.is_active && ' · nonaktif'}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>
+                          {(a.target_role ?? 'semua role')} · {(a.target_region ?? 'semua wilayah')} · {(a.target_unit ?? 'semua unit')}
+                        </div>
+                      </div>
+                      {a.is_active && (
+                        <button onClick={() => removeAnnouncement(a.id)} style={{ flexShrink: 0, height: 28, padding: '0 10px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 7, cursor: 'pointer', fontSize: 11, color: 'var(--red)', fontFamily: 'var(--font)' }}>
+                          Nonaktifkan
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Chat Toggle */}
             <div style={{
