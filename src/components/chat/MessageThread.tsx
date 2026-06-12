@@ -96,7 +96,10 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   const rows = useMemo(() => {
     const out: Array<{ msg: typeof messages[number]; day: string; showDate: boolean; cont: boolean }> = []
     let prev: typeof messages[number] | null = null
+    const seen = new Set<string>()
     for (const m of messages) {
+      if (seen.has(m.id)) continue   // safety net: never render a message twice
+      seen.add(m.id)
       const day = m.created_at.slice(0, 10)
       const showDate = !prev || prev.created_at.slice(0, 10) !== day
       const cont = !showDate && !!prev && prev.sender_id === m.sender_id &&

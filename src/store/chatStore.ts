@@ -36,17 +36,29 @@ async function decryptMsg(msg: ChatMessage, key: CryptoKey | null): Promise<Chat
   catch { return { ...msg, content: '🔒 Tidak dapat mendekripsi' } }
 }
 
+// Ids currently being decrypted/appended — guards the async window so the
+// broadcast and the postgres-INSERT delivery of the same message can't both add.
+const _ingestingIds = new Set<string>()
+
 // Decrypt + append an incoming message to the open thread (dedup, guarded).
 async function ingestIncoming(msg: ChatMessage, userId: string) {
-  if (useChatStore.getState().currentConvId !== msg.conversation_id) return
-  const key = await getConvKey(msg.conversation_id, msg.sender_id)
-  const m = await decryptMsg(msg, key)
-  if (_typingClear) { clearTimeout(_typingClear); _typingClear = null }
-  useChatStore.setState(s => {
-    if (s.currentConvId !== msg.conversation_id) return s
-    if (s.messages.some(x => x.id === m.id)) return { peerTyping: false }
-    return { messages: [...s.messages, m], peerTyping: false }
-  })
+  const st = useChatStore.getState()
+  if (st.currentConvId !== msg.conversation_id) return
+  if (_ingestingIds.has(msg.id)) return                       // already in flight
+  if (st.messages.some(x => x.id === msg.id)) return          // already present
+  _ingestingIds.add(msg.id)
+  try {
+    const key = await getConvKey(msg.conversation_id, msg.sender_id)
+    const m = await decryptMsg(msg, key)
+    if (_typingClear) { clearTimeout(_typingClear); _typingClear = null }
+    useChatStore.setState(s => {
+      if (s.currentConvId !== msg.conversation_id) return s
+      if (s.messages.some(x => x.id === m.id)) return { peerTyping: false }
+      return { messages: [...s.messages, m], peerTyping: false }
+    })
+  } finally {
+    _ingestingIds.delete(msg.id)
+  }
 }
 
 const PIN_HASH_KEY  = 'jateamhub-chat-pin-hash'
@@ -425,7 +437,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         }
       )
-      // Status changes: delivered_at / read_at / reactions / soft-delete
+      // Status changes: delivered_at / read_at / reactions / soft-delete.
+      // Only merge status fields — never overwrite the locally decrypted
+      // `content` with the DB ciphertext.
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_messages' },
         (payload) => {
           const msg = payload.new as ChatMessage
@@ -433,7 +447,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           set(s => ({
             messages: msg.deleted_at
               ? s.messages.filter(m => m.id !== msg.id)
-              : s.messages.map(m => m.id === msg.id ? { ...m, ...msg } : m),
+              : s.messages.map(m => m.id === msg.id ? {
+                  ...m,
+                  delivered_at: msg.delivered_at,
+                  read_at:      msg.read_at,
+                  is_read:      msg.is_read,
+                  reactions:    msg.reactions ?? m.reactions,
+                } : m),
           }))
         }
       )
