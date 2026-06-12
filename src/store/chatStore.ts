@@ -4,7 +4,7 @@ import {
   getConversations, getMessages, createConversation, sendMessage,
   uploadChatFile, markMessagesRead, markMessagesDelivered, deleteMessage, editMessage,
   clearConversationMessages, toggleReaction, updateLastSeen,
-  getStarredIds, addStar, removeStar,
+  getStarredIds, addStar, removeStar, triggerPush,
   getChatEnabled, setChatEnabled as dbSetChatEnabled,
   type ChatConversation, type ChatMessage,
 } from '../utils/supabaseClient'
@@ -14,6 +14,7 @@ import {
   initKeysOnUnlock, clearCryptoSession, getConvKey, encryptText, decryptText,
 } from '../utils/chatCrypto'
 import { messagePreview } from '../utils/chatText'
+import { unregisterPushSubscription } from '../utils/push'
 
 // Short preview text for a notification body.
 function previewOf(msg: ChatMessage): string {
@@ -204,6 +205,7 @@ window.addEventListener('jateamhub-logout', () => {
   stopIdleTimer()
   teardownRealtime()
   clearCryptoSession()
+  void unregisterPushSubscription()
   _userId = ''
   useChatStore.setState({
     isLocked: true, currentConvId: null, messages: [],
@@ -382,6 +384,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }))
       // Broadcast the stored (cipher) row so the partner decrypts with their key.
       _convChannel?.send({ type: 'broadcast', event: 'msg', payload: { msg } })
+      void triggerPush(convId)
     }
     set({ sending: false })
   },
@@ -422,6 +425,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         )),
       }))
       _convChannel?.send({ type: 'broadcast', event: 'msg', payload: { msg } })
+      void triggerPush(convId)
     }
     set({ sending: false })
   },
@@ -505,6 +509,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (get().currentConvId === targetConvId) {
       _convChannel?.send({ type: 'broadcast', event: 'msg', payload: { msg: sent } })
     }
+    void triggerPush(targetConvId)
   },
 
   editText: async (msgId, text, senderId) => {

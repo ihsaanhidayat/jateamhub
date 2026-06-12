@@ -689,6 +689,12 @@ export const addStar = async (userId: string, messageId: string) =>
 export const removeStar = async (userId: string, messageId: string) =>
   supabase.from('chat_stars').delete().eq('user_id', userId).eq('message_id', messageId)
 
+// Fire a closed-app push to the other participant (best-effort).
+export const triggerPush = async (conversationId: string) => {
+  try { await supabase.functions.invoke('notify-push', { body: { conversation_id: conversationId } }) }
+  catch { /* best effort — in-app realtime still delivers */ }
+}
+
 // ── Presence: heartbeat last_seen ─────────────────────────────
 export const updateLastSeen = async (userId: string) =>
   supabase.from('profiles')
