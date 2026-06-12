@@ -15,6 +15,7 @@ interface Props {
   onReact?:       (id: string, emoji: string) => void
   onReply?:       (msg: ChatMessage) => void
   onEdit?:        (msg: ChatMessage) => void
+  onForward?:     (msg: ChatMessage) => void
   onQuoteJump?:   (id: string) => void
 }
 
@@ -100,7 +101,7 @@ const FileIcon = ({ name }: { name: string }) => {
   return <span style={{ fontSize: 22 }}>{icons[ext] ?? '📎'}</span>
 }
 
-function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, onDelete, onReact, onReply, onEdit, onQuoteJump }: Props) {
+function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, onDelete, onReact, onReply, onEdit, onForward, onQuoteJump }: Props) {
   const [showInfo,    setShowInfo]    = useState(false)
   const [showReact,   setShowReact]   = useState(false)
   const [hover,       setHover]       = useState(false)
@@ -280,6 +281,20 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
                 >{emoji}</button>
               )
             })}
+            {onForward && msg.message_type !== 'audio' && (
+              <button
+                onClick={() => { onForward(msg); setShowReact(false) }}
+                title="Teruskan"
+                style={{
+                  width: 34, height: 34, marginLeft: 2,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  borderLeft: '1px solid var(--border)', borderRadius: 0,
+                  color: 'var(--silver2, var(--silver))', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
+              </button>
+            )}
             {canEdit && (
               <button
                 onClick={() => { onEdit!(msg); setShowReact(false) }}
@@ -308,6 +323,14 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
             )}
+          </div>
+        )}
+
+        {/* Forwarded indicator */}
+        {msg.is_forwarded && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3, fontSize: 11, fontStyle: 'italic', opacity: 0.75, color: isMine ? 'rgba(255,255,255,0.92)' : 'var(--silver4)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
+            Diteruskan
           </div>
         )}
 

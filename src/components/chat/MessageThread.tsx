@@ -35,6 +35,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   const reactToMsg  = useChatStore(s => s.reactToMsg)
   const setReplyTo  = useChatStore(s => s.setReplyTo)
   const setEditing  = useChatStore(s => s.setEditing)
+  const setForwarding = useChatStore(s => s.setForwarding)
   const lock        = useChatStore(s => s.lock)
   const unreadAnchorId = useChatStore(s => s.unreadAnchorId)
   const [highlightId, setHighlightId] = useState<string | null>(null)
@@ -346,6 +347,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
               onReact={onReact}
               onReply={setReplyTo}
               onEdit={setEditing}
+              onForward={setForwarding}
               onQuoteJump={onQuoteJump}
             />
           </div>

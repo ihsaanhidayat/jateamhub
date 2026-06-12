@@ -103,6 +103,7 @@ interface ChatState {
   peerTyping:    boolean                    // partner is typing in the open thread
   replyTo:       ChatMessage | null         // message being replied to (composer)
   editing:       ChatMessage | null         // message being edited (composer)
+  forwarding:    ChatMessage | null         // message being forwarded (picker)
   unreadAnchorId: string | null             // first unread message at thread open
   loading:       boolean
   msgLoading:    boolean
@@ -126,6 +127,8 @@ interface ChatState {
   setReplyTo:        (msg: ChatMessage | null) => void
   setEditing:        (msg: ChatMessage | null) => void
   editText:          (msgId: string, text: string, senderId: string) => Promise<void>
+  setForwarding:     (msg: ChatMessage | null) => void
+  forwardMessage:    (msg: ChatMessage, targetConvId: string, senderId: string) => Promise<void>
 
   // Realtime — global channel + presence owned by App.tsx
   _realtimeSub: (() => void) | null
@@ -201,7 +204,7 @@ window.addEventListener('jateamhub-logout', () => {
   useChatStore.setState({
     isLocked: true, currentConvId: null, messages: [],
     conversations: [], unreadTotal: 0, onlineUsers: {}, encReady: false,
-    replyTo: null, editing: null, unreadAnchorId: null, _realtimeSub: null,
+    replyTo: null, editing: null, forwarding: null, unreadAnchorId: null, _realtimeSub: null,
   })
 })
 
@@ -219,6 +222,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   peerTyping:    false,
   replyTo:       null,
   editing:       null,
+  forwarding:    null,
   unreadAnchorId: null,
   loading:       false,
   msgLoading:    false,
@@ -427,6 +431,46 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setReplyTo: (msg) => set({ replyTo: msg, editing: null }),
 
   setEditing: (msg) => set({ editing: msg, replyTo: null }),
+
+  setForwarding: (msg) => set({ forwarding: msg }),
+
+  forwardMessage: async (msg, targetConvId, senderId) => {
+    const conv = get().conversations.find(c => c.id === targetConvId)
+    const partnerId = conv ? (conv.participant_a === senderId ? conv.participant_b : conv.participant_a) : null
+    const isText = msg.message_type === 'text'
+
+    let stored = msg.content, encrypted = false
+    if (isText && msg.content && partnerId) {
+      const key = await getConvKey(targetConvId, partnerId)
+      if (key) { try { stored = await encryptText(key, msg.content); encrypted = true } catch { /* plaintext */ } }
+    }
+
+    const sent = await sendMessage(
+      targetConvId, senderId,
+      isText ? stored : null,
+      msg.message_type,
+      msg.file_url ?? undefined, msg.file_name ?? undefined, msg.file_size ?? undefined,
+      encrypted, null, true,
+    )
+    if (!sent) return
+
+    const preview = messagePreview({ message_type: sent.message_type, content: isText ? msg.content : null, file_name: sent.file_name })
+    set(s => {
+      const localSent = isText && encrypted ? { ...sent, content: msg.content } : sent
+      const addHere = s.currentConvId === targetConvId && !s.messages.some(m => m.id === sent.id)
+      return {
+        messages: addHere ? [...s.messages, localSent] : s.messages,
+        conversations: sortConvs(s.conversations.map(c =>
+          c.id === targetConvId
+            ? { ...c, last_message_at: sent.created_at, last_preview: preview, last_sender_id: senderId }
+            : c)),
+      }
+    })
+    // Instant delivery if the target is the open conversation.
+    if (get().currentConvId === targetConvId) {
+      _convChannel?.send({ type: 'broadcast', event: 'msg', payload: { msg: sent } })
+    }
+  },
 
   editText: async (msgId, text, senderId) => {
     const body = text.trim()

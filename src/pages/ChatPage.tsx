@@ -6,6 +6,7 @@ import ConversationList from '../components/chat/ConversationList'
 import MessageThread from '../components/chat/MessageThread'
 import ChatLockScreen from '../components/chat/ChatLockScreen'
 import NewConversationModal from '../components/chat/NewConversationModal'
+import ForwardModal from '../components/chat/ForwardModal'
 
 interface Props { onClose: () => void }
 
@@ -239,6 +240,8 @@ export default function ChatPage({ onClose }: Props) {
           onStarted={handleSelectConv}
         />
       )}
+
+      <ForwardModal currentUserId={profile.id} />
     </div>
   )
 }
