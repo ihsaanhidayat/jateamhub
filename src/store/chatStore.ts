@@ -12,6 +12,7 @@ import { playPing, showMessageNotification } from '../utils/notify'
 import {
   initKeysOnUnlock, clearCryptoSession, getConvKey, encryptText, decryptText,
 } from '../utils/chatCrypto'
+import { messagePreview } from '../utils/chatText'
 
 // Short preview text for a notification body.
 function previewOf(msg: ChatMessage): string {
@@ -26,6 +27,31 @@ function previewOf(msg: ChatMessage): string {
 function partnerOf(conv: ChatConversation | undefined, userId: string): string | null {
   if (!conv) return null
   return conv.participant_a === userId ? conv.participant_b : conv.participant_a
+}
+
+// Most-recent-first ordering for the conversation list.
+function sortConvs(convs: ChatConversation[]): ChatConversation[] {
+  return [...convs].sort((a, b) => {
+    const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
+    const tb = b.last_message_at ? new Date(b.last_message_at).getTime() : 0
+    return tb - ta
+  })
+}
+
+// Update a conversation's sidebar preview (decrypting if needed) + bump it up.
+async function setConvPreview(convId: string, partnerId: string, msg: ChatMessage, plaintext?: string) {
+  let content = plaintext ?? msg.content
+  if (plaintext === undefined && msg.is_encrypted && content) {
+    const key = await getConvKey(convId, partnerId)
+    content = key ? await decryptText(key, content).catch(() => '🔒') : '🔒 Pesan terenkripsi'
+  }
+  const preview = messagePreview({ message_type: msg.message_type, content, file_name: msg.file_name })
+  useChatStore.setState(s => ({
+    conversations: sortConvs(s.conversations.map(c =>
+      c.id === convId
+        ? { ...c, last_preview: preview, last_sender_id: msg.sender_id, last_message_at: msg.created_at }
+        : c)),
+  }))
 }
 
 // Decrypt one message's content (text only). Fails soft to a placeholder.
@@ -76,6 +102,7 @@ interface ChatState {
   onlineUsers:   Record<string, boolean>   // userId → online
   peerTyping:    boolean                    // partner is typing in the open thread
   replyTo:       ChatMessage | null         // message being replied to (composer)
+  unreadAnchorId: string | null             // first unread message at thread open
   loading:       boolean
   msgLoading:    boolean
   sending:       boolean
@@ -170,7 +197,8 @@ window.addEventListener('jateamhub-logout', () => {
   _userId = ''
   useChatStore.setState({
     isLocked: true, currentConvId: null, messages: [],
-    conversations: [], unreadTotal: 0, onlineUsers: {}, encReady: false, _realtimeSub: null,
+    conversations: [], unreadTotal: 0, onlineUsers: {}, encReady: false,
+    replyTo: null, unreadAnchorId: null, _realtimeSub: null,
   })
 })
 
@@ -187,6 +215,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   onlineUsers:   {},
   peerTyping:    false,
   replyTo:       null,
+  unreadAnchorId: null,
   loading:       false,
   msgLoading:    false,
   sending:       false,
@@ -208,6 +237,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadConversations: async (userId) => {
     set({ loading: true })
     const convs = await getConversations(userId)
+    // Decrypt each conversation's last-message preview for the sidebar.
+    await Promise.all(convs.map(async c => {
+      const lm = c.last_msg
+      if (!lm) { c.last_preview = ''; c.last_sender_id = null; return }
+      c.last_sender_id = lm.sender_id
+      let content = lm.content
+      if (lm.is_encrypted && content) {
+        const partnerId = c.participant_a === userId ? c.participant_b : c.participant_a
+        const key = await getConvKey(c.id, partnerId)
+        content = key ? await decryptText(key, content).catch(() => '🔒') : '🔒 Pesan terenkripsi'
+      }
+      c.last_preview = messagePreview({ message_type: lm.message_type, content, file_name: lm.file_name })
+    }))
     const total = convs.reduce((sum, c) => sum + (c.unread_count ?? 0), 0)
     set({ conversations: convs, loading: false, unreadTotal: total })
   },
@@ -216,7 +258,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (_convChannel) { _convChannel.unsubscribe(); _convChannel = null }
 
     if (_typingClear) { clearTimeout(_typingClear); _typingClear = null }
-    set({ peerTyping: false, replyTo: null })
+    set({ peerTyping: false, replyTo: null, unreadAnchorId: null })
 
     if (!id) { set({ currentConvId: null, messages: [] }); return }
 
@@ -229,7 +271,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const decrypted = key || msgs.some(m => m.is_encrypted)
       ? await Promise.all(msgs.map(m => decryptMsg(m, key)))
       : msgs
-    set({ messages: decrypted, msgLoading: false })
+    // Capture the unread boundary BEFORE marking read (drives the divider).
+    const firstUnread = decrypted.find(m => m.sender_id !== userId && !m.read_at && !m.deleted_at)
+    set({ messages: decrypted, msgLoading: false, unreadAnchorId: firstUnread?.id ?? null })
 
     // Recipient opened the thread → mark delivered + read (drives sender's ✓✓ blue)
     if (document.visibilityState === 'visible') {
@@ -309,9 +353,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const localMsg = encrypted ? { ...msg, content: body } : msg   // show plaintext locally
       set(s => ({
         messages: s.messages.some(m => m.id === msg.id) ? s.messages : [...s.messages, localMsg],
-        conversations: s.conversations.map(c =>
-          c.id === convId ? { ...c, last_message_at: msg.created_at } : c
-        ),
+        conversations: sortConvs(s.conversations.map(c =>
+          c.id === convId ? { ...c, last_message_at: msg.created_at, last_preview: body, last_sender_id: senderId } : c
+        )),
       }))
       // Broadcast the stored (cipher) row so the partner decrypts with their key.
       _convChannel?.send({ type: 'broadcast', event: 'msg', payload: { msg } })
@@ -334,11 +378,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       : 'document'
     const msg = await sendMessage(convId, senderId, null, type, result.url, result.name, result.size, false, replyId)
     if (msg) {
+      const preview = messagePreview({ message_type: type, content: null, file_name: result.name })
       set(s => ({
         messages: s.messages.some(m => m.id === msg.id) ? s.messages : [...s.messages, msg],
-        conversations: s.conversations.map(c =>
-          c.id === convId ? { ...c, last_message_at: msg.created_at } : c
-        ),
+        conversations: sortConvs(s.conversations.map(c =>
+          c.id === convId ? { ...c, last_message_at: msg.created_at, last_preview: preview, last_sender_id: senderId } : c
+        )),
       }))
       _convChannel?.send({ type: 'broadcast', event: 'msg', payload: { msg } })
     }
@@ -404,8 +449,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
             return
           }
 
-          // I'm the recipient → acknowledge delivery
+          // I'm the recipient → acknowledge delivery + refresh sidebar preview
           markMessagesDelivered(msg.conversation_id, userId)
+          void setConvPreview(msg.conversation_id, msg.sender_id, msg)
 
           const viewingThread = state.currentConvId === msg.conversation_id
           const focused       = document.visibilityState === 'visible'
@@ -416,11 +462,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
           } else {
             set(s => ({
               unreadTotal: s.unreadTotal + 1,
-              conversations: s.conversations.map(c =>
+              conversations: sortConvs(s.conversations.map(c =>
                 c.id === msg.conversation_id
                   ? { ...c, unread_count: (c.unread_count ?? 0) + 1, last_message_at: msg.created_at }
                   : c
-              ),
+              )),
             }))
           }
 

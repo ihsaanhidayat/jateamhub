@@ -171,10 +171,14 @@ export default function ConversationList({ currentUserId, onNewChat, onSelectCon
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                   <span style={{
                     flex: 1, minWidth: 0, fontSize: 12,
-                    color: online ? 'var(--green, #22c55e)' : 'var(--silver4)',
+                    color: unread > 0 ? 'var(--silver2, var(--silver))' : 'var(--silver4)',
+                    fontWeight: unread > 0 ? 600 : 400,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
-                    {online ? 'online' : (other?.username ? `@${other.username}` : '')}
+                    {conv.last_preview
+                      ? <>{conv.last_sender_id === currentUserId && <span style={{ color: 'var(--silver4)' }}>Anda: </span>}{conv.last_preview}</>
+                      : online ? <span style={{ color: 'var(--green, #22c55e)' }}>online</span>
+                      : (other?.username ? `@${other.username}` : 'Mulai percakapan')}
                   </span>
                   {unread > 0 && (
                     <span style={{

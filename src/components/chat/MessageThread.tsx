@@ -35,6 +35,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   const reactToMsg  = useChatStore(s => s.reactToMsg)
   const setReplyTo  = useChatStore(s => s.setReplyTo)
   const lock        = useChatStore(s => s.lock)
+  const unreadAnchorId = useChatStore(s => s.unreadAnchorId)
   const [highlightId, setHighlightId] = useState<string | null>(null)
 
   const listRef   = useRef<HTMLDivElement>(null)
@@ -311,6 +312,15 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
 
         {rows.map(({ msg, day, showDate, cont }) => (
           <div key={msg.id} data-mid={msg.id} className={highlightId === msg.id ? 'chat-quote-flash' : undefined}>
+            {msg.id === unreadAnchorId && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0 10px' }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--accent)', opacity: 0.35 }} />
+                <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+                  Pesan belum dibaca
+                </span>
+                <div style={{ flex: 1, height: 1, background: 'var(--accent)', opacity: 0.35 }} />
+              </div>
+            )}
             {showDate && (
               <div style={{
                 display: 'flex', justifyContent: 'center', margin: '14px 0 10px',

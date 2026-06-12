@@ -445,6 +445,10 @@ export interface ChatConversation {
   profile_a?:       Pick<Profile, 'id' | 'full_name' | 'username' | 'avatar_url' | 'avatar_emoji' | 'emoji' | 'last_seen'>
   profile_b?:       Pick<Profile, 'id' | 'full_name' | 'username' | 'avatar_url' | 'avatar_emoji' | 'emoji' | 'last_seen'>
   unread_count?:    number
+  // Last-message preview (decrypted client-side in the store).
+  last_msg?:        { sender_id: string; content: string | null; message_type: string; file_name: string | null; is_encrypted: boolean } | null
+  last_preview?:    string
+  last_sender_id?:  string | null
 }
 
 // Reactions: emoji → array of user ids who reacted
@@ -503,11 +507,27 @@ export const getConversations = async (userId: string): Promise<ChatConversation
     unreadMap[row.conversation_id] = (unreadMap[row.conversation_id] ?? 0) + 1
   }
 
+  // Latest message per conversation (RLS-safe RPC) → sidebar preview.
+  const { data: lastRows } = await supabase.rpc('chat_last_messages')
+  const lastMap: Record<string, ChatConversation['last_msg']> = {}
+  for (const r of ((lastRows ?? []) as ChatMessage[])) {
+    if (!lastMap[r.conversation_id]) {
+      lastMap[r.conversation_id] = {
+        sender_id:    r.sender_id,
+        content:      r.content,
+        message_type: r.message_type,
+        file_name:    r.file_name,
+        is_encrypted: r.is_encrypted,
+      }
+    }
+  }
+
   return convs.map(c => ({
     ...c,
     profile_a:    pMap[c.participant_a] ?? null,
     profile_b:    pMap[c.participant_b] ?? null,
     unread_count: unreadMap[c.id] ?? 0,
+    last_msg:     lastMap[c.id] ?? null,
   }))
 }
 
