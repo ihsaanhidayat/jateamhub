@@ -125,8 +125,10 @@ export default function ChatInput({ senderId, otherName }: Props) {
     setText('')
     setEmojiOpen(false)
     resetHeight()
+    taRef.current?.focus()   // keep the keyboard open on mobile
     if (editing) await editText(editing.id, t, senderId)
     else await sendText(t, senderId)
+    taRef.current?.focus()
   }
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -329,6 +331,7 @@ export default function ChatInput({ senderId, otherName }: Props) {
             ) : (
               <button
                 onClick={handleSend}
+                onMouseDown={e => e.preventDefault()}
                 disabled={!canSend}
                 style={{
                   width: 44, height: 44, flexShrink: 0,

@@ -206,7 +206,16 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             fontWeight: peerTyping ? 600 : 400, minHeight: 14,
           }}>
-            {peerTyping ? 'mengetik…' : (statusText || (other?.username ? `@${other.username}` : ''))}
+            {peerTyping ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                mengetik
+                <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2 }}>
+                  {[0, 1, 2].map(i => (
+                    <span key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', animation: 'typingDot 1.2s infinite', animationDelay: `${i * 0.18}s` }} />
+                  ))}
+                </span>
+              </span>
+            ) : (statusText || (other?.username ? `@${other.username}` : ''))}
           </div>
         </div>
 
@@ -373,24 +382,6 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
           </div>
         ))}
 
-        {peerTyping && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 9 }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              background: 'var(--bg2)', border: '1px solid var(--border)',
-              borderRadius: '5px 16px 16px 16px',
-              padding: '11px 14px', boxShadow: '0 1px 2px rgba(0,0,0,.10)',
-            }}>
-              {[0, 1, 2].map(i => (
-                <span key={i} style={{
-                  width: 6, height: 6, borderRadius: '50%', background: 'var(--silver4)',
-                  display: 'inline-block', animation: 'typingDot 1.2s infinite',
-                  animationDelay: `${i * 0.18}s`,
-                }} />
-              ))}
-            </div>
-          </div>
-        )}
         <div ref={bottomRef} />
       </div>
 
