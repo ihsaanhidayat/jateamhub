@@ -115,6 +115,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
   const emojiCount = msg.message_type === 'text' && msg.content && !msg.reply_to ? emojiOnlyCount(msg.content) : 0
   const isBig   = emojiCount > 0 && emojiCount <= 3
   const isMedia = msg.message_type === 'image' || msg.message_type === 'video'
+  const hasCaption = isMedia && !!msg.content
   const bg      = isBig ? 'transparent' : isMine ? 'var(--accent)' : 'var(--bg2)'
   const textCol = isBig ? 'var(--silver)' : isMine ? 'white' : 'var(--silver)'
 
@@ -380,6 +381,12 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
           />
         )}
 
+        {hasCaption && (
+          <div style={{ padding: '5px 7px 1px', fontSize: 14, lineHeight: 1.4, whiteSpace: 'pre-wrap', color: textCol }}>
+            {linkify(msg.content ?? '')}
+          </div>
+        )}
+
         {msg.message_type === 'audio' && msg.file_url && (
           <AudioMessage src={msg.file_url} isMine={isMine} />
         )}
@@ -419,7 +426,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
             display: 'flex', alignItems: 'center', gap: 4,
             justifyContent: isMine ? 'flex-end' : 'flex-start',
             cursor: isMine ? 'pointer' : 'default',
-            ...(isMedia ? {
+            ...(isMedia && !hasCaption ? {
               position: 'absolute', right: 8, bottom: 8,
               padding: '2px 7px', borderRadius: 10,
               background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(2px)',

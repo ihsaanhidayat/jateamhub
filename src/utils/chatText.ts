@@ -5,8 +5,8 @@ export function messagePreview(msg: {
   message_type: string; content: string | null; file_name?: string | null
 }): string {
   switch (msg.message_type) {
-    case 'image':    return '📷 Foto'
-    case 'video':    return '🎬 Video'
+    case 'image':    return msg.content ? `📷 ${msg.content}` : '📷 Foto'
+    case 'video':    return msg.content ? `🎬 ${msg.content}` : '🎬 Video'
     case 'audio':    return '🎵 Pesan suara'
     case 'document': return '📎 ' + (msg.file_name ?? 'Dokumen')
     default:         return msg.content ?? ''

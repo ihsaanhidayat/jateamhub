@@ -119,7 +119,7 @@ interface ChatState {
   closeConvChannel:  () => void
   startConv:         (createdBy: string, participantB: string) => Promise<ChatConversation | null>
   sendText:          (text: string, senderId: string) => Promise<void>
-  sendFile:          (file: File, senderId: string) => Promise<void>
+  sendFile:          (file: File, senderId: string, caption?: string) => Promise<void>
   removeMsg:         (msgId: string) => Promise<void>
   clearConv:         () => Promise<void>
   reactToMsg:        (msgId: string, emoji: string, userId: string) => Promise<void>
@@ -380,10 +380,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ sending: false })
   },
 
-  sendFile: async (file, senderId) => {
+  sendFile: async (file, senderId, caption) => {
     const convId = get().currentConvId
     if (!convId) return
     const replyId = get().replyTo?.id ?? null
+    const cap = caption?.trim() || ''
     set({ sending: true, replyTo: null })
     get().resetIdle()
     const result = await uploadChatFile(convId, file)
@@ -393,11 +394,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
       : file.type.startsWith('video/') ? 'video'
       : file.type.startsWith('audio/') ? 'audio'
       : 'document'
-    const msg = await sendMessage(convId, senderId, null, type, result.url, result.name, result.size, false, replyId)
+
+    // Encrypt the caption (if any) like a text message.
+    let stored: string | null = cap || null, encrypted = false
+    if (cap) {
+      const partnerId = partnerOf(get().conversations.find(c => c.id === convId), senderId)
+      if (partnerId) {
+        const key = await getConvKey(convId, partnerId)
+        if (key) { try { stored = await encryptText(key, cap); encrypted = true } catch { /* plaintext */ } }
+      }
+    }
+
+    const msg = await sendMessage(convId, senderId, stored, type, result.url, result.name, result.size, encrypted, replyId)
     if (msg) {
-      const preview = messagePreview({ message_type: type, content: null, file_name: result.name })
+      const localMsg = encrypted ? { ...msg, content: cap } : msg
+      const preview = messagePreview({ message_type: type, content: cap || null, file_name: result.name })
       set(s => ({
-        messages: s.messages.some(m => m.id === msg.id) ? s.messages : [...s.messages, msg],
+        messages: s.messages.some(m => m.id === msg.id) ? s.messages : [...s.messages, localMsg],
         conversations: sortConvs(s.conversations.map(c =>
           c.id === convId ? { ...c, last_message_at: msg.created_at, last_preview: preview, last_sender_id: senderId } : c
         )),

@@ -27,6 +27,9 @@ export default function ChatInput({ senderId, otherName }: Props) {
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [recording, setRecording] = useState(false)
   const [recordSecs, setRecordSecs] = useState(0)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingUrl, setPendingUrl]   = useState<string | null>(null)
+  const [caption, setCaption]         = useState('')
   const mrRef     = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
@@ -140,7 +143,26 @@ export default function ChatInput({ senderId, otherName }: Props) {
       return
     }
     setFileErr('')
-    await sendFile(file, senderId)
+    // Images/videos → preview with optional caption; others send immediately.
+    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+      setPendingFile(file)
+      setPendingUrl(URL.createObjectURL(file))
+      setCaption('')
+    } else {
+      await sendFile(file, senderId)
+    }
+  }
+
+  const closePending = () => {
+    if (pendingUrl) URL.revokeObjectURL(pendingUrl)
+    setPendingFile(null); setPendingUrl(null); setCaption('')
+  }
+
+  const sendPending = async () => {
+    if (!pendingFile || sending) return
+    const f = pendingFile, cap = caption
+    closePending()
+    await sendFile(f, senderId, cap)
   }
 
   if (!currentConvId) return null
@@ -157,6 +179,37 @@ export default function ChatInput({ senderId, otherName }: Props) {
 
   return (
     <div style={{ flexShrink: 0, padding: '10px 14px max(14px, env(safe-area-inset-bottom))', borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
+      {pendingFile && pendingUrl && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) closePending() }}
+          style={{ position: 'fixed', inset: 0, zIndex: 230, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', padding: 16 }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'white', flexShrink: 0 }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>{otherName ? `Kirim ke ${otherName}` : 'Kirim media'}</span>
+            <button onClick={closePending} style={{ width: 38, height: 38, background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: '50%', cursor: 'pointer', color: 'white', fontSize: 22, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+          </div>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0, padding: '12px 0' }}>
+            {pendingFile.type.startsWith('image/')
+              ? <img src={pendingUrl} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 12 }} />
+              : <video src={pendingUrl} controls style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12 }} />}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+            <input
+              value={caption}
+              onChange={e => setCaption(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendPending() } }}
+              placeholder="Tambah keterangan…"
+              autoFocus
+              style={{ flex: 1, height: 46, padding: '0 16px', boxSizing: 'border-box', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 23, color: 'var(--silver)', fontSize: 14, fontFamily: 'var(--font)', outline: 'none' }}
+            />
+            <button onClick={sendPending} disabled={sending} title="Kirim" style={{ width: 46, height: 46, flexShrink: 0, background: 'var(--accent)', border: 'none', borderRadius: '50%', cursor: sending ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {sending
+                ? <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.35)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
+                : <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>}
+            </button>
+          </div>
+        </div>
+      )}
       {editing && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8,
