@@ -61,24 +61,29 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
     setNewCount(0)
   }
 
+  const scrollRaf = useRef(0)
   const onScroll = () => {
-    const el = listRef.current
-    if (!el) return
-    const dist = el.scrollHeight - el.scrollTop - el.clientHeight
-    atBottom.current = dist < 120
-    setShowFab(dist > 240)
-    if (atBottom.current) setNewCount(0)
+    if (scrollRaf.current) return
+    scrollRaf.current = requestAnimationFrame(() => {
+      scrollRaf.current = 0
+      const el = listRef.current
+      if (!el) return
+      const dist = el.scrollHeight - el.scrollTop - el.clientHeight
+      atBottom.current = dist < 120
+      setShowFab(dist > 240)
+      if (atBottom.current) setNewCount(0)
 
-    // Near the top → load older history, preserving scroll position.
-    if (el.scrollTop < 80 && hasMoreOlder && !loadingOlder) {
-      const prevH = el.scrollHeight, prevTop = el.scrollTop
-      loadOlder(currentUserId).then(n => {
-        if (n > 0) requestAnimationFrame(() => {
-          const e2 = listRef.current
-          if (e2) e2.scrollTop = e2.scrollHeight - prevH + prevTop
+      // Near the top → load older history, preserving scroll position.
+      if (el.scrollTop < 80 && hasMoreOlder && !loadingOlder) {
+        const prevH = el.scrollHeight, prevTop = el.scrollTop
+        loadOlder(currentUserId).then(n => {
+          if (n > 0) requestAnimationFrame(() => {
+            const e2 = listRef.current
+            if (e2) e2.scrollTop = e2.scrollHeight - prevH + prevTop
+          })
         })
-      })
-    }
+      }
+    })
   }
 
   // Stick to bottom on a new message at the bottom; never on prepended history.
@@ -166,10 +171,10 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   }, [messages])
 
   return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column',
-      minWidth: 0, minHeight: 0, background: 'var(--bg)', position: 'relative',
-    }}>
+    <div
+      className="chat-wallpaper"
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, position: 'relative' }}
+    >
       {/* Thread header — fixed; only the message list below scrolls */}
       <div style={{
         flexShrink: 0,
@@ -311,7 +316,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
       <div
         ref={listRef}
         onScroll={onScroll}
-        className="chat-msglist chat-wallpaper"
+        className="chat-msglist"
         style={{
           flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
           touchAction: 'pan-y', padding: '14px 16px 10px', position: 'relative',

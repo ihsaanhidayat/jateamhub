@@ -41,10 +41,20 @@ export default function ChatPage({ onClose }: Props) {
     const el = rootRef.current
     if (!el) return
     const vv = window.visualViewport
+    let raf = 0, lastH = -1, lastTop = -1
+    // Batch via rAF and only write when the value actually changed, so
+    // scroll-driven viewport events don't thrash layout every frame.
     const apply = () => {
-      const h = vv?.height ?? window.innerHeight
-      el.style.height = `${h}px`
-      el.style.top = `${vv?.offsetTop ?? 0}px`
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        const node = rootRef.current
+        if (!node) return
+        const h   = Math.round(vv?.height ?? window.innerHeight)
+        const top = Math.round(vv?.offsetTop ?? 0)
+        if (h !== lastH)   { node.style.height = `${h}px`; lastH = h }
+        if (top !== lastTop) { node.style.top = `${top}px`; lastTop = top }
+      })
     }
     apply()
     vv?.addEventListener('resize', apply)
@@ -52,6 +62,7 @@ export default function ChatPage({ onClose }: Props) {
     window.addEventListener('resize', apply)
     window.addEventListener('orientationchange', apply)
     return () => {
+      if (raf) cancelAnimationFrame(raf)
       vv?.removeEventListener('resize', apply)
       vv?.removeEventListener('scroll', apply)
       window.removeEventListener('resize', apply)
@@ -122,7 +133,7 @@ export default function ChatPage({ onClose }: Props) {
         display: 'flex', flexDirection: 'column', minHeight: 0,
         animation: 'fadeUp 180ms ease',
       }}
-      onPointerMove={resetIdle}
+      onPointerDown={resetIdle}
       onKeyDown={resetIdle}
     >
       {/* Page header */}
