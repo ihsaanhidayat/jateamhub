@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, memo } from 'react'
 import type { ChatMessage } from '../../utils/supabaseClient'
 import { QUICK_REACTIONS } from './emojiData'
 import { linkify, emojiOnlyCount, messagePreview } from '../../utils/chatText'
+import AudioMessage from './AudioMessage'
 
 interface Props {
   msg:            ChatMessage
@@ -356,7 +357,11 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
           />
         )}
 
-        {(msg.message_type === 'document' || msg.message_type === 'audio') && msg.file_url && (
+        {msg.message_type === 'audio' && msg.file_url && (
+          <AudioMessage src={msg.file_url} isMine={isMine} />
+        )}
+
+        {msg.message_type === 'document' && msg.file_url && (
           <a
             href={msg.file_url}
             target="_blank"

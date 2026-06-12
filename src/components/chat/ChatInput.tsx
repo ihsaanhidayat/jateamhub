@@ -25,8 +25,60 @@ export default function ChatInput({ senderId, otherName }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null)
   const [fileErr, setFileErr] = useState('')
   const [emojiOpen, setEmojiOpen] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [recordSecs, setRecordSecs] = useState(0)
+  const mrRef     = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
+  const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+  const cancelRef = useRef(false)
 
   const resetHeight = () => { if (taRef.current) taRef.current.style.height = '24px' }
+
+  const startRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setFileErr('Perekaman suara tidak didukung di perangkat ini.'); setTimeout(() => setFileErr(''), 3000); return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+        : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : ''
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+      chunksRef.current = []
+      cancelRef.current = false
+      mr.ondataavailable = e => { if (e.data.size) chunksRef.current.push(e.data) }
+      mr.onstop = async () => {
+        streamRef.current?.getTracks().forEach(t => t.stop())
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+        setRecording(false); setRecordSecs(0)
+        if (cancelRef.current) return
+        const type = mr.mimeType || 'audio/webm'
+        const blob = new Blob(chunksRef.current, { type })
+        if (blob.size < 800) return   // too short — ignore
+        const ext = type.includes('mp4') ? 'm4a' : 'webm'
+        await sendFile(new File([blob], `Pesan suara ${Date.now()}.${ext}`, { type }), senderId)
+      }
+      mr.start()
+      mrRef.current = mr
+      setRecording(true); setRecordSecs(0)
+      timerRef.current = setInterval(() => setRecordSecs(s => s + 1), 1000)
+    } catch {
+      setFileErr('Tidak dapat mengakses mikrofon.'); setTimeout(() => setFileErr(''), 3000)
+    }
+  }
+
+  const stopRecording = (cancel: boolean) => {
+    cancelRef.current = cancel
+    try { mrRef.current?.stop() } catch { /* ignore */ }
+  }
+
+  // Cleanup on unmount.
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    if (timerRef.current) clearInterval(timerRef.current)
+  }, [])
 
   // Focus the composer when starting a reply.
   useEffect(() => { if (replyTo) taRef.current?.focus() }, [replyTo])
@@ -94,6 +146,7 @@ export default function ChatInput({ senderId, otherName }: Props) {
   if (!currentConvId) return null
 
   const canSend = !!text.trim() && !sending
+  const showMic = !text.trim() && !editing
   const iconBtn = (active: boolean): React.CSSProperties => ({
     width: 34, height: 34, flexShrink: 0,
     background: active ? 'var(--accent-light)' : 'none', border: 'none',
@@ -153,61 +206,94 @@ export default function ChatInput({ senderId, otherName }: Props) {
         }}>{fileErr}</div>
       )}
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', position: 'relative' }}>
-        {emojiOpen && <EmojiPicker onPick={insertEmoji} onClose={() => setEmojiOpen(false)} />}
+        {recording ? (
+          <>
+            <div style={{
+              flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: 44,
+              padding: '0 8px 0 12px', background: 'var(--bg4)', border: '1px solid var(--border2)',
+              borderRadius: 22, boxSizing: 'border-box',
+            }}>
+              <button onClick={() => stopRecording(true)} title="Batalkan" style={{ width: 32, height: 32, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--red)', animation: 'pulse 1.2s infinite', flexShrink: 0 }} />
+              <span style={{ fontSize: 14, color: 'var(--silver)', fontFamily: 'var(--mono)' }}>
+                {`${Math.floor(recordSecs / 60)}:${(recordSecs % 60).toString().padStart(2, '0')}`}
+              </span>
+              <span style={{ flex: 1, textAlign: 'right', fontSize: 11.5, color: 'var(--silver4)' }}>Merekam…</span>
+            </div>
+            <button onClick={() => stopRecording(false)} title="Kirim" style={{ width: 44, height: 44, flexShrink: 0, background: 'var(--accent)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </>
+        ) : (
+          <>
+            {emojiOpen && <EmojiPicker onPick={insertEmoji} onClose={() => setEmojiOpen(false)} />}
 
-        {/* Composer pill: emoji + attachment + textarea */}
-        <div style={{
-          flex: 1, display: 'flex', alignItems: 'flex-end', gap: 4,
-          background: 'var(--bg4)', border: '1px solid var(--border2)',
-          borderRadius: 22, padding: '3px 6px 3px 5px', minHeight: 44, boxSizing: 'border-box',
-        }}>
-          <button onClick={() => setEmojiOpen(v => !v)} disabled={sending} title="Emoji" style={iconBtn(emojiOpen)}>😊</button>
-          <button onClick={() => fileRef.current?.click()} disabled={sending} title="Lampirkan file" style={iconBtn(false)}>
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-          </button>
-          <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }} onChange={handleFile} />
+            {/* Composer pill: emoji + attachment + textarea */}
+            <div style={{
+              flex: 1, display: 'flex', alignItems: 'flex-end', gap: 4,
+              background: 'var(--bg4)', border: '1px solid var(--border2)',
+              borderRadius: 22, padding: '3px 6px 3px 5px', minHeight: 44, boxSizing: 'border-box',
+            }}>
+              <button onClick={() => setEmojiOpen(v => !v)} disabled={sending} title="Emoji" style={iconBtn(emojiOpen)}>😊</button>
+              <button onClick={() => fileRef.current?.click()} disabled={sending} title="Lampirkan file" style={iconBtn(false)}>
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }} onChange={handleFile} />
 
-          <textarea
-            ref={taRef}
-            value={text}
-            onChange={e => {
-              setText(e.target.value)
-              if (e.target.value.trim()) notifyTyping()
-              const el = e.target
-              el.style.height = 'auto'
-              el.style.height = Math.min(el.scrollHeight, 120) + 'px'
-            }}
-            onKeyDown={handleKey}
-            placeholder="Ketik pesan..."
-            rows={1}
-            disabled={sending}
-            style={{
-              flex: 1, height: 24, maxHeight: 120, padding: '7px 6px',
-              resize: 'none', overflow: 'auto', background: 'none', border: 'none',
-              fontSize: 14, color: 'var(--silver)', fontFamily: 'var(--font)',
-              outline: 'none', lineHeight: 1.4, boxSizing: 'content-box',
-            }}
-          />
-        </div>
+              <textarea
+                ref={taRef}
+                value={text}
+                onChange={e => {
+                  setText(e.target.value)
+                  if (e.target.value.trim()) notifyTyping()
+                  const el = e.target
+                  el.style.height = 'auto'
+                  el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+                }}
+                onKeyDown={handleKey}
+                placeholder="Ketik pesan..."
+                rows={1}
+                disabled={sending}
+                style={{
+                  flex: 1, height: 24, maxHeight: 120, padding: '7px 6px',
+                  resize: 'none', overflow: 'auto', background: 'none', border: 'none',
+                  fontSize: 14, color: 'var(--silver)', fontFamily: 'var(--font)',
+                  outline: 'none', lineHeight: 1.4, boxSizing: 'content-box',
+                }}
+              />
+            </div>
 
-        {/* Send */}
-        <button
-          onClick={handleSend}
-          disabled={!canSend}
-          style={{
-            width: 44, height: 44, flexShrink: 0,
-            background: canSend ? 'var(--accent)' : 'var(--bg4)',
-            border: canSend ? 'none' : '1px solid var(--border2)',
-            borderRadius: '50%', cursor: canSend ? 'pointer' : 'not-allowed',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 150ms, transform 100ms',
-          }}
-        >
-          {sending
-            ? <span style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,0.35)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
-            : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={canSend ? 'white' : 'var(--silver4)'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          }
-        </button>
+            {/* Mic (empty) or Send */}
+            {showMic ? (
+              <button onClick={startRecording} disabled={sending} title="Rekam pesan suara" style={{
+                width: 44, height: 44, flexShrink: 0, background: 'var(--accent)', border: 'none',
+                borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </button>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={!canSend}
+                style={{
+                  width: 44, height: 44, flexShrink: 0,
+                  background: canSend ? 'var(--accent)' : 'var(--bg4)',
+                  border: canSend ? 'none' : '1px solid var(--border2)',
+                  borderRadius: '50%', cursor: canSend ? 'pointer' : 'not-allowed',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'background 150ms, transform 100ms',
+                }}
+              >
+                {sending
+                  ? <span style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,0.35)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
+                  : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={canSend ? 'white' : 'var(--silver4)'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                }
+              </button>
+            )}
+          </>
+        )}
       </div>
     </div>
   )
