@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import {
   supabase,
   getConversations, getMessages, createConversation, sendMessage,
-  uploadChatFile, markMessagesRead, markMessagesDelivered, deleteMessage,
+  uploadChatFile, markMessagesRead, markMessagesDelivered, deleteMessage, editMessage,
   clearConversationMessages, toggleReaction, updateLastSeen,
   getChatEnabled, setChatEnabled as dbSetChatEnabled,
   type ChatConversation, type ChatMessage,
@@ -102,6 +102,7 @@ interface ChatState {
   onlineUsers:   Record<string, boolean>   // userId → online
   peerTyping:    boolean                    // partner is typing in the open thread
   replyTo:       ChatMessage | null         // message being replied to (composer)
+  editing:       ChatMessage | null         // message being edited (composer)
   unreadAnchorId: string | null             // first unread message at thread open
   loading:       boolean
   msgLoading:    boolean
@@ -123,6 +124,8 @@ interface ChatState {
   reactToMsg:        (msgId: string, emoji: string, userId: string) => Promise<void>
   notifyTyping:      () => void
   setReplyTo:        (msg: ChatMessage | null) => void
+  setEditing:        (msg: ChatMessage | null) => void
+  editText:          (msgId: string, text: string, senderId: string) => Promise<void>
 
   // Realtime — global channel + presence owned by App.tsx
   _realtimeSub: (() => void) | null
@@ -198,7 +201,7 @@ window.addEventListener('jateamhub-logout', () => {
   useChatStore.setState({
     isLocked: true, currentConvId: null, messages: [],
     conversations: [], unreadTotal: 0, onlineUsers: {}, encReady: false,
-    replyTo: null, unreadAnchorId: null, _realtimeSub: null,
+    replyTo: null, editing: null, unreadAnchorId: null, _realtimeSub: null,
   })
 })
 
@@ -215,6 +218,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   onlineUsers:   {},
   peerTyping:    false,
   replyTo:       null,
+  editing:       null,
   unreadAnchorId: null,
   loading:       false,
   msgLoading:    false,
@@ -258,7 +262,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (_convChannel) { _convChannel.unsubscribe(); _convChannel = null }
 
     if (_typingClear) { clearTimeout(_typingClear); _typingClear = null }
-    set({ peerTyping: false, replyTo: null, unreadAnchorId: null })
+    set({ peerTyping: false, replyTo: null, editing: null, unreadAnchorId: null })
 
     if (!id) { set({ currentConvId: null, messages: [] }); return }
 
@@ -306,6 +310,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       })
       .on('broadcast', { event: 'del' }, ({ payload }) => {
         set(s => ({ messages: s.messages.filter(m => m.id !== payload.id) }))
+      })
+      .on('broadcast', { event: 'edit' }, async ({ payload }) => {
+        const { id: mid, content, is_encrypted, edited_at, sender_id } = payload
+        let text = content as string
+        if (is_encrypted && content) {
+          const key = await getConvKey(id, sender_id)
+          text = key ? await decryptText(key, content).catch(() => '🔒') : '🔒 Pesan terenkripsi'
+        }
+        set(s => ({ messages: s.messages.map(m => m.id === mid ? { ...m, content: text, is_encrypted, edited_at } : m) }))
       })
       .on('broadcast', { event: 'clear' }, () => set({ messages: [] }))
       .on('broadcast', { event: 'typing' }, () => {
@@ -411,7 +424,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
     _convChannel?.send({ type: 'broadcast', event: 'typing', payload: {} })
   },
 
-  setReplyTo: (msg) => set({ replyTo: msg }),
+  setReplyTo: (msg) => set({ replyTo: msg, editing: null }),
+
+  setEditing: (msg) => set({ editing: msg, replyTo: null }),
+
+  editText: async (msgId, text, senderId) => {
+    const body = text.trim()
+    const convId = get().currentConvId
+    if (!body || !convId) { set({ editing: null }); return }
+
+    const partnerId = partnerOf(get().conversations.find(c => c.id === convId), senderId)
+    let stored = body, encrypted = false
+    if (partnerId) {
+      const key = await getConvKey(convId, partnerId)
+      if (key) { try { stored = await encryptText(key, body); encrypted = true } catch { /* plaintext */ } }
+    }
+    const editedAt = new Date().toISOString()
+    await editMessage(msgId, stored, encrypted)
+    set(s => ({
+      editing: null,
+      messages: s.messages.map(m =>
+        m.id === msgId ? { ...m, content: body, is_encrypted: encrypted, edited_at: editedAt } : m),
+    }))
+    _convChannel?.send({
+      type: 'broadcast', event: 'edit',
+      payload: { id: msgId, content: stored, is_encrypted: encrypted, edited_at: editedAt, sender_id: senderId },
+    })
+  },
 
   reactToMsg: async (msgId, emoji, userId) => {
     // Optimistic toggle
@@ -506,6 +545,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   read_at:      msg.read_at,
                   is_read:      msg.is_read,
                   reactions:    msg.reactions ?? m.reactions,
+                  edited_at:    msg.edited_at,
                 } : m),
           }))
         }

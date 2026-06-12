@@ -16,6 +16,9 @@ export default function ChatInput({ senderId, otherName }: Props) {
   const notifyTyping  = useChatStore(s => s.notifyTyping)
   const replyTo       = useChatStore(s => s.replyTo)
   const setReplyTo    = useChatStore(s => s.setReplyTo)
+  const editing       = useChatStore(s => s.editing)
+  const setEditing    = useChatStore(s => s.setEditing)
+  const editText      = useChatStore(s => s.editText)
 
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -27,6 +30,21 @@ export default function ChatInput({ senderId, otherName }: Props) {
 
   // Focus the composer when starting a reply.
   useEffect(() => { if (replyTo) taRef.current?.focus() }, [replyTo])
+
+  // Load the message text into the composer when starting an edit.
+  useEffect(() => {
+    if (editing) {
+      setText(editing.content ?? '')
+      requestAnimationFrame(() => {
+        const el = taRef.current
+        if (!el) return
+        el.focus()
+        el.setSelectionRange(el.value.length, el.value.length)
+        el.style.height = 'auto'
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+      })
+    }
+  }, [editing])
 
   const insertEmoji = (emoji: string) => {
     const el = taRef.current
@@ -44,13 +62,16 @@ export default function ChatInput({ senderId, otherName }: Props) {
     })
   }
 
+  const cancelEdit = () => { setEditing(null); setText(''); resetHeight() }
+
   const handleSend = async () => {
     if (!text.trim() || sending) return
     const t = text
     setText('')
     setEmojiOpen(false)
     resetHeight()
-    await sendText(t, senderId)
+    if (editing) await editText(editing.id, t, senderId)
+    else await sendText(t, senderId)
   }
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -83,7 +104,23 @@ export default function ChatInput({ senderId, otherName }: Props) {
 
   return (
     <div style={{ flexShrink: 0, padding: '10px 14px max(14px, env(safe-area-inset-bottom))', borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
-      {replyTo && (
+      {editing && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8,
+          padding: '7px 8px 7px 11px', background: 'var(--bg4)', borderRadius: 10,
+          borderLeft: '3px solid var(--accent)', animation: 'popIn 130ms ease',
+        }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--accent)' }}>Mengedit pesan</div>
+            <div style={{ fontSize: 12, color: 'var(--silver3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {editing.content}
+            </div>
+          </div>
+          <button onClick={cancelEdit} title="Batal edit" style={{ width: 28, height: 28, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%', color: 'var(--silver3)', fontSize: 18, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+        </div>
+      )}
+      {replyTo && !editing && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8,
           padding: '7px 8px 7px 11px', background: 'var(--bg4)', borderRadius: 10,

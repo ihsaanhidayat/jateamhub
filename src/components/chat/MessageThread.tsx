@@ -34,6 +34,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   const clearConv   = useChatStore(s => s.clearConv)
   const reactToMsg  = useChatStore(s => s.reactToMsg)
   const setReplyTo  = useChatStore(s => s.setReplyTo)
+  const setEditing  = useChatStore(s => s.setEditing)
   const lock        = useChatStore(s => s.lock)
   const unreadAnchorId = useChatStore(s => s.unreadAnchorId)
   const [highlightId, setHighlightId] = useState<string | null>(null)
@@ -344,6 +345,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
               onDelete={removeMsg}
               onReact={onReact}
               onReply={setReplyTo}
+              onEdit={setEditing}
               onQuoteJump={onQuoteJump}
             />
           </div>

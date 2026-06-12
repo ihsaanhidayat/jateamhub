@@ -469,6 +469,7 @@ export interface ChatMessage {
   reactions:        MessageReactions
   is_encrypted:     boolean         // content berisi ciphertext (E2EE)
   reply_to:         string | null   // id pesan yang dibalas
+  edited_at:        string | null   // waktu terakhir diedit
   created_at:       string
   deleted_at:       string | null
 }
@@ -668,6 +669,11 @@ export const toggleReaction = async (
 export const deleteMessage = async (messageId: string) =>
   supabase.from('chat_messages')
     .update({ deleted_at: new Date().toISOString() })
+    .eq('id', messageId)
+
+export const editMessage = async (messageId: string, content: string, isEncrypted: boolean) =>
+  supabase.from('chat_messages')
+    .update({ content, is_encrypted: isEncrypted, edited_at: new Date().toISOString() })
     .eq('id', messageId)
 
 // ── Presence: heartbeat last_seen ─────────────────────────────

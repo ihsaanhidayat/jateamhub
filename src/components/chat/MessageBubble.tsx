@@ -13,8 +13,11 @@ interface Props {
   onDelete?:      (id: string) => void
   onReact?:       (id: string, emoji: string) => void
   onReply?:       (msg: ChatMessage) => void
+  onEdit?:        (msg: ChatMessage) => void
   onQuoteJump?:   (id: string) => void
 }
+
+const EDIT_WINDOW_MS = 15 * 60 * 1000
 
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
   useEffect(() => {
@@ -96,7 +99,7 @@ const FileIcon = ({ name }: { name: string }) => {
   return <span style={{ fontSize: 22 }}>{icons[ext] ?? '📎'}</span>
 }
 
-function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, onDelete, onReact, onReply, onQuoteJump }: Props) {
+function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, onDelete, onReact, onReply, onEdit, onQuoteJump }: Props) {
   const [showInfo,    setShowInfo]    = useState(false)
   const [showReact,   setShowReact]   = useState(false)
   const [hover,       setHover]       = useState(false)
@@ -116,6 +119,9 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
     setHeartFx(true)
     setTimeout(() => setHeartFx(false), 700)
   }
+
+  const canEdit = isMine && msg.message_type === 'text' && !!onEdit &&
+    (Date.now() - new Date(msg.created_at).getTime() < EDIT_WINDOW_MS)
 
   // Corner radii — tail on the first bubble of a group, tighter when continued.
   const radius = isMine
@@ -216,12 +222,26 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
                 >{emoji}</button>
               )
             })}
+            {canEdit && (
+              <button
+                onClick={() => { onEdit!(msg); setShowReact(false) }}
+                title="Edit pesan"
+                style={{
+                  width: 34, height: 34, marginLeft: 2,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  borderLeft: '1px solid var(--border)', borderRadius: 0,
+                  color: 'var(--silver2, var(--silver))', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+            )}
             {isMine && onDelete && (
               <button
                 onClick={() => { onDelete(msg.id); setShowReact(false) }}
                 title="Hapus pesan"
                 style={{
-                  width: 34, height: 34, marginLeft: 2,
+                  width: 34, height: 34, marginLeft: canEdit ? 0 : 2,
                   background: 'none', border: 'none', cursor: 'pointer',
                   borderLeft: '1px solid var(--border)', borderRadius: 0,
                   color: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -325,6 +345,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
             fontSize: 10, lineHeight: 1.4,
           }}
         >
+          {msg.edited_at && <span style={{ opacity: 0.7, fontStyle: 'italic' }}>diedit</span>}
           <span style={{ opacity: isMedia ? 0.95 : 0.8 }}>{fmtTime(msg.created_at)}</span>
           {isMine && <Ticks delivered={!!msg.delivered_at} read={!!msg.read_at} light={isBig} />}
         </div>
