@@ -33,7 +33,9 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   const removeMsg   = useChatStore(s => s.removeMsg)
   const clearConv   = useChatStore(s => s.clearConv)
   const reactToMsg  = useChatStore(s => s.reactToMsg)
+  const setReplyTo  = useChatStore(s => s.setReplyTo)
   const lock        = useChatStore(s => s.lock)
+  const [highlightId, setHighlightId] = useState<string | null>(null)
 
   const listRef   = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -95,7 +97,24 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
     [reactToMsg, currentUserId],
   )
 
+  // Jump to a quoted message + flash it.
+  const onQuoteJump = useCallback((id: string) => {
+    const el = listRef.current?.querySelector(`[data-mid="${id}"]`) as HTMLElement | null
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightId(id)
+    setTimeout(() => setHighlightId(null), 1300)
+  }, [])
+
   const other = conv.participant_a === currentUserId ? conv.profile_b : conv.profile_a
+  const otherName = other?.full_name ?? other?.username ?? 'Pesan'
+
+  // Fast id → message lookup for resolving reply quotes.
+  const byId = useMemo(() => {
+    const m = new Map<string, typeof messages[number]>()
+    for (const x of messages) m.set(x.id, x)
+    return m
+  }, [messages])
   const otherId = other?.id
   const isOnline = !!otherId && (
     onlineUsers[otherId] === true ||
@@ -291,7 +310,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
         )}
 
         {rows.map(({ msg, day, showDate, cont }) => (
-          <div key={msg.id}>
+          <div key={msg.id} data-mid={msg.id} className={highlightId === msg.id ? 'chat-quote-flash' : undefined}>
             {showDate && (
               <div style={{
                 display: 'flex', justifyContent: 'center', margin: '14px 0 10px',
@@ -310,8 +329,12 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
               isMine={msg.sender_id === currentUserId}
               currentUserId={currentUserId}
               cont={cont}
+              quoted={msg.reply_to ? (byId.get(msg.reply_to) ?? null) : null}
+              quotedName={otherName}
               onDelete={removeMsg}
               onReact={onReact}
+              onReply={setReplyTo}
+              onQuoteJump={onQuoteJump}
             />
           </div>
         ))}
@@ -360,7 +383,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
         </button>
       )}
 
-      <ChatInput senderId={currentUserId} />
+      <ChatInput senderId={currentUserId} otherName={otherName} />
     </div>
   )
 }

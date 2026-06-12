@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef, memo } from 'react'
 import type { ChatMessage } from '../../utils/supabaseClient'
 import { QUICK_REACTIONS } from './emojiData'
-import { linkify, emojiOnlyCount } from '../../utils/chatText'
+import { linkify, emojiOnlyCount, messagePreview } from '../../utils/chatText'
 
 interface Props {
   msg:            ChatMessage
   isMine:         boolean
   currentUserId?: string
   cont?:          boolean    // continuation of the same sender's group
+  quoted?:        ChatMessage | null   // resolved message this one replies to
+  quotedName?:    string               // display name of the quoted sender
   onDelete?:      (id: string) => void
   onReact?:       (id: string, emoji: string) => void
+  onReply?:       (msg: ChatMessage) => void
+  onQuoteJump?:   (id: string) => void
 }
 
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
@@ -92,7 +96,7 @@ const FileIcon = ({ name }: { name: string }) => {
   return <span style={{ fontSize: 22 }}>{icons[ext] ?? '📎'}</span>
 }
 
-function MessageBubble({ msg, isMine, currentUserId, cont, onDelete, onReact }: Props) {
+function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, onDelete, onReact, onReply, onQuoteJump }: Props) {
   const [showInfo,    setShowInfo]    = useState(false)
   const [showReact,   setShowReact]   = useState(false)
   const [hover,       setHover]       = useState(false)
@@ -100,7 +104,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, onDelete, onReact }: 
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const emojiCount = msg.message_type === 'text' && msg.content ? emojiOnlyCount(msg.content) : 0
+  const emojiCount = msg.message_type === 'text' && msg.content && !msg.reply_to ? emojiOnlyCount(msg.content) : 0
   const isBig   = emojiCount > 0 && emojiCount <= 3
   const isMedia = msg.message_type === 'image' || msg.message_type === 'video'
   const bg      = isBig ? 'transparent' : isMine ? 'var(--accent)' : 'var(--bg2)'
@@ -182,6 +186,19 @@ function MessageBubble({ msg, isMine, currentUserId, cont, onDelete, onReact }: 
               animation: 'popIn 130ms ease',
             }}
           >
+            {onReply && (
+              <button
+                onClick={() => { onReply(msg); setShowReact(false) }}
+                title="Balas"
+                style={{
+                  width: 34, height: 34, marginRight: 2, background: 'none', border: 'none',
+                  borderRight: '1px solid var(--border)', borderRadius: 0, cursor: 'pointer',
+                  color: 'var(--silver2, var(--silver))', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+              </button>
+            )}
             {QUICK_REACTIONS.map(emoji => {
               const mine = !!currentUserId && (reactions[emoji]?.includes(currentUserId) ?? false)
               return (
@@ -213,6 +230,26 @@ function MessageBubble({ msg, isMine, currentUserId, cont, onDelete, onReact }: 
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
             )}
+          </div>
+        )}
+
+        {/* Quoted (reply) block */}
+        {msg.reply_to && (
+          <div
+            onClick={e => { e.stopPropagation(); if (quoted) onQuoteJump?.(quoted.id) }}
+            style={{
+              marginBottom: 5, cursor: quoted ? 'pointer' : 'default', overflow: 'hidden',
+              background: isMine ? 'rgba(255,255,255,0.16)' : 'var(--bg4)',
+              borderRadius: 8, padding: '5px 9px',
+              borderLeft: '3px solid ' + (isMine ? 'rgba(255,255,255,0.75)' : 'var(--accent)'),
+            }}
+          >
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: isMine ? 'white' : 'var(--accent)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {quoted ? (quoted.sender_id === currentUserId ? 'Anda' : (quotedName ?? 'Pesan')) : 'Pesan'}
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 }}>
+              {quoted ? messagePreview(quoted) : 'Pesan tidak tersedia'}
+            </div>
           </div>
         )}
 
@@ -344,21 +381,36 @@ function MessageBubble({ msg, isMine, currentUserId, cont, onDelete, onReact }: 
         )}
       </div>
 
-      {/* Hover trigger (desktop) to open the reaction bar */}
-      {onReact && hover && !showReact && (
-        <button
-          onClick={e => { e.stopPropagation(); setShowReact(true) }}
-          title="Beri reaksi"
-          style={{
-            width: 28, height: 28, flexShrink: 0, alignSelf: 'center',
-            background: 'var(--bg2)', border: '1px solid var(--border2)',
-            borderRadius: '50%', cursor: 'pointer', fontSize: 14,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--silver3)',
-          }}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-        </button>
+      {/* Hover triggers (desktop): reply + react */}
+      {hover && !showReact && (onReact || onReply) && (
+        <div style={{ display: 'flex', gap: 4, alignSelf: 'center', flexShrink: 0 }}>
+          {onReply && (
+            <button
+              onClick={e => { e.stopPropagation(); onReply(msg) }}
+              title="Balas"
+              style={{
+                width: 28, height: 28, background: 'var(--bg2)', border: '1px solid var(--border2)',
+                borderRadius: '50%', cursor: 'pointer', color: 'var(--silver3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+            </button>
+          )}
+          {onReact && (
+            <button
+              onClick={e => { e.stopPropagation(); setShowReact(true) }}
+              title="Beri reaksi"
+              style={{
+                width: 28, height: 28, background: 'var(--bg2)', border: '1px solid var(--border2)',
+                borderRadius: '50%', cursor: 'pointer', color: 'var(--silver3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            </button>
+          )}
+        </div>
       )}
 
       {lightboxSrc && (

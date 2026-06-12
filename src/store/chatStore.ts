@@ -75,6 +75,7 @@ interface ChatState {
   unreadTotal:   number
   onlineUsers:   Record<string, boolean>   // userId → online
   peerTyping:    boolean                    // partner is typing in the open thread
+  replyTo:       ChatMessage | null         // message being replied to (composer)
   loading:       boolean
   msgLoading:    boolean
   sending:       boolean
@@ -94,6 +95,7 @@ interface ChatState {
   clearConv:         () => Promise<void>
   reactToMsg:        (msgId: string, emoji: string, userId: string) => Promise<void>
   notifyTyping:      () => void
+  setReplyTo:        (msg: ChatMessage | null) => void
 
   // Realtime — global channel + presence owned by App.tsx
   _realtimeSub: (() => void) | null
@@ -184,6 +186,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   unreadTotal:   0,
   onlineUsers:   {},
   peerTyping:    false,
+  replyTo:       null,
   loading:       false,
   msgLoading:    false,
   sending:       false,
@@ -213,7 +216,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (_convChannel) { _convChannel.unsubscribe(); _convChannel = null }
 
     if (_typingClear) { clearTimeout(_typingClear); _typingClear = null }
-    set({ peerTyping: false })
+    set({ peerTyping: false, replyTo: null })
 
     if (!id) { set({ currentConvId: null, messages: [] }); return }
 
@@ -289,7 +292,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const convId = get().currentConvId
     if (!convId || !text.trim()) return
     const body = text.trim()
-    set({ sending: true })
+    const replyId = get().replyTo?.id ?? null
+    set({ sending: true, replyTo: null })
     get().resetIdle()
 
     // Encrypt for storage if a conversation key is available.
@@ -300,7 +304,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (key) { try { stored = await encryptText(key, body); encrypted = true } catch { /* fall back to plaintext */ } }
     }
 
-    const msg = await sendMessage(convId, senderId, stored, 'text', undefined, undefined, undefined, encrypted)
+    const msg = await sendMessage(convId, senderId, stored, 'text', undefined, undefined, undefined, encrypted, replyId)
     if (msg) {
       const localMsg = encrypted ? { ...msg, content: body } : msg   // show plaintext locally
       set(s => ({
@@ -318,7 +322,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendFile: async (file, senderId) => {
     const convId = get().currentConvId
     if (!convId) return
-    set({ sending: true })
+    const replyId = get().replyTo?.id ?? null
+    set({ sending: true, replyTo: null })
     get().resetIdle()
     const result = await uploadChatFile(convId, file)
     if (!result) { set({ sending: false }); return }
@@ -327,7 +332,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       : file.type.startsWith('video/') ? 'video'
       : file.type.startsWith('audio/') ? 'audio'
       : 'document'
-    const msg = await sendMessage(convId, senderId, null, type, result.url, result.name, result.size)
+    const msg = await sendMessage(convId, senderId, null, type, result.url, result.name, result.size, false, replyId)
     if (msg) {
       set(s => ({
         messages: s.messages.some(m => m.id === msg.id) ? s.messages : [...s.messages, msg],
@@ -360,6 +365,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     _lastTypingSent = now
     _convChannel?.send({ type: 'broadcast', event: 'typing', payload: {} })
   },
+
+  setReplyTo: (msg) => set({ replyTo: msg }),
 
   reactToMsg: async (msgId, emoji, userId) => {
     // Optimistic toggle

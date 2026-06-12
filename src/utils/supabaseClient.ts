@@ -464,6 +464,7 @@ export interface ChatMessage {
   read_at:          string | null   // dibaca penerima
   reactions:        MessageReactions
   is_encrypted:     boolean         // content berisi ciphertext (E2EE)
+  reply_to:         string | null   // id pesan yang dibalas
   created_at:       string
   deleted_at:       string | null
 }
@@ -561,6 +562,7 @@ export const sendMessage = async (
   fileName?:      string,
   fileSize?:      number,
   isEncrypted?:   boolean,
+  replyTo?:       string | null,
 ): Promise<ChatMessage | null> => {
   const { data, error } = await supabase
     .from('chat_messages')
@@ -573,6 +575,7 @@ export const sendMessage = async (
       file_name:       fileName ?? null,
       file_size:       fileSize ?? null,
       is_encrypted:    isEncrypted ?? false,
+      reply_to:        replyTo ?? null,
     })
     .select()
     .single()

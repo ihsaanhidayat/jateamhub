@@ -1,18 +1,21 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useChatStore } from '../../store/chatStore'
+import { messagePreview } from '../../utils/chatText'
 import EmojiPicker from './EmojiPicker'
 
 const ACCEPT = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar'
 const MAX_MB = 50
 
-interface Props { senderId: string }
+interface Props { senderId: string; otherName?: string }
 
-export default function ChatInput({ senderId }: Props) {
+export default function ChatInput({ senderId, otherName }: Props) {
   const sendText      = useChatStore(s => s.sendText)
   const sendFile      = useChatStore(s => s.sendFile)
   const sending       = useChatStore(s => s.sending)
   const currentConvId = useChatStore(s => s.currentConvId)
   const notifyTyping  = useChatStore(s => s.notifyTyping)
+  const replyTo       = useChatStore(s => s.replyTo)
+  const setReplyTo    = useChatStore(s => s.setReplyTo)
 
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -21,6 +24,9 @@ export default function ChatInput({ senderId }: Props) {
   const [emojiOpen, setEmojiOpen] = useState(false)
 
   const resetHeight = () => { if (taRef.current) taRef.current.style.height = '24px' }
+
+  // Focus the composer when starting a reply.
+  useEffect(() => { if (replyTo) taRef.current?.focus() }, [replyTo])
 
   const insertEmoji = (emoji: string) => {
     const el = taRef.current
@@ -77,6 +83,31 @@ export default function ChatInput({ senderId }: Props) {
 
   return (
     <div style={{ flexShrink: 0, padding: '10px 14px max(14px, env(safe-area-inset-bottom))', borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
+      {replyTo && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8,
+          padding: '7px 8px 7px 11px', background: 'var(--bg4)', borderRadius: 10,
+          borderLeft: '3px solid var(--accent)', animation: 'popIn 130ms ease',
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--accent)' }}>
+              Membalas {replyTo.sender_id === senderId ? 'diri sendiri' : (otherName ?? 'pesan')}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--silver3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {messagePreview(replyTo)}
+            </div>
+          </div>
+          <button
+            onClick={() => setReplyTo(null)}
+            title="Batal balas"
+            style={{
+              width: 28, height: 28, flexShrink: 0, background: 'none', border: 'none',
+              cursor: 'pointer', borderRadius: '50%', color: 'var(--silver3)', fontSize: 18, lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >×</button>
+        </div>
+      )}
       {fileErr && (
         <div style={{
           padding: '6px 12px', marginBottom: 8,
