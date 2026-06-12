@@ -4,7 +4,7 @@ import {
   getConversations, getMessages, getMessagesBefore, createConversation, sendMessage,
   uploadChatFile, markMessagesRead, markMessagesDelivered, deleteMessage, editMessage,
   clearConversationMessages, toggleReaction, updateLastSeen,
-  getStarredIds, addStar, removeStar, triggerPush,
+  getStarredIds, addStar, removeStar, triggerPush, logAudit,
   getChatEnabled, setChatEnabled as dbSetChatEnabled,
   type ChatConversation, type ChatMessage,
 } from '../utils/supabaseClient'
@@ -252,6 +252,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setEnabled: async (v) => {
     await dbSetChatEnabled(v)
     set({ enabled: v })
+    void logAudit('chat.toggle_global', { target_type: 'config', metadata: { enabled: v } })
   },
 
   loadConversations: async (userId) => {

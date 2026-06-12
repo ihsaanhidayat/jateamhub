@@ -711,6 +711,35 @@ export const triggerPush = async (conversationId: string) => {
   catch { /* best effort — in-app realtime still delivers */ }
 }
 
+// ── Audit log (governance) ────────────────────────────────────
+export interface AuditLog {
+  id:           string
+  actor_id:     string | null
+  actor_name:   string | null
+  action:       string
+  target_type:  string | null
+  target_id:    string | null
+  target_label: string | null
+  metadata:     Record<string, unknown>
+  ip:           string | null
+  created_at:   string
+}
+
+export const logAudit = async (
+  action: string,
+  opts?: { target_type?: string; target_id?: string; target_label?: string; metadata?: Record<string, unknown> },
+) => {
+  try { await supabase.functions.invoke('audit-log', { body: { action, ...opts } }) }
+  catch { /* best effort — never block the action being logged */ }
+}
+
+export const getAuditLogs = async (limit = 200): Promise<AuditLog[]> => {
+  const { data, error } = await supabase
+    .from('audit_logs').select('*').order('created_at', { ascending: false }).limit(limit)
+  if (error) { console.error('getAuditLogs:', error); return [] }
+  return (data ?? []) as AuditLog[]
+}
+
 // ── Presence: heartbeat last_seen ─────────────────────────────
 export const updateLastSeen = async (userId: string) =>
   supabase.from('profiles')

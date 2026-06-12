@@ -7,15 +7,25 @@ import { useStore } from '../../store/dashboardStore'
 import { useChatStore } from '../../store/chatStore'
 import {
   getPendingRegistrations, approveRegistration, rejectRegistration,
-  supabase, updateProfile,
+  supabase, updateProfile, logAudit, getAuditLogs,
 } from '../../utils/supabaseClient'
-import type { PendingRegistration } from '../../utils/supabaseClient'
+import type { PendingRegistration, AuditLog } from '../../utils/supabaseClient'
 import { REGION_LABELS, UNIT_LABELS, canManageUser, getAllowedRoles, getAllowedRegions, getAllowedUnits, getDisplayBadge } from '../../utils/roles'
 import type { Role } from '../../types'
 import type { Profile } from '../../utils/supabaseClient'
 import { REGIONS, UNITS } from '../../types'
 
 const EMOJI_PRESETS = ['','🌸','🔥','⭐','🎯','💎','🚀','🌊','🦁','🐯','🌺','🎨','💡','🍀','🏆','🦋','🌙','☀️','🍉']
+
+const AUDIT_LABELS: Record<string, { label: string; color: string }> = {
+  'auth.login':          { label: 'LOGIN',       color: '#64748b' },
+  'user.create':         { label: 'BUAT USER',   color: '#22c55e' },
+  'user.update':         { label: 'UBAH USER',   color: '#D97706' },
+  'user.delete':         { label: 'HAPUS USER',  color: '#ef4444' },
+  'chat.toggle_global':  { label: 'CHAT GLOBAL', color: '#0ea5e9' },
+  'chat.toggle_user':    { label: 'CHAT USER',   color: '#0ea5e9' },
+  'announcement.send':   { label: 'PENGUMUMAN',  color: '#8b5cf6' },
+}
 
 const inputSt: React.CSSProperties = {
   width: '100%', height: 38, background: 'var(--bg4)',
@@ -33,10 +43,19 @@ export default function SuperadminDashboard() {
   const { profile, logout, users, loadUsers, addUser, updateUser, removeUser } = useAuthStore()
   const toast = useStore.getState().toast
 
-  const [tab, setTab] = useState<'pending' | 'users' | 'settings'>('pending')
+  const [tab, setTab] = useState<'pending' | 'users' | 'audit' | 'settings'>('pending')
   const { enabled: chatEnabled, setEnabled: setChatEnabled, loadEnabled } = useChatStore()
 
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [auditLoad, setAuditLoad] = useState(false)
+  const loadAudit = async () => {
+    setAuditLoad(true)
+    setAuditLogs(await getAuditLogs(300))
+    setAuditLoad(false)
+  }
+
   useEffect(() => { loadEnabled() }, [])
+  useEffect(() => { if (tab === 'audit') loadAudit() }, [tab])
   const [pending,     setPending]     = useState<PendingRegistration[]>([])
   const [pendingLoad, setPendingLoad] = useState(false)
   const [rejectId,    setRejectId]    = useState<string | null>(null)
@@ -166,6 +185,9 @@ export default function SuperadminDashboard() {
         </button>
         <button className={`admin-tab${tab === 'users' ? ' active' : ''}`} onClick={() => setTab('users')}>
           👥 Users ({users.length})
+        </button>
+        <button className={`admin-tab${tab === 'audit' ? ' active' : ''}`} onClick={() => setTab('audit')}>
+          🛡️ Log Audit
         </button>
         <button className={`admin-tab${tab === 'settings' ? ' active' : ''}`} onClick={() => setTab('settings')}>
           ⚙️ Pengaturan
@@ -327,6 +349,7 @@ export default function SuperadminDashboard() {
                               setTogglingChat(u.id)
                               const newVal = !u.chat_enabled
                               await updateProfile(u.id, { chat_enabled: newVal })
+                              void logAudit('chat.toggle_user', { target_type: 'user', target_id: u.id, target_label: u.username, metadata: { enabled: newVal } })
                               await loadUsers(true)
                               setTogglingChat(null)
                               toast(`Chat ${newVal ? 'diaktifkan' : 'dinonaktifkan'} untuk ${u.full_name || u.username}.`, 'success')
@@ -473,6 +496,51 @@ export default function SuperadminDashboard() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── AUDIT TAB ── */}
+        {tab === 'audit' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: 'var(--silver3)' }}>
+                {auditLoad ? 'Memuat…' : `${auditLogs.length} aktivitas terbaru`}
+              </span>
+              <button onClick={loadAudit} disabled={auditLoad} style={{ height: 30, padding: '0 12px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: 'var(--silver)', fontFamily: 'var(--font)' }}>
+                ↻ Muat ulang
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {!auditLoad && auditLogs.length === 0 && (
+                <div style={{ padding: 28, textAlign: 'center', color: 'var(--silver4)', fontSize: 13 }}>Belum ada aktivitas tercatat.</div>
+              )}
+              {auditLogs.map(log => {
+                const meta = AUDIT_LABELS[log.action] ?? { label: log.action, color: 'var(--silver3)' }
+                const extra = Object.entries(log.metadata ?? {}).filter(([, v]) => v !== '' && v != null && v !== false)
+                return (
+                  <div key={log.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 12px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                    <span style={{ flexShrink: 0, marginTop: 1, fontSize: 10, fontWeight: 800, color: 'white', background: meta.color, borderRadius: 6, padding: '3px 7px', whiteSpace: 'nowrap', fontFamily: 'var(--mono)' }}>{meta.label}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, color: 'var(--silver)' }}>
+                        <strong>{log.actor_name ?? 'Sistem'}</strong>
+                        {log.target_label && <span style={{ color: 'var(--silver3)' }}> → {log.target_label}</span>}
+                      </div>
+                      {extra.length > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--silver4)', marginTop: 2, fontFamily: 'var(--mono)' }}>
+                          {extra.map(([k, v]) => `${k}: ${String(v)}`).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                      <div style={{ fontSize: 11, color: 'var(--silver4)', whiteSpace: 'nowrap' }}>
+                        {new Date(log.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      {log.ip && <div style={{ fontSize: 10, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>{log.ip}</div>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 

@@ -3,6 +3,7 @@
 // Init → Login → Dashboard → Logout → Login (tanpa refresh)
 // ─────────────────────────────────────────────────────────────
 import { create } from 'zustand'
+import { logAudit } from '../utils/supabaseClient'
 import {
   supabase, getProfile, signIn, signOut, signInWithGoogle,
   createUser, getAllProfiles, getProfilesByScope,
@@ -165,6 +166,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Sukses — set profile langsung (tidak tunggu onAuthStateChange)
       set({ profile, loading: false, initialized: true })
+      void logAudit('auth.login', { metadata: { username } })
       return null
     } catch {
       set({ loading: false })
@@ -264,6 +266,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!canAssignRole(me as any, role)) return 'Tidak bisa assign role ini.'
     const { error } = await createUser(username, password, role, unitId, regionScope, unitScope)
     if (error) return error.message
+    void logAudit('user.create', { target_type: 'user', target_label: username, metadata: { role, region_scope: regionScope, unit_scope: unitScope } })
     await get().loadUsers()
     return null
   },
@@ -296,6 +299,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (pwErr) return pwErr.message
     }
 
+    void logAudit('user.update', {
+      target_type: 'user', target_id: userId, target_label: target.username,
+      metadata: {
+        ...(role !== target.role ? { role_from: target.role, role_to: role } : {}),
+        password_reset: !!(newPassword && newPassword.length >= 6),
+      },
+    })
     await get().loadUsers()
     return null
   },
@@ -312,6 +322,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { error } = await supabase.functions.invoke('delete-user', { body: { userId } })
     if (error) await supabase.from('profiles').delete().eq('id', userId)
 
+    void logAudit('user.delete', { target_type: 'user', target_id: userId, target_label: target.username, metadata: { role: target.role } })
     await get().loadUsers()
     return null
   },
