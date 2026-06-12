@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import {
   supabase,
-  getConversations, getMessages, createConversation, sendMessage,
+  getConversations, getMessages, getMessagesBefore, createConversation, sendMessage,
   uploadChatFile, markMessagesRead, markMessagesDelivered, deleteMessage, editMessage,
   clearConversationMessages, toggleReaction, updateLastSeen,
   getStarredIds, addStar, removeStar, triggerPush,
@@ -108,6 +108,8 @@ interface ChatState {
   forwarding:    ChatMessage | null         // message being forwarded (picker)
   starredIds:    Record<string, boolean>    // bookmarked message ids
   unreadAnchorId: string | null             // first unread message at thread open
+  hasMoreOlder:  boolean                    // more history above the loaded window
+  loadingOlder:  boolean
   loading:       boolean
   msgLoading:    boolean
   sending:       boolean
@@ -119,6 +121,7 @@ interface ChatState {
   setEnabled:        (v: boolean) => Promise<void>
   loadConversations: (userId: string) => Promise<void>
   selectConv:        (id: string | null, userId: string) => Promise<void>
+  loadOlder:         (userId: string) => Promise<number>
   closeConvChannel:  () => void
   startConv:         (createdBy: string, participantB: string) => Promise<ChatConversation | null>
   sendText:          (text: string, senderId: string) => Promise<void>
@@ -231,6 +234,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   forwarding:    null,
   starredIds:    {},
   unreadAnchorId: null,
+  hasMoreOlder:  false,
+  loadingOlder:  false,
   loading:       false,
   msgLoading:    false,
   sending:       false,
@@ -274,7 +279,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (_convChannel) { _convChannel.unsubscribe(); _convChannel = null }
 
     if (_typingClear) { clearTimeout(_typingClear); _typingClear = null }
-    set({ peerTyping: false, replyTo: null, editing: null, unreadAnchorId: null })
+    set({ peerTyping: false, replyTo: null, editing: null, unreadAnchorId: null, hasMoreOlder: false, loadingOlder: false })
 
     if (!id) { set({ currentConvId: null, messages: [] }); return }
 
@@ -289,7 +294,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       : msgs
     // Capture the unread boundary BEFORE marking read (drives the divider).
     const firstUnread = decrypted.find(m => m.sender_id !== userId && !m.read_at && !m.deleted_at)
-    set({ messages: decrypted, msgLoading: false, unreadAnchorId: firstUnread?.id ?? null })
+    set({ messages: decrypted, msgLoading: false, unreadAnchorId: firstUnread?.id ?? null, hasMoreOlder: msgs.length >= 50 })
 
     // Recipient opened the thread → mark delivered + read (drives sender's ✓✓ blue)
     if (document.visibilityState === 'visible') {
@@ -339,6 +344,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
         _typingClear = setTimeout(() => set({ peerTyping: false }), 3500)
       })
       .subscribe()
+  },
+
+  loadOlder: async (userId) => {
+    const st = get()
+    if (st.loadingOlder || !st.hasMoreOlder || !st.currentConvId || st.messages.length === 0) return 0
+    const convId = st.currentConvId
+    const oldest = st.messages[0]
+    set({ loadingOlder: true })
+
+    const older = await getMessagesBefore(convId, oldest.created_at, 50)
+    const partnerId = partnerOf(st.conversations.find(c => c.id === convId), userId)
+    const key = partnerId && older.some(m => m.is_encrypted) ? await getConvKey(convId, partnerId) : null
+    const decrypted = older.some(m => m.is_encrypted)
+      ? await Promise.all(older.map(m => decryptMsg(m, key))) : older
+
+    let added = 0
+    set(s => {
+      if (s.currentConvId !== convId) return { loadingOlder: false }
+      const existing = new Set(s.messages.map(m => m.id))
+      const toAdd = decrypted.filter(m => !existing.has(m.id))
+      added = toAdd.length
+      return {
+        messages: [...toAdd, ...s.messages],
+        loadingOlder: false,
+        hasMoreOlder: older.length >= 50,
+      }
+    })
+    return added
   },
 
   closeConvChannel: () => {

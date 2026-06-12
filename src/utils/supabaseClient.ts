@@ -545,6 +545,22 @@ export const getMessages = async (conversationId: string, limit = 50): Promise<C
   return ((data ?? []) as ChatMessage[]).reverse()
 }
 
+// Older page: messages created before a cursor (for scroll-up pagination).
+export const getMessagesBefore = async (
+  conversationId: string, before: string, limit = 50,
+): Promise<ChatMessage[]> => {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .is('deleted_at', null)
+    .lt('created_at', before)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) { console.error('getMessagesBefore:', error); return [] }
+  return ((data ?? []) as ChatMessage[]).reverse()
+}
+
 export const createConversation = async (
   createdBy: string,
   participantB: string,

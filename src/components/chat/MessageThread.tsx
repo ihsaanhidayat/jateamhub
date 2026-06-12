@@ -40,12 +40,16 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   const toggleStar  = useChatStore(s => s.toggleStar)
   const lock        = useChatStore(s => s.lock)
   const unreadAnchorId = useChatStore(s => s.unreadAnchorId)
+  const hasMoreOlder = useChatStore(s => s.hasMoreOlder)
+  const loadingOlder = useChatStore(s => s.loadingOlder)
+  const loadOlder    = useChatStore(s => s.loadOlder)
   const [highlightId, setHighlightId] = useState<string | null>(null)
 
-  const listRef   = useRef<HTMLDivElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const atBottom  = useRef(true)
-  const prevLen   = useRef(messages.length)
+  const listRef    = useRef<HTMLDivElement>(null)
+  const bottomRef  = useRef<HTMLDivElement>(null)
+  const atBottom   = useRef(true)
+  const prevLen    = useRef(messages.length)
+  const prevLastId = useRef<string | null>(null)
   const [showFab,      setShowFab]      = useState(false)
   const [newCount,     setNewCount]     = useState(0)
   const [menuOpen,     setMenuOpen]     = useState(false)
@@ -64,20 +68,34 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
     atBottom.current = dist < 120
     setShowFab(dist > 240)
     if (atBottom.current) setNewCount(0)
+
+    // Near the top → load older history, preserving scroll position.
+    if (el.scrollTop < 80 && hasMoreOlder && !loadingOlder) {
+      const prevH = el.scrollHeight, prevTop = el.scrollTop
+      loadOlder(currentUserId).then(n => {
+        if (n > 0) requestAnimationFrame(() => {
+          const e2 = listRef.current
+          if (e2) e2.scrollTop = e2.scrollHeight - prevH + prevTop
+        })
+      })
+    }
   }
 
-  // Stick to bottom on new content only when the user is already there;
-  // otherwise count the new arrivals for the "N pesan baru" badge.
+  // Stick to bottom on a new message at the bottom; never on prepended history.
   useEffect(() => {
-    const delta = messages.length - prevLen.current
+    const grew   = messages.length > prevLen.current
     prevLen.current = messages.length
+    const lastId = messages.length ? messages[messages.length - 1].id : null
+    const appended = grew && lastId !== prevLastId.current && prevLastId.current !== null
+    prevLastId.current = lastId
     if (atBottom.current) scrollToBottom(true)
-    else if (delta > 0)   setNewCount(c => c + delta)
-  }, [messages.length, peerTyping])
+    else if (appended)    setNewCount(c => c + 1)
+  }, [messages.length])
 
   // Jump to bottom when switching conversations.
   useEffect(() => {
     atBottom.current = true
+    prevLastId.current = messages.length ? messages[messages.length - 1].id : null
     setShowFab(false); setNewCount(0); setMenuOpen(false); setConfirmClear(false)
     requestAnimationFrame(() => scrollToBottom(false))
   }, [conv.id])
@@ -299,6 +317,11 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
           touchAction: 'pan-y', padding: '14px 16px 10px', position: 'relative',
         }}
       >
+        {loadingOlder && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 10px' }}>
+            <span style={{ width: 20, height: 20, border: '2px solid var(--border2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
+          </div>
+        )}
         {encReady && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
