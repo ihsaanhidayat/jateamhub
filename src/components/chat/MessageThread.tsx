@@ -36,6 +36,8 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   const setReplyTo  = useChatStore(s => s.setReplyTo)
   const setEditing  = useChatStore(s => s.setEditing)
   const setForwarding = useChatStore(s => s.setForwarding)
+  const starredIds  = useChatStore(s => s.starredIds)
+  const toggleStar  = useChatStore(s => s.toggleStar)
   const lock        = useChatStore(s => s.lock)
   const unreadAnchorId = useChatStore(s => s.unreadAnchorId)
   const [highlightId, setHighlightId] = useState<string | null>(null)
@@ -47,6 +49,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
   const [showFab,      setShowFab]      = useState(false)
   const [newCount,     setNewCount]     = useState(0)
   const [menuOpen,     setMenuOpen]     = useState(false)
+  const [starredOpen,  setStarredOpen]  = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
 
   const scrollToBottom = (smooth = true) => {
@@ -99,6 +102,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
     (id: string, emoji: string) => reactToMsg(id, emoji, currentUserId),
     [reactToMsg, currentUserId],
   )
+  const onStar = useCallback((id: string) => toggleStar(id, currentUserId), [toggleStar, currentUserId])
 
   // Jump to a quoted message + flash it.
   const onQuoteJump = useCallback((id: string) => {
@@ -229,6 +233,20 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
               boxShadow: 'var(--shadow-lg)', animation: 'popIn 120ms ease',
             }}>
               <button
+                onClick={() => { setMenuOpen(false); setStarredOpen(true) }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '9px 11px', background: 'none', border: 'none',
+                  borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                  color: 'var(--silver)', fontSize: 13, fontFamily: 'var(--font)', fontWeight: 500,
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                Pesan berbintang
+              </button>
+              <button
                 onClick={handleClear}
                 onMouseLeave={() => { if (confirmClear) setTimeout(() => setConfirmClear(false), 2500) }}
                 style={{
@@ -341,6 +359,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
               isMine={msg.sender_id === currentUserId}
               currentUserId={currentUserId}
               cont={cont}
+              starred={!!starredIds[msg.id]}
               quoted={msg.reply_to ? (byId.get(msg.reply_to) ?? null) : null}
               quotedName={otherName}
               onDelete={removeMsg}
@@ -348,6 +367,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
               onReply={setReplyTo}
               onEdit={setEditing}
               onForward={setForwarding}
+              onStar={onStar}
               onQuoteJump={onQuoteJump}
             />
           </div>
@@ -395,6 +415,47 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           {newCount > 0 && <span>{newCount} pesan baru</span>}
         </button>
+      )}
+
+      {/* Starred messages */}
+      {starredOpen && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setStarredOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 210, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div style={{ width: '100%', maxWidth: 420, maxHeight: '80vh', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 18, display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)', animation: 'fadeUp 180ms ease' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#F5B301" stroke="#F5B301" strokeWidth="2" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                Pesan berbintang
+              </span>
+              <button onClick={() => setStarredOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)', fontSize: 20, lineHeight: 1 }}>×</button>
+            </div>
+            <div className="chat-msglist" style={{ flex: 1, overflowY: 'auto', padding: '6px 8px 12px' }}>
+              {messages.filter(m => starredIds[m.id]).length === 0 && (
+                <div style={{ padding: 28, textAlign: 'center', color: 'var(--silver4)', fontSize: 13 }}>Belum ada pesan berbintang di percakapan ini.</div>
+              )}
+              {messages.filter(m => starredIds[m.id]).map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => { setStarredOpen(false); onQuoteJump(m.id) }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 11px', border: 'none', borderRadius: 10, background: 'none', cursor: 'pointer', textAlign: 'left' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--accent)' }}>
+                      {m.sender_id === currentUserId ? 'Anda' : otherName}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--silver)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {m.message_type === 'text' ? m.content : m.message_type === 'image' ? '📷 Foto' : m.message_type === 'video' ? '🎬 Video' : m.message_type === 'audio' ? '🎵 Pesan suara' : '📎 ' + (m.file_name ?? 'File')}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       <ChatInput senderId={currentUserId} otherName={otherName} />

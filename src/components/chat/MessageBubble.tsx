@@ -9,6 +9,7 @@ interface Props {
   isMine:         boolean
   currentUserId?: string
   cont?:          boolean    // continuation of the same sender's group
+  starred?:       boolean    // bookmarked by me
   quoted?:        ChatMessage | null   // resolved message this one replies to
   quotedName?:    string               // display name of the quoted sender
   onDelete?:      (id: string) => void
@@ -16,6 +17,7 @@ interface Props {
   onReply?:       (msg: ChatMessage) => void
   onEdit?:        (msg: ChatMessage) => void
   onForward?:     (msg: ChatMessage) => void
+  onStar?:        (id: string) => void
   onQuoteJump?:   (id: string) => void
 }
 
@@ -101,7 +103,7 @@ const FileIcon = ({ name }: { name: string }) => {
   return <span style={{ fontSize: 22 }}>{icons[ext] ?? '📎'}</span>
 }
 
-function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, onDelete, onReact, onReply, onEdit, onForward, onQuoteJump }: Props) {
+function MessageBubble({ msg, isMine, currentUserId, cont, starred, quoted, quotedName, onDelete, onReact, onReply, onEdit, onForward, onStar, onQuoteJump }: Props) {
   const [showInfo,    setShowInfo]    = useState(false)
   const [showReact,   setShowReact]   = useState(false)
   const [hover,       setHover]       = useState(false)
@@ -296,6 +298,20 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
               </button>
             )}
+            {onStar && (
+              <button
+                onClick={() => { onStar(msg.id); setShowReact(false) }}
+                title={starred ? 'Hapus bintang' : 'Beri bintang'}
+                style={{
+                  width: 34, height: 34, marginLeft: 2,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  borderLeft: '1px solid var(--border)', borderRadius: 0,
+                  color: starred ? '#F5B301' : 'var(--silver2, var(--silver))', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill={starred ? '#F5B301' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </button>
+            )}
             {canEdit && (
               <button
                 onClick={() => { onEdit!(msg); setShowReact(false) }}
@@ -437,6 +453,9 @@ function MessageBubble({ msg, isMine, currentUserId, cont, quoted, quotedName, o
             fontSize: 10, lineHeight: 1.4,
           }}
         >
+          {starred && (
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="#F5B301" stroke="#F5B301" strokeWidth="2" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          )}
           {msg.edited_at && <span style={{ opacity: 0.7, fontStyle: 'italic' }}>diedit</span>}
           <span style={{ opacity: isMedia ? 0.95 : 0.8 }}>{fmtTime(msg.created_at)}</span>
           {isMine && <Ticks delivered={!!msg.delivered_at} read={!!msg.read_at} light={isBig} />}

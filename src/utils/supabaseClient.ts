@@ -679,6 +679,16 @@ export const editMessage = async (messageId: string, content: string, isEncrypte
     .update({ content, is_encrypted: isEncrypted, edited_at: new Date().toISOString() })
     .eq('id', messageId)
 
+// ── Starred (bookmarked) messages ─────────────────────────────
+export const getStarredIds = async (userId: string): Promise<string[]> => {
+  const { data } = await supabase.from('chat_stars').select('message_id').eq('user_id', userId)
+  return (data ?? []).map(r => r.message_id as string)
+}
+export const addStar = async (userId: string, messageId: string) =>
+  supabase.from('chat_stars').insert({ user_id: userId, message_id: messageId })
+export const removeStar = async (userId: string, messageId: string) =>
+  supabase.from('chat_stars').delete().eq('user_id', userId).eq('message_id', messageId)
+
 // ── Presence: heartbeat last_seen ─────────────────────────────
 export const updateLastSeen = async (userId: string) =>
   supabase.from('profiles')

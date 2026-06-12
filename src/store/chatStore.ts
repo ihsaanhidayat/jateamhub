@@ -4,6 +4,7 @@ import {
   getConversations, getMessages, createConversation, sendMessage,
   uploadChatFile, markMessagesRead, markMessagesDelivered, deleteMessage, editMessage,
   clearConversationMessages, toggleReaction, updateLastSeen,
+  getStarredIds, addStar, removeStar,
   getChatEnabled, setChatEnabled as dbSetChatEnabled,
   type ChatConversation, type ChatMessage,
 } from '../utils/supabaseClient'
@@ -104,6 +105,7 @@ interface ChatState {
   replyTo:       ChatMessage | null         // message being replied to (composer)
   editing:       ChatMessage | null         // message being edited (composer)
   forwarding:    ChatMessage | null         // message being forwarded (picker)
+  starredIds:    Record<string, boolean>    // bookmarked message ids
   unreadAnchorId: string | null             // first unread message at thread open
   loading:       boolean
   msgLoading:    boolean
@@ -129,6 +131,8 @@ interface ChatState {
   editText:          (msgId: string, text: string, senderId: string) => Promise<void>
   setForwarding:     (msg: ChatMessage | null) => void
   forwardMessage:    (msg: ChatMessage, targetConvId: string, senderId: string) => Promise<void>
+  loadStarred:       (userId: string) => Promise<void>
+  toggleStar:        (messageId: string, userId: string) => Promise<void>
 
   // Realtime — global channel + presence owned by App.tsx
   _realtimeSub: (() => void) | null
@@ -204,7 +208,7 @@ window.addEventListener('jateamhub-logout', () => {
   useChatStore.setState({
     isLocked: true, currentConvId: null, messages: [],
     conversations: [], unreadTotal: 0, onlineUsers: {}, encReady: false,
-    replyTo: null, editing: null, forwarding: null, unreadAnchorId: null, _realtimeSub: null,
+    replyTo: null, editing: null, forwarding: null, starredIds: {}, unreadAnchorId: null, _realtimeSub: null,
   })
 })
 
@@ -223,6 +227,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   replyTo:       null,
   editing:       null,
   forwarding:    null,
+  starredIds:    {},
   unreadAnchorId: null,
   loading:       false,
   msgLoading:    false,
@@ -260,6 +265,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }))
     const total = convs.reduce((sum, c) => sum + (c.unread_count ?? 0), 0)
     set({ conversations: convs, loading: false, unreadTotal: total })
+    get().loadStarred(userId)
   },
 
   selectConv: async (id, userId) => {
@@ -446,6 +452,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setEditing: (msg) => set({ editing: msg, replyTo: null }),
 
   setForwarding: (msg) => set({ forwarding: msg }),
+
+  loadStarred: async (userId) => {
+    const ids = await getStarredIds(userId)
+    set({ starredIds: Object.fromEntries(ids.map(id => [id, true])) })
+  },
+
+  toggleStar: async (messageId, userId) => {
+    const isStarred = !!get().starredIds[messageId]
+    set(s => {
+      const next = { ...s.starredIds }
+      if (isStarred) delete next[messageId]; else next[messageId] = true
+      return { starredIds: next }
+    })
+    if (isStarred) await removeStar(userId, messageId)
+    else await addStar(userId, messageId)
+  },
 
   forwardMessage: async (msg, targetConvId, senderId) => {
     const conv = get().conversations.find(c => c.id === targetConvId)
