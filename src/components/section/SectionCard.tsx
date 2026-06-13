@@ -211,7 +211,7 @@ export default memo(function SectionCard({
           </div>
         )}
 
-        <span className="section-icon" style={{ marginTop: section.subtitle ? 1 : 0 }}>
+        <span className="section-icon">
           {section.icon || '📁'}
         </span>
 
@@ -289,7 +289,7 @@ export default memo(function SectionCard({
       </div>
 
       {/* ── Body ─────────────────────────────────────────── */}
-      <div className={`section-body${effectiveCollapsed ? ' collapsed' : ''}${isExpanded ? ' expanded' : ''}${!effectiveCollapsed && !isExpanded ? ' fixed5' : ''}`}>
+      <div className={`section-body${effectiveCollapsed ? ' collapsed' : ''}${isExpanded ? ' expanded' : ''}${!effectiveCollapsed && !isExpanded && (section as any).widgetType !== 'calendar' ? ' fixed5' : ''}`}>
         {/* Empty state */}
         {!widgetContent && filteredItems.length === 0 && !editMode && (
           <div className="section-empty">

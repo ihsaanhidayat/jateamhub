@@ -18,15 +18,15 @@ export const getFaviconUrl = (url: string, size = 128): string => {
   return `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`
 }
 
-// Ordered, high→low quality favicon sources. AppIcon walks this list,
-// advancing on each <img> error, before falling back to its generic SVG.
+// Ordered favicon sources. AppIcon walks this list, advancing on each <img>
+// error, before falling back to its generic SVG. DuckDuckGo first — it's fast
+// and good quality; Google is the robust fallback.
 export const getFaviconSources = (url: string): string[] => {
   const domain = getDomainFromUrl(url)
   if (!domain) return []
   return [
-    `https://icon.horse/icon/${domain}`,                          // crisp, real site icons
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,             // fast, clean
     `https://www.google.com/s2/favicons?domain=${domain}&sz=128`, // robust fallback
-    `https://icons.duckduckgo.com/ip3/${domain}.ico`,             // last resort
   ]
 }
 

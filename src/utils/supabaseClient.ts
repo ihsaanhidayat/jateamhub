@@ -80,7 +80,7 @@ export const signInWithGoogle = () =>
 export const linkGoogleIdentity = () =>
   supabase.auth.linkIdentity({
     provider: 'google',
-    options: { redirectTo: window.location.origin },
+    options: { redirectTo: window.location.origin, queryParams: { prompt: 'select_account' } },
   })
 
 // Daftar identity yang terhubung ke user saat ini (email, google, dll).

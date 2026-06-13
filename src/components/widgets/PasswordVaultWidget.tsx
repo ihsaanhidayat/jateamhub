@@ -110,6 +110,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   // add form
   const [form, setForm] = useState({ label: '', username: '', password: '', url: '' })
   const [showPw, setShowPw] = useState(false)
+  const [showAdd, setShowAdd] = useState(false)
   const [showGen, setShowGen] = useState(false)
   const [genLen,  setGenLen]  = useState(16)
   const [genOpts, setGenOpts] = useState({ upper: true, digit: true, symbol: true })
@@ -121,7 +122,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   const doLock = useCallback(() => {
     clearVaultSession()
     setLocked(true); setEntries([]); setRevealed(new Set())
-    setEditId(null); setShowGen(false)
+    setEditId(null); setShowGen(false); setShowAdd(false)
     setForm({ label: '', username: '', password: '', url: '' })
   }, [])
 
@@ -395,52 +396,62 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
 
   return (
     <div onPointerDown={resetIdle} onKeyDown={resetIdle} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px' }}>
-      {/* Always-on compact add form (top) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: 6, background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 8, flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: 5 }}>
-          <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Nama situs" style={{ ...miniInp, flex: 1 }} />
-          <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username / email" style={{ ...miniInp, flex: 1 }} />
-        </div>
-        <div style={{ display: 'flex', gap: 5 }}>
-          <input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-            onKeyDown={e => { if (e.key === 'Enter' && canAdd) addEntry() }}
-            placeholder="Kata sandi" type={showPw ? 'text' : 'password'} style={{ ...miniInp, flex: 1 }} />
-          <button onClick={() => setShowPw(v => !v)} title={showPw ? 'Sembunyikan' : 'Tampilkan'} style={miniBtn}>{showPw ? <IconEyeOff size={13} /> : <IconEye size={13} />}</button>
-          <button onClick={() => setShowGen(v => !v)} title="Buat kata sandi" style={{ ...miniBtn, color: showGen ? 'var(--accent)' : 'var(--silver3)' }}><IconRefresh size={13} /></button>
-          <button onClick={addEntry} disabled={!canAdd} title="Tambah" style={{ ...miniBtn, background: canAdd ? 'var(--accent)' : 'var(--bg)', border: canAdd ? 'none' : '1px solid var(--border2)', color: canAdd ? 'white' : 'var(--silver4)', cursor: canAdd ? 'pointer' : 'not-allowed' }}><IconPlus size={14} /></button>
-        </div>
-        {form.password && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
-              <div style={{ width: `${strength(form.password).pct}%`, height: '100%', background: strength(form.password).color, transition: 'width 200ms' }} />
+      {/* Sticky top: add trigger/form + toolbar */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 3, background: 'var(--bg2)', display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 4 }}>
+        {/* Collapsible add form */}
+        {!showAdd ? (
+          <button onClick={() => setShowAdd(true)} style={{ height: 30, background: 'var(--accent-light)', border: '1px dashed var(--accent-soft)', borderRadius: 8, color: 'var(--accent)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, flexShrink: 0 }}>
+            <IconPlus size={13} /> Tambahkan password
+          </button>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: 6, background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 8, flexShrink: 0, animation: 'slideDown 150ms ease' }}>
+            <div style={{ display: 'flex', gap: 5 }}>
+              <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Nama situs" autoFocus style={{ ...miniInp, flex: 1 }} />
+              <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username / email" style={{ ...miniInp, flex: 1 }} />
             </div>
-            <span style={{ fontSize: 8.5, color: strength(form.password).color, fontFamily: 'var(--mono)' }}>{strength(form.password).label}</span>
+            <div style={{ display: 'flex', gap: 5 }}>
+              <input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter' && canAdd) addEntry() }}
+                placeholder="Kata sandi" type={showPw ? 'text' : 'password'} style={{ ...miniInp, flex: 1 }} />
+              <button onClick={() => setShowPw(v => !v)} title={showPw ? 'Sembunyikan' : 'Tampilkan'} style={miniBtn}>{showPw ? <IconEyeOff size={13} /> : <IconEye size={13} />}</button>
+              <button onClick={() => setShowGen(v => !v)} title="Buat kata sandi" style={{ ...miniBtn, color: showGen ? 'var(--accent)' : 'var(--silver3)' }}><IconRefresh size={13} /></button>
+              <button onClick={addEntry} disabled={!canAdd} title="Tambah" style={{ ...miniBtn, background: canAdd ? 'var(--accent)' : 'var(--bg)', border: canAdd ? 'none' : '1px solid var(--border2)', color: canAdd ? 'white' : 'var(--silver4)', cursor: canAdd ? 'pointer' : 'not-allowed' }}><IconPlus size={14} /></button>
+              <button onClick={() => { setShowAdd(false); setShowGen(false); setForm({ label: '', username: '', password: '', url: '' }) }} title="Tutup" style={{ ...miniBtn, fontSize: 15, color: 'var(--silver3)' }}>×</button>
+            </div>
+            {form.password && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ width: `${strength(form.password).pct}%`, height: '100%', background: strength(form.password).color, transition: 'width 200ms' }} />
+                </div>
+                <span style={{ fontSize: 8.5, color: strength(form.password).color, fontFamily: 'var(--mono)' }}>{strength(form.password).label}</span>
+              </div>
+            )}
+            {showGen && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>{genLen}</span>
+                <input type="range" min={8} max={32} value={genLen} onChange={e => setGenLen(+e.target.value)} style={{ flex: 1, minWidth: 70, accentColor: 'var(--accent)' }} />
+                {([['upper', 'A'], ['digit', '0'], ['symbol', '#']] as const).map(([k, lbl]) => (
+                  <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9.5, color: 'var(--silver3)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={genOpts[k]} onChange={e => setGenOpts(o => ({ ...o, [k]: e.target.checked }))} style={{ accentColor: 'var(--accent)' }} />{lbl}
+                  </label>
+                ))}
+                <button onClick={useGenerated} style={{ height: 22, padding: '0 9px', background: 'var(--accent)', border: 'none', borderRadius: 5, color: 'white', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Pakai</button>
+              </div>
+            )}
           </div>
         )}
-        {showGen && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>{genLen}</span>
-            <input type="range" min={8} max={32} value={genLen} onChange={e => setGenLen(+e.target.value)} style={{ flex: 1, minWidth: 70, accentColor: 'var(--accent)' }} />
-            {([['upper', 'A'], ['digit', '0'], ['symbol', '#']] as const).map(([k, lbl]) => (
-              <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9.5, color: 'var(--silver3)', cursor: 'pointer' }}>
-                <input type="checkbox" checked={genOpts[k]} onChange={e => setGenOpts(o => ({ ...o, [k]: e.target.checked }))} style={{ accentColor: 'var(--accent)' }} />{lbl}
-              </label>
-            ))}
-            <button onClick={useGenerated} style={{ height: 22, padding: '0 9px', background: 'var(--accent)', border: 'none', borderRadius: 5, color: 'white', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Pakai</button>
-          </div>
-        )}
-      </div>
 
-      {/* Toolbar */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1 }}>
-          <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--silver4)', display: 'flex', pointerEvents: 'none' }}><IconSearch size={13} /></span>
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari..." style={{ ...inp, height: 30, paddingLeft: 28 }} />
+        {/* Toolbar */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--silver4)', display: 'flex', pointerEvents: 'none' }}><IconSearch size={13} /></span>
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari..." style={{ ...inp, height: 30, paddingLeft: 28 }} />
+          </div>
+          <button onClick={() => fileRef.current?.click()} title="Impor CSV" style={toolBtn}><IconUpload size={14} /></button>
+          <button onClick={doLock} title="Kunci" style={toolBtn}><IconLock size={14} /></button>
+          <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onImport(f) }} />
         </div>
-        <button onClick={() => fileRef.current?.click()} title="Impor CSV" style={toolBtn}><IconUpload size={14} /></button>
-        <button onClick={doLock} title="Kunci" style={toolBtn}><IconLock size={14} /></button>
-        <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
-          onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onImport(f) }} />
       </div>
       {err && <div style={{ fontSize: 11, color: 'var(--red)' }}>{err}</div>}
 

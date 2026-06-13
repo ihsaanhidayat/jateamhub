@@ -2,7 +2,7 @@ import { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { hijriDate, weton, dateFromYmd } from '../../utils/dates'
 import { holidayOn } from '../../utils/holidays'
-import { IconChevL, IconChevR, IconClock, IconPlus, IconEdit, IconDownload } from '../ui/icons'
+import { IconChevL, IconChevR, IconClock, IconPlus, IconEdit } from '../ui/icons'
 import type { CalendarEvent, CalendarKind } from '../../types'
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -32,47 +32,6 @@ function buildGrid(year: number, month: number) {
     cells.push({ date: `${ny}-${pad(nm)}-${pad(d)}`, curr: false })
   }
   return cells
-}
-
-// ── Google Calendar template URL + .ics export ─────────────────────────
-function gcalUrl(ev: CalendarEvent) {
-  let dates: string
-  if (ev.time) {
-    const start = new Date(`${ev.date}T${ev.time}:00`)
-    const end   = new Date(start.getTime() + 60 * 60 * 1000)
-    const f = (d: Date) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`
-    dates = `${f(start)}/${f(end)}`
-  } else {
-    const start = ev.date.replace(/-/g, '')
-    const d = new Date(`${ev.date}T00:00:00`); d.setDate(d.getDate() + 1)
-    dates = `${start}/${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
-  }
-  const p = new URLSearchParams({ action: 'TEMPLATE', text: ev.title, dates, details: 'Dibuat dari JATEAMHUB' })
-  return `https://calendar.google.com/calendar/render?${p.toString()}`
-}
-function downloadIcs(ev: CalendarEvent) {
-  const stamp = (d: Date) => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`
-  let dt: string
-  if (ev.time) {
-    const start = new Date(`${ev.date}T${ev.time}:00`)
-    const end   = new Date(start.getTime() + 60 * 60 * 1000)
-    dt = `DTSTART:${stamp(start)}\r\nDTEND:${stamp(end)}`
-  } else {
-    const d = new Date(`${ev.date}T00:00:00`); const nd = new Date(d); nd.setDate(nd.getDate() + 1)
-    dt = `DTSTART;VALUE=DATE:${ev.date.replace(/-/g, '')}\r\nDTEND;VALUE=DATE:${nd.getFullYear()}${pad(nd.getMonth() + 1)}${pad(nd.getDate())}`
-  }
-  const ics = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//JATEAMHUB//Calendar//ID', 'CALSCALE:GREGORIAN',
-    'BEGIN:VEVENT', `UID:${ev.id}@jateamhub`, `DTSTAMP:${stamp(new Date())}`, dt,
-    `SUMMARY:${ev.title.replace(/([,;\\])/g, '\\$1')}`,
-    'BEGIN:VALARM', 'TRIGGER:-PT30M', 'ACTION:DISPLAY', 'DESCRIPTION:Pengingat', 'END:VALARM',
-    'END:VEVENT', 'END:VCALENDAR',
-  ].join('\r\n')
-  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }))
-  const a = document.createElement('a')
-  a.href = url; a.download = `${ev.title.slice(0, 40).replace(/[^\w\-]+/g, '_') || 'acara'}.ics`
-  document.body.appendChild(a); a.click(); a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 // ── CalendarWidget ─────────────────────────────────────────────────────
@@ -307,19 +266,27 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
           </div>
         )}
 
-        {/* Add form — fully inline */}
+        {/* Add form — badges (penanda) above, inline input below */}
         {showAddForm && !discardConfirm && (
-          <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: 6, background: 'var(--bg4)', borderRadius: 8, border: '1px solid var(--border2)', flexShrink: 0, animation: 'slideDown 150ms ease' }}>
-            {/* Penanda toggle */}
-            <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 6, padding: 2, flexShrink: 0 }}>
-              {([['event', 'Event'], ['note', 'Catatan']] as const).map(([k, lbl]) => (
-                <button key={k} onClick={() => setNewKind(k)} style={{
-                  height: 24, padding: '0 8px', borderRadius: 4, border: 'none', cursor: 'pointer',
-                  fontSize: 10, fontWeight: 700, fontFamily: 'var(--font)',
-                  background: newKind === k ? RED : 'transparent', color: newKind === k ? 'white' : 'var(--silver4)',
-                }}>{lbl}</button>
-              ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: 6, background: 'var(--bg4)', borderRadius: 8, border: '1px solid var(--border2)', flexShrink: 0, animation: 'slideDown 150ms ease' }}>
+            {/* Penanda badges (not in the input row) */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {([['event', 'Event'], ['note', 'Catatan']] as const).map(([k, lbl]) => {
+                const on = newKind === k
+                return (
+                  <button key={k} onClick={() => setNewKind(k)} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4, height: 20, padding: '0 9px',
+                    borderRadius: 99, cursor: 'pointer', fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)',
+                    border: `1px solid ${on ? (k === 'event' ? RED : 'var(--accent)') : 'var(--border2)'}`,
+                    background: on ? (k === 'event' ? 'color-mix(in srgb, ' + RED + ' 14%, transparent)' : 'var(--accent-light)') : 'transparent',
+                    color: on ? (k === 'event' ? RED : 'var(--accent)') : 'var(--silver4)',
+                  }}>
+                    <span style={{ width: 6, height: 6, borderRadius: k === 'event' ? '50%' : 2, background: k === 'event' ? RED : 'var(--accent)', opacity: on ? 1 : 0.5 }} />{lbl}
+                  </button>
+                )
+              })}
             </div>
+            <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
             <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addEvent() }}
               placeholder={newKind === 'event' ? 'Judul event…' : 'Catatan…'}
               style={{ flex: '1 1 90px', minWidth: 80, height: 28, padding: '0 9px', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 11.5, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box' }} />
@@ -340,6 +307,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
               style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: 'none', background: newTitle.trim() ? RED : 'var(--border2)', color: 'white', cursor: newTitle.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconPlus size={14} /></button>
             <button onClick={closeAdd} title="Tutup"
               style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: '1px solid var(--border2)', background: 'none', color: 'var(--silver3)', cursor: 'pointer', fontSize: 15, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            </div>
           </div>
         )}
 
@@ -349,11 +317,20 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
 
         {/* Entry rows */}
         <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {selectedEvs.length === 0 && !showAddForm && (
+          {selectedEvs.length === 0 && !selHoliday && !showAddForm && (
             <div style={{ fontSize: 11, color: 'var(--silver4)', fontFamily: 'var(--font)', padding: '10px 0', textAlign: 'center' }}>
               Tidak ada agenda · {isMobile ? 'ketuk' : 'klik'} dua kali tanggal untuk tambah
             </div>
           )}
+
+          {/* Holiday — non-editable */}
+          {selHoliday && (
+            <div className="cal-row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'color-mix(in srgb, ' + RED + ' 7%, var(--bg4))', border: '1px solid color-mix(in srgb, ' + RED + ' 25%, transparent)' }}>
+              <Badge label="Libur" color={RED} />
+              <div style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, color: RED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selHoliday}</div>
+            </div>
+          )}
+
           {selectedEvs.map((ev, idx) => {
             if (editId === ev.id) return (
               <EntryEditor key={ev.id} ev={ev} onCancel={() => setEditId(null)} onSave={p => saveEdit(ev.id, p)} onDelete={() => deleteEvent(ev.id)} />
@@ -364,29 +341,11 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
                 display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8,
                 background: 'var(--bg4)', border: '1px solid var(--border)', animationDelay: `${idx * 40}ms`,
               }}>
-                <span style={{ width: 7, height: 7, flexShrink: 0, borderRadius: isEvent ? '50%' : 2, background: RED, opacity: isEvent ? 1 : 0.5 }} />
+                <Badge label={isEvent ? 'Event' : 'Catatan'} color={isEvent ? RED : 'var(--accent)'} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--silver)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.title}</div>
-                  <div style={{ fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-                    {ev.time && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><IconClock size={10} /> {ev.time}</span>}
-                    {!isEvent && <span>catatan</span>}
-                  </div>
+                  {ev.time && <div style={{ fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}><IconClock size={10} /> {ev.time}</div>}
                 </div>
-                {isEvent && (
-                  <>
-                    <a href={gcalUrl(ev)} target="_blank" rel="noopener noreferrer" title="Tambah ke Google Calendar"
-                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, color: 'var(--silver3)', textDecoration: 'none' }}
-                      onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    </a>
-                    <button onClick={() => downloadIcs(ev)} title="Unduh .ics"
-                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)' }}
-                      onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
-                      <IconDownload size={14} />
-                    </button>
-                  </>
-                )}
-                {/* Edit (replaces the old trash) */}
                 <button onClick={() => setEditId(ev.id)} title="Edit"
                   style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)' }}
                   onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
@@ -400,6 +359,18 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
     </div>
   )
 })
+
+// Small kind/holiday badge.
+function Badge({ label, color }: { label: string; color: string }) {
+  return (
+    <span style={{
+      flexShrink: 0, fontSize: 8, fontWeight: 800, fontFamily: 'var(--mono)',
+      letterSpacing: '0.3px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: 99,
+      color, background: `color-mix(in srgb, ${color} 14%, transparent)`,
+      border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
+    }}>{label}</span>
+  )
+}
 
 // Inline editor for an existing entry (title, time for events, Delete + Save).
 function EntryEditor({ ev, onSave, onDelete, onCancel }: { ev: CalendarEvent; onSave: (p: Partial<CalendarEvent>) => void; onDelete: () => void; onCancel: () => void }) {
