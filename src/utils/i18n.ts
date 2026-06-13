@@ -71,6 +71,31 @@ const DICT: Record<string, { id: string; en: string }> = {
   'v.sitename':     { id: 'Nama situs', en: 'Site name' },
   'v.username':     { id: 'Username / email', en: 'Username / email' },
   'v.password':     { id: 'Kata sandi', en: 'Password' },
+
+  // Profile
+  'p.detail':       { id: 'Detail Akun', en: 'Account Details' },
+  'p.changepw':     { id: 'Ganti Password', en: 'Change Password' },
+  'p.resetpw':      { id: 'Reset Password', en: 'Reset Password' },
+  'p.prefs':        { id: 'Preferensi', en: 'Preferences' },
+  'p.region':       { id: 'Wilayah', en: 'Region' },
+  'p.unit':         { id: 'Unit', en: 'Unit' },
+  'p.role':         { id: 'Role', en: 'Role' },
+  'p.notfilled':    { id: 'Belum diisi', en: 'Not set' },
+  'p.usermgmt':     { id: 'User Management', en: 'User Management' },
+
+  // Add content modal
+  'add.content':    { id: 'Tambah Konten', en: 'Add Content' },
+  'add.choose':     { id: 'Pilih jenis konten yang ingin ditambahkan ke dashboard', en: 'Choose what to add to your dashboard' },
+  'modal.section':  { id: 'Section', en: 'Section' },
+  'modal.section.d':{ id: 'Kumpulkan link dan shortcut dalam satu folder', en: 'Group links and shortcuts in one folder' },
+  'modal.widget':   { id: 'Widget', en: 'Widget' },
+  'modal.widget.d': { id: 'Tambahkan fitur interaktif ke dashboard', en: 'Add interactive features to your dashboard' },
+
+  // Item modal
+  'item.add':       { id: 'Tambah Link', en: 'Add Link' },
+  'item.edit':      { id: 'Edit Link', en: 'Edit Link' },
+  'item.title':     { id: 'Judul', en: 'Title' },
+  'item.url':       { id: 'URL', en: 'URL' },
 }
 
 interface I18nState { lang: Lang; setLang: (l: Lang) => void }

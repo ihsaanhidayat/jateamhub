@@ -29,7 +29,7 @@ function Preferences() {
   const row: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 0', borderTop: '1px solid var(--border)' }
   return (
     <div style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 10, padding: '4px 14px 10px' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '10px 0 0' }}>Preferensi</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '10px 0 0' }}>{t('p.prefs')}</div>
       {/* Language */}
       <div style={{ ...row, borderTop: 'none' }}>
         <span style={{ fontSize: 13, color: 'var(--silver)', fontWeight: 500 }}>🌐 {t('language')}</span>
@@ -57,12 +57,13 @@ function Preferences() {
 
 // ── Detail Info — collapsible ─────────────────────────────────
 function DetailInfo({ profile }: { profile: any }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const rows = [
     { label: 'Username', value: `@${profile?.username}` },
-    { label: 'Wilayah', value: REGION_LABELS[profile?.region_scope] ?? profile?.region_scope ?? '—' },
-    { label: 'Unit', value: UNIT_LABELS[profile?.unit_scope] ?? profile?.unit_scope ?? '—' },
-    { label: 'Role', value: profile?.role ?? '—' },
+    { label: t('p.region'), value: REGION_LABELS[profile?.region_scope] ?? profile?.region_scope ?? '—' },
+    { label: t('p.unit'), value: UNIT_LABELS[profile?.unit_scope] ?? profile?.unit_scope ?? '—' },
+    { label: t('p.role'), value: profile?.role ?? '—' },
   ]
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
@@ -72,7 +73,7 @@ function DetailInfo({ profile }: { profile: any }) {
         alignItems: 'center', justifyContent: 'space-between',
         fontFamily: 'var(--font)',
       }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--silver2)' }}>Detail Akun</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--silver2)' }}>{t('p.detail')}</span>
         <span style={{ fontSize: 11, color: 'var(--silver4)', transition: 'transform 150ms', transform: open ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>▾</span>
       </button>
       {open && (
@@ -349,6 +350,7 @@ function ChangePasswordSection({ profileId, username, onDone }: { profileId?: st
 interface Props { onClose: () => void }
 
 export default function ProfilePage({ onClose }: Props) {
+  const t = useT()
   const { profile } = useAuthStore()
   const toast = useStore.getState().toast
 
@@ -388,9 +390,9 @@ export default function ProfilePage({ onClose }: Props) {
   }
 
   const TABS = [
-    { id: 'profile', label: '👤 Profil Saya' },
-    ...(canManage ? [{ id: 'users', label: `👥 User Management (${um.users.length})` }] : []),
-    ...(isSuperAdmin ? [{ id: 'settings', label: '⚙️ Settings' }] : []),
+    { id: 'profile', label: `👤 ${t('tab.profile')}` },
+    ...(canManage ? [{ id: 'users', label: `👥 ${t('tab.users')} (${um.users.length})` }] : []),
+    ...(isSuperAdmin ? [{ id: 'settings', label: `⚙️ ${t('tab.settings')}` }] : []),
   ] as const
 
   const [tabState, setTabState] = useState<'profile' | 'users' | 'settings'>('profile')
@@ -555,7 +557,7 @@ export default function ProfilePage({ onClose }: Props) {
               {/* ── Nama Lengkap — editable ── */}
               <div style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>
-                  Nama Lengkap
+                  {t('fullname')}
                 </div>
                 {editingName ? (
                   <div style={{ display: 'flex', gap: 8 }}>

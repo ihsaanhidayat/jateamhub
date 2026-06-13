@@ -73,10 +73,10 @@ export default function AddSectionModal({ open, onClose }: Props) {
         boxShadow: 'var(--shadow-lg)', animation: 'scaleIn 0.18s ease',
       }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)', marginBottom: 6 }}>
-          Tambah Konten
+          {t("add.content")}
         </div>
         <div style={{ fontSize: 12, color: 'var(--silver3)', marginBottom: 20 }}>
-          Pilih jenis konten yang ingin ditambahkan ke dashboard
+          {t("add.choose")}
         </div>
 
         {/* Row 1: Section atau Widget */}
@@ -88,9 +88,9 @@ export default function AddSectionModal({ open, onClose }: Props) {
             onClick={() => { useStore.getState().addPersonalSectionAuto(); onClose() }}>
             <span style={{ fontSize: 36 }}>📁</span>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)', marginBottom: 4 }}>Section</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)', marginBottom: 4 }}>{t("modal.section")}</div>
               <div style={{ fontSize: 11, color: 'var(--silver3)', lineHeight: 1.5 }}>
-                Kumpulkan link dan shortcut dalam satu folder
+                {t("modal.section.d")}
               </div>
             </div>
           </div>
@@ -101,9 +101,9 @@ export default function AddSectionModal({ open, onClose }: Props) {
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'; (e.currentTarget as HTMLElement).style.background = 'var(--bg2)' }}>
             <span style={{ fontSize: 36 }}>🧩</span>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)', marginBottom: 4 }}>Widget</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)', marginBottom: 4 }}>{t("modal.widget")}</div>
               <div style={{ fontSize: 11, color: 'var(--silver3)', lineHeight: 1.5 }}>
-                Tambahkan fitur interaktif ke dashboard
+                {t("modal.widget.d")}
               </div>
             </div>
             {/* Sub-pilihan widget */}
