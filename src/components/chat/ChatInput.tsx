@@ -36,7 +36,7 @@ export default function ChatInput({ senderId, otherName }: Props) {
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null)
   const cancelRef = useRef(false)
 
-  const resetHeight = () => { if (taRef.current) taRef.current.style.height = '24px' }
+  const resetHeight = () => { if (taRef.current) taRef.current.style.height = '38px' }
 
   const startRecording = async () => {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
@@ -180,7 +180,7 @@ export default function ChatInput({ senderId, otherName }: Props) {
   })
 
   return (
-    <div style={{ flexShrink: 0, padding: '10px 14px max(14px, env(safe-area-inset-bottom))', borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
+    <div style={{ flexShrink: 0, padding: '8px 12px max(8px, env(safe-area-inset-bottom))', borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
       {pendingFile && pendingUrl && (
         <div
           onClick={e => { if (e.target === e.currentTarget) closePending() }}
@@ -310,12 +310,14 @@ export default function ChatInput({ senderId, otherName }: Props) {
                 onKeyDown={handleKey}
                 placeholder="Ketik pesan..."
                 rows={1}
-                disabled={sending}
+                // NOTE: never disable while sending — disabling blurs the field and
+                // collapses the mobile keyboard, causing the up/down flicker.
+                readOnly={sending}
                 style={{
-                  flex: 1, height: 24, maxHeight: 120, padding: '7px 6px',
+                  flex: 1, height: 38, maxHeight: 120, padding: '9px 6px',
                   resize: 'none', overflow: 'auto', background: 'none', border: 'none',
                   fontSize: 14, color: 'var(--silver)', fontFamily: 'var(--font)',
-                  outline: 'none', lineHeight: 1.4, boxSizing: 'content-box',
+                  outline: 'none', lineHeight: '20px', boxSizing: 'border-box',
                 }}
               />
             </div>

@@ -116,6 +116,70 @@ function ChangePwButton({ profileId, username, iconOnly }: { profileId?: string;
   )
 }
 
+// ── Akun Terhubung (bind / unbind Google) ───────────────────
+function ConnectedAccounts() {
+  const profile              = useAuthStore(s => s.profile)
+  const linkGoogle           = useAuthStore(s => s.linkGoogle)
+  const unlinkGoogle         = useAuthStore(s => s.unlinkGoogle)
+  const reconcileGoogleEmail = useAuthStore(s => s.reconcileGoogleEmail)
+  const toast = useStore(s => (s as any).toast as (m: string, t?: 'success'|'error'|'warn') => void)
+  const [busy, setBusy] = useState(false)
+  const [confirmUnlink, setConfirmUnlink] = useState(false)
+
+  // After returning from a Google link redirect, persist google_email.
+  useEffect(() => { reconcileGoogleEmail() }, [])
+
+  const linked = !!profile?.google_email
+
+  const handleLink = async () => {
+    setBusy(true)
+    const err = await linkGoogle()
+    if (err) { toast?.(err, 'error'); setBusy(false) }
+    // success → browser redirects to Google
+  }
+  const handleUnlink = async () => {
+    if (!confirmUnlink) { setConfirmUnlink(true); setTimeout(() => setConfirmUnlink(false), 4000); return }
+    setBusy(true); setConfirmUnlink(false)
+    const err = await unlinkGoogle()
+    setBusy(false)
+    toast?.(err ?? 'Akun Google diputuskan.', err ? 'error' : 'success')
+  }
+
+  return (
+    <div style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>
+        Akun Terhubung
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 20, lineHeight: 1 }}>🔗</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, color: 'var(--silver)', fontWeight: 600 }}>Google</div>
+          <div style={{ fontSize: 11, color: linked ? 'var(--green, #16A34A)' : 'var(--silver4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {linked ? `Terhubung · ${profile?.google_email}` : 'Belum terhubung'}
+          </div>
+        </div>
+        {linked ? (
+          <button onClick={handleUnlink} disabled={busy} style={{
+            height: 32, padding: '0 12px', background: confirmUnlink ? 'var(--red)' : 'none',
+            border: `1px solid ${confirmUnlink ? 'var(--red)' : 'var(--border2)'}`, borderRadius: 8,
+            color: confirmUnlink ? 'white' : 'var(--silver3)', fontSize: 12, fontWeight: 600,
+            cursor: busy ? 'wait' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0,
+          }}>{confirmUnlink ? 'Yakin putuskan?' : 'Putuskan'}</button>
+        ) : (
+          <button onClick={handleLink} disabled={busy} style={{
+            height: 32, padding: '0 14px', background: 'var(--accent)', border: 'none', borderRadius: 8,
+            color: 'white', fontSize: 12, fontWeight: 700, cursor: busy ? 'wait' : 'pointer',
+            fontFamily: 'var(--font)', flexShrink: 0,
+          }}>{busy ? '...' : 'Hubungkan'}</button>
+        )}
+      </div>
+      <div style={{ fontSize: 10.5, color: 'var(--silver4)', marginTop: 10, lineHeight: 1.5 }}>
+        Hubungkan Google agar bisa masuk dengan akun lokal <b>atau</b> Google — widget &amp; data tetap sama.
+      </div>
+    </div>
+  )
+}
+
 // ── Change Password Form (pure form, no internal toggle) ─────
 function ChangePasswordSection({ profileId, username, onDone }: { profileId?: string, username?: string, onDone?: () => void }) {
   const [oldPw, setOldPw] = useState('')
@@ -437,6 +501,9 @@ export default function ProfilePage({ onClose }: Props) {
                   </div>
                 )}
               </div>
+
+              {/* ── Akun Terhubung — bind/unbind Google ── */}
+              <ConnectedAccounts />
 
               {/* Preview foto fullscreen */}
               {showAvatarPreview && profile?.avatar_url && (

@@ -152,9 +152,12 @@ input, textarea, select { font-family: var(--font); }
   grid-auto-rows: min-content;
   gap: 14px; align-items: start;
 }
+/* Section group: wider tracks so 5 icons per row fit comfortably */
+.dashboard-grid--sections { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 @media (max-width: 767px) {
   .shared-sections-row,
   .dashboard-grid { grid-template-columns: 1fr; padding: 12px; gap: 12px; }
+  .dashboard-grid--sections { grid-template-columns: 1fr; }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -674,6 +677,22 @@ mark.hl { background: var(--accent-soft); color: var(--accent); border-radius: 3
 .chat-msglist::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--silver4) 45%, transparent); }
 .chat-msglist::-webkit-scrollbar-track { background: transparent; }
 .chat-bubble-in { animation: bubbleIn 160ms cubic-bezier(.2,.8,.3,1); }
+
+/* ── Calendar widget ──────────────────────────────────────── */
+@keyframes calRingIn   { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes calRingPulse{ 0%,100% { box-shadow: 0 0 0 0 var(--cal-ring, transparent); } 50% { box-shadow: 0 0 0 4px transparent; } }
+@keyframes calDotPop   { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes calRowIn    { from { opacity: 0; transform: translateX(7px); } to { opacity: 1; transform: none; } }
+@keyframes calToday    { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+@keyframes calChalkDraw{ from { stroke-dashoffset: 300; } to { stroke-dashoffset: 0; } }
+.cal-chalk      { animation: calChalkDraw 560ms cubic-bezier(.45,.05,.3,1) both; }
+.cal-ring       { animation: calRingIn 420ms cubic-bezier(.34,1.56,.64,1) both; }
+.cal-ring-today { animation: calRingIn 420ms cubic-bezier(.34,1.56,.64,1) both, calRingPulse 2.3s ease-in-out .5s infinite; }
+.cal-dot        { animation: calDotPop 280ms cubic-bezier(.34,1.56,.64,1) both; }
+.cal-row        { animation: calRowIn 220ms ease both; }
+@media (prefers-reduced-motion: reduce) {
+  .cal-ring, .cal-ring-today, .cal-dot, .cal-row, .cal-chalk { animation: none !important; }
+}
 
 
 /* ══════════════════════════════════════════════════════════

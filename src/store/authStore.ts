@@ -8,6 +8,7 @@ import {
   supabase, getProfile, signIn, signOut, signInWithGoogle,
   createUser, getAllProfiles, getProfilesByScope,
   updateProfile, updateUserPassword,
+  linkGoogleIdentity, getIdentities, unlinkIdentity,
 } from '../utils/supabaseClient'
 import type { Profile } from '../utils/supabaseClient'
 import type { Role } from '../types'
@@ -28,6 +29,9 @@ interface AuthState {
   login:                    (username: string, password: string) => Promise<string | null>
   loginWithGoogle:          () => Promise<void>
   completeGoogleOnboarding: (username: string, fullName: string, region: string, unit: string) => Promise<string | null>
+  linkGoogle:               () => Promise<string | null>
+  unlinkGoogle:             () => Promise<string | null>
+  reconcileGoogleEmail:     () => Promise<void>
   logout:                   () => void
 
   loadUsers:   (force?: boolean) => Promise<void>
@@ -210,6 +214,64 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!profile) return 'Gagal memuat profil. Coba lagi.'
     set({ profile, pendingGoogleUser: null, loading: false })
     return null
+  },
+
+  // ── Bind Google ke akun yang sedang login ────────────────
+  // Redirect ke Google; saat kembali user tetap di profil yang sama
+  // (identity Google kini menempel ke user_id ini). reconcileGoogleEmail()
+  // mengisi profiles.google_email setelah kembali.
+  linkGoogle: async () => {
+    const me = get().profile
+    if (!me) return 'Tidak ada sesi.'
+    const { error } = await linkGoogleIdentity()
+    if (error) {
+      // Manual linking nonaktif, atau akun Google sudah terpakai user lain.
+      if (/manual linking|identity is already linked|already linked|exists/i.test(error.message))
+        return 'Akun Google ini sudah terhubung ke user lain, atau penautan manual belum diaktifkan.'
+      return error.message
+    }
+    return null   // biasanya tidak tercapai — halaman sudah redirect
+  },
+
+  // ── Putuskan Google dari akun ────────────────────────────
+  unlinkGoogle: async () => {
+    const me = get().profile
+    if (!me) return 'Tidak ada sesi.'
+    const { data, error } = await getIdentities()
+    if (error) return error.message
+    const identities = data?.identities ?? []
+    if (identities.length <= 1) return 'Tidak bisa memutuskan satu-satunya metode login.'
+    const google = identities.find(i => i.provider === 'google')
+    if (!google) return 'Tidak ada akun Google yang terhubung.'
+    const { error: unErr } = await unlinkIdentity(google)
+    if (unErr) return unErr.message
+    await updateProfile(me.id, { google_email: null })
+    const fresh = await getProfile(me.id)
+    if (fresh) set({ profile: fresh })
+    void logAudit('auth.google_unlink', {})
+    return null
+  },
+
+  // ── Sinkronkan profiles.google_email dgn identity Google aktif ──
+  reconcileGoogleEmail: async () => {
+    const me = get().profile
+    if (!me) return
+    try {
+      const { data } = await getIdentities()
+      const google = (data?.identities ?? []).find(i => i.provider === 'google')
+      const email = (google?.identity_data?.email as string | undefined) ?? null
+      if (email && me.google_email !== email) {
+        await updateProfile(me.id, { google_email: email })
+        const fresh = await getProfile(me.id)
+        if (fresh) set({ profile: fresh })
+        void logAudit('auth.google_link', { metadata: { email } })
+      } else if (!google && me.google_email) {
+        // Identity hilang tapi profil masih menyimpan email → bersihkan.
+        await updateProfile(me.id, { google_email: null })
+        const fresh = await getProfile(me.id)
+        if (fresh) set({ profile: fresh })
+      }
+    } catch { /* best effort */ }
   },
 
   // ── Logout ────────────────────────────────────────────────

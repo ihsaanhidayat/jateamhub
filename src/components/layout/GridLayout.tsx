@@ -17,9 +17,9 @@ import { useAuthStore } from '../../store/authStore'
 import SectionCard from '../section/SectionCard'
 import type { Section } from '../../types'
 import NotesWidget from '../widgets/NotesWidget'
-import TodoWidget, { TodoInputFooter } from '../widgets/TodoWidget'
 import ClockWidget from '../widgets/ClockWidget'
 import CalendarWidget from '../widgets/CalendarWidget'
+import PasswordVaultWidget from '../widgets/PasswordVaultWidget'
 
 // ── Skeleton dashboard ───────────────────────────────────────
 function SkeletonDashboard() {
@@ -94,17 +94,13 @@ function SortableSectionCard({
               ? <NotesWidget sectionId={section.id} />
               : (section as any).widgetType === 'clock'
               ? <ClockWidget />
-              : (section as any).widgetType === 'todo'
-              ? <TodoWidget sectionId={section.id} />
               : (section as any).widgetType === 'calendar'
               ? <CalendarWidget sectionId={section.id} isExpanded={isExpanded} />
+              : (section as any).widgetType === 'password'
+              ? <PasswordVaultWidget sectionId={section.id} />
               : null
           }
-          widgetFooter={
-            (section as any).widgetType === 'todo'
-              ? <TodoInputFooter sectionId={section.id} />
-              : undefined
-          }
+          widgetFooter={undefined}
         />
       </div>
     )
@@ -142,6 +138,28 @@ const useIsMobile = () => {
   return v
 }
 
+// ── Collapsible group header (Widget / Section) ──────────────
+function GroupHeader({ label, count, collapsed, onToggle }: { label: string; count: number; collapsed: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className="dash-group-header"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+        margin: '4px 20px 2px', padding: '6px 4px', maxWidth: 'calc(100% - 40px)',
+        background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)',
+        color: 'var(--silver2)',
+      }}
+    >
+      <span style={{ fontSize: 13, display: 'inline-block', transition: 'transform 180ms', transform: collapsed ? 'rotate(-90deg)' : 'none', color: 'var(--silver4)' }}>▾</span>
+      <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', fontFamily: 'var(--mono)' }}>{label}</span>
+      <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: 'var(--bg4)', color: 'var(--silver3)', border: '1px solid var(--border)', fontFamily: 'var(--mono)' }}>{count}</span>
+      <span style={{ flex: 1, height: 1, background: 'var(--border)', marginLeft: 4 }} />
+      <span style={{ fontSize: 10, color: 'var(--silver4)', fontWeight: 600 }}>{collapsed ? 'Tampilkan' : 'Sembunyikan'}</span>
+    </button>
+  )
+}
+
 // ── Main component ───────────────────────────────────────────
 export default function GridLayout({ onAddSection }: { onAddSection?: () => void }) {
   // Granular selectors — hanya re-render saat data ini berubah
@@ -161,7 +179,69 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
   // Tutup focus saat edit mode mati
   useEffect(() => { if (!editMode) setFocusedId(null) }, [editMode])
 
+  // ── One-time migration: fold any legacy To-Do widget into the Calendar ──
+  useEffect(() => {
+    const uid = profile?.id
+    if (!uid || !isDataInitialized) return
+    const flag = `todo-migrated-${uid}`
+    if (localStorage.getItem(flag)) return
+    const store = useStore.getState()
+    const todoSecs = store.personalSections.filter(s => (s as any).widgetType === 'todo')
+    if (todoSecs.length === 0) { localStorage.setItem(flag, '1'); return }
+
+    const todayStr = new Date().toISOString().split('T')[0]
+    const migrated: any[] = []
+    for (const ts of todoSecs) {
+      try {
+        const items = JSON.parse(ts.items?.[0]?.desc ?? '[]')
+        for (const it of items) migrated.push({
+          id: it.id ?? crypto.randomUUID(), date: it.date ?? todayStr,
+          title: it.text ?? '(tugas)', time: it.dueTime || undefined,
+          color: 'accent', kind: 'todo', done: !!it.done,
+          doneAt: it.doneAt, createdAt: it.createdAt ?? Date.now(),
+        })
+      } catch { /* skip bad data */ }
+    }
+
+    // Find or create a Calendar widget to receive the items.
+    let cal = store.personalSections.find(s => (s as any).widgetType === 'calendar')
+    if (!cal) {
+      store.addPersonalSection({
+        title: 'Kalender', icon: '📅', subtitle: '', items: [],
+        layout: { x: 0, y: 0, w: 4, h: 6 }, visibility: 'all',
+        targetUnits: [], pageId: 'beranda', type: 'widget', widgetType: 'calendar',
+      } as any)
+      cal = useStore.getState().personalSections.find(s => (s as any).widgetType === 'calendar')
+    }
+    if (cal) {
+      let existing: any[] = []
+      try { existing = JSON.parse(cal.items?.[0]?.desc ?? '[]') } catch {}
+      const mergedEvents = [...existing, ...migrated]
+      const item0 = cal.items[0] ?? { id: `cal-${cal.id}`, title: '', url: '', icon: '', desc: '', tags: [], newTab: false, iconUrl: '', useFavicon: false }
+      const active = mergedEvents.filter(e => !(e.kind === 'todo' && e.done)).length
+      store.updatePersonalSection(cal.id, {
+        items: [{ ...item0, desc: JSON.stringify(mergedEvents) }, ...cal.items.slice(1)],
+        subtitle: active === 0 ? '' : `${active} agenda`,
+      })
+    }
+    for (const ts of todoSecs) store.deletePersonalSection(ts.id)
+    store.syncPersonalToDb()
+    localStorage.setItem(flag, '1')
+  }, [profile?.id, isDataInitialized])
+
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin'
+
+  // ── Collapsible groups (Widget / Section) — persisted per user ──
+  const uid = profile?.id ?? ''
+  const [widgetsCollapsed,  setWidgetsCollapsed]  = useState(false)
+  const [sectionsCollapsed, setSectionsCollapsed] = useState(false)
+  useEffect(() => {
+    if (!uid) return
+    setWidgetsCollapsed(localStorage.getItem(`dash-grp-widget-${uid}`) === '1')
+    setSectionsCollapsed(localStorage.getItem(`dash-grp-section-${uid}`) === '1')
+  }, [uid])
+  const toggleWidgets  = () => setWidgetsCollapsed(v => { const n = !v; if (uid) localStorage.setItem(`dash-grp-widget-${uid}`, n ? '1' : '0'); return n })
+  const toggleSections = () => setSectionsCollapsed(v => { const n = !v; if (uid) localStorage.setItem(`dash-grp-section-${uid}`, n ? '1' : '0'); return n })
 
   // dnd-kit sensors
   const sensors = useSensors(
@@ -316,33 +396,15 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={personalSections.map(s => s.id)} strategy={rectSortingStrategy}>
-          <div className="dashboard-grid">
-            {/* Shared sections first — non-draggable */}
-            {sharedAsSections.filter(s => sectionMatches(s as any)).map(section => (
-              <div key={section.id}>
-                <SectionCard
-                  section={section}
-                  isShared={true}
-                  canEdit={false}
-                  isMobileView={isMobile}
-                  onFocus={() => {}}
-                  onEditSection={() => {}}
-                  onEditItem={() => {}}
-                  onAddItem={() => {}}
-                  onDeleteSection={() => {}}
-                  onSave={() => {}}
-                  onCancel={() => {}}
-                />
-              </div>
-            ))}
+          {(() => {
+            const widgetSecs = personalSections.filter(s => (s as any).type === 'widget' && sectionMatches(s))
+            const linkSecs   = personalSections.filter(s => (s as any).type !== 'widget' && sectionMatches(s))
+            const sharedVis  = sharedAsSections.filter(s => sectionMatches(s as any))
 
-            {/* Personal sections — draggable */}
-            {personalSections.filter(section => sectionMatches(section)).map(section => (
+            const renderPersonal = (section: Section) => (
               <div
                 key={section.id}
-                style={{
-                  gridColumn: (expandedWidgetId === section.id && !isMobile) ? 'span 2' : undefined,
-                }}
+                style={{ gridColumn: (expandedWidgetId === section.id && !isMobile) ? 'span 2' : undefined }}
               >
                 <SortableSectionCard
                   section={section}
@@ -352,7 +414,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                   focusedId={focusedId}
                   onFocus={(id: string | null) => setFocusedId(prev => prev === id ? null : id)}
                   isExpanded={expandedWidgetId === section.id}
-                  onExpandTodo={((section as any).widgetType === 'todo' || (section as any).widgetType === 'notes' || (section as any).widgetType === 'calendar') ? () => setExpandedWidgetId(prev => prev === section.id ? null : section.id) : undefined}
+                  onExpandTodo={((section as any).widgetType === 'notes' || (section as any).widgetType === 'calendar') ? () => setExpandedWidgetId(prev => prev === section.id ? null : section.id) : undefined}
                   onEditSection={handleEditSection}
                   onEditItem={handleEditItem}
                   onAddItem={handleAddItem}
@@ -361,8 +423,51 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                   onCancel={() => { setFocusedId(null); handleCancel() }}
                 />
               </div>
-            ))}
-          </div>
+            )
+
+            return (
+              <>
+                {/* ── WIDGET GROUP ── */}
+                {widgetSecs.length > 0 && (
+                  <>
+                    <GroupHeader label="Widget" count={widgetSecs.length} collapsed={widgetsCollapsed} onToggle={toggleWidgets} />
+                    {!widgetsCollapsed && (
+                      <div className="dashboard-grid">{widgetSecs.map(renderPersonal)}</div>
+                    )}
+                  </>
+                )}
+
+                {/* ── SECTION GROUP (shared + personal links) ── */}
+                {(linkSecs.length > 0 || sharedVis.length > 0) && (
+                  <>
+                    <GroupHeader label="Section" count={sharedVis.length + linkSecs.length} collapsed={sectionsCollapsed} onToggle={toggleSections} />
+                    {!sectionsCollapsed && (
+                      <div className="dashboard-grid dashboard-grid--sections">
+                        {sharedVis.map(section => (
+                          <div key={section.id}>
+                            <SectionCard
+                              section={section}
+                              isShared={true}
+                              canEdit={false}
+                              isMobileView={isMobile}
+                              onFocus={() => {}}
+                              onEditSection={() => {}}
+                              onEditItem={() => {}}
+                              onAddItem={() => {}}
+                              onDeleteSection={() => {}}
+                              onSave={() => {}}
+                              onCancel={() => {}}
+                            />
+                          </div>
+                        ))}
+                        {linkSecs.map(renderPersonal)}
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )
+          })()}
         </SortableContext>
 
         {/* Drag overlay — ghost card saat drag */}
@@ -391,7 +496,6 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
       {isMobile && expandedWidgetId && (() => {
         const sec = personalSections.find(s => s.id === expandedWidgetId)
         if (!sec) return null
-        const isTodo     = (sec as any).widgetType === 'todo'
         const isNotes    = (sec as any).widgetType === 'notes'
         const isCalendar = (sec as any).widgetType === 'calendar'
         return (
@@ -423,11 +527,9 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
               </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              {isTodo     && <TodoWidget     sectionId={expandedWidgetId} />}
               {isNotes    && <NotesWidget    sectionId={expandedWidgetId} />}
               {isCalendar && <CalendarWidget sectionId={expandedWidgetId} isExpanded />}
             </div>
-            {isTodo && <TodoInputFooter sectionId={expandedWidgetId} />}
           </div>
         )
       })()}

@@ -1,5 +1,5 @@
 import { useState, memo } from 'react'
-import { getFaviconUrl, isValidUrl } from '../../utils/helpers'
+import { getFaviconSources, isValidUrl } from '../../utils/helpers'
 import type { LinkItem, IconSize } from '../../types'
 import { ICON_SIZE_MAP } from '../../types'
 
@@ -11,7 +11,8 @@ interface Props {
 }
 
 export default memo(function AppIcon({ item, iconSize, faviconEnabled, className }: Props) {
-  const [faviconError, setFaviconError] = useState(false)
+  // Index into the favicon source chain; bumped on each load error.
+  const [srcIdx, setSrcIdx] = useState(0)
   const sizes = ICON_SIZE_MAP[iconSize]
 
   const wrapStyle: React.CSSProperties = {
@@ -56,21 +57,21 @@ export default memo(function AppIcon({ item, iconSize, faviconEnabled, className
     )
   }
 
-  // 3. Favicon (if enabled and URL is valid)
-  const shouldFavicon = (faviconEnabled || item.useFavicon) && isValidUrl(item.url) && !faviconError
-  if (shouldFavicon) {
-    const faviconUrl = getFaviconUrl(item.url, 64)
+  // 3. Favicon — walk a high→low quality source chain, advancing on error.
+  const sources = (faviconEnabled || item.useFavicon) && isValidUrl(item.url) ? getFaviconSources(item.url) : []
+  if (sources.length > 0 && srcIdx < sources.length) {
     return (
       <div style={wrapStyle} className={className}>
         <img
-          src={faviconUrl}
+          key={srcIdx}
+          src={sources[srcIdx]}
           alt={item.title}
           style={imgStyle}
-          onError={() => setFaviconError(true)}
+          onError={() => setSrcIdx(i => i + 1)}
           onLoad={e => {
-            // Google returns its globe at 16×16 for unknown domains; treat it as missing
+            // A 16×16 result usually means "no real icon" — try the next source.
             const img = e.target as HTMLImageElement
-            if (img.naturalWidth <= 16 && img.naturalHeight <= 16) setFaviconError(true)
+            if (img.naturalWidth <= 16 && img.naturalHeight <= 16) setSrcIdx(i => i + 1)
           }}
           loading="lazy"
         />

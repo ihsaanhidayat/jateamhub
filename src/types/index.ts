@@ -62,7 +62,7 @@ export type ThemeId = string  // legacy compat: 'pearl' | 'slate'
 
 // ── Section ───────────────────────────────────
 export type SectionVisibility = 'all' | 'admin' | 'unit'
-export type WidgetType  = 'clock' | 'notes' | 'todo' | 'calendar'
+export type WidgetType  = 'clock' | 'notes' | 'todo' | 'calendar' | 'password'
 export type SectionType = 'section' | 'widget'
 export interface SectionLayout { x: number; y: number; w: number; h: number }
 
@@ -173,13 +173,32 @@ export interface TodoItem {
   date:      string       // 'YYYY-MM-DD' tanggal task dibuat
 }
 
+// kind 'todo' → checkable agenda item (done = strikethrough); 'note' → plain
+// activity for the day. Legacy events without `kind` are treated as 'todo'.
+export type CalendarKind = 'todo' | 'note'
 export interface CalendarEvent {
   id:        string
   date:      string            // 'YYYY-MM-DD'
   title:     string
   time?:     string            // 'HH:MM' optional
   color?:    'accent' | 'red' | 'green' | 'yellow'
+  kind?:     CalendarKind
+  done?:     boolean
+  doneAt?:   number
   createdAt: number
+}
+
+// ── Password vault ────────────────────────────
+// Stored ENCRYPTED (base64 iv‖ciphertext) inside the widget's items[0].desc.
+// Never persisted in plaintext anywhere.
+export interface VaultEntry {
+  id:        string
+  label:     string            // site / app name
+  username:  string            // login / email
+  password:  string
+  url?:      string
+  note?:     string
+  updatedAt: number            // ms timestamp
 }
 
 export interface TodoHistory {

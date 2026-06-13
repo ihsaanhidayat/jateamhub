@@ -237,18 +237,6 @@ export default memo(function SectionCard({
                 fontFamily: 'var(--mono)', border: '1px solid var(--border)',
               }}>{section.items.length}</span>
             )}
-            {/* Badge pending todo saat collapsed */}
-            {(section as any).widgetType === 'todo' && (() => {
-              try {
-                const its = JSON.parse(section.items?.[0]?.desc ?? '[]')
-                const tod = new Date().toISOString().split('T')[0]
-                const ov = its.filter((i: any) => !i.done && i.date < tod).length
-                const pn = its.filter((i: any) => !i.done).length
-                if (ov > 0) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--red)', color: 'white', fontFamily: 'var(--mono)', animation: 'pulse 2.4s ease-in-out infinite' }}>⚠️ {ov}</span>
-                if (pn > 0 && effectiveCollapsed) return <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'var(--accent)', color: 'white', fontFamily: 'var(--mono)' }}>{pn}</span>
-              } catch {}
-              return null
-            })()}
           </div>
           {section.subtitle && (
             <div style={{
@@ -286,7 +274,7 @@ export default memo(function SectionCard({
           )}
 
           {/* Expand button — todo & notes */}
-          {((section as any).widgetType === 'todo' || (section as any).widgetType === 'notes') && onExpandTodo && !editMode && (
+          {((section as any).widgetType === 'notes' || (section as any).widgetType === 'calendar') && onExpandTodo && !editMode && (
             <button
               className="sec-action-btn-lg"
               onMouseDown={e => e.stopPropagation()}
@@ -361,7 +349,7 @@ export default memo(function SectionCard({
         {widgetContent ? widgetContent : (isFolderGrid ? (
           <div
             className="folder-grid"
-            style={{ '--folder-cols': appearance.folderGridCols } as React.CSSProperties}
+            style={{ '--folder-cols': 5 } as React.CSSProperties}
             onDragOver={e => e.preventDefault()}
             onDrop={e => {
               e.preventDefault()

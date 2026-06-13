@@ -12,8 +12,8 @@ interface Props {
 export default function AddSectionModal({ open, onClose }: Props) {
   // Granular selectors — hanya re-render saat sections berubah
   const hasClockWidget    = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'clock'))
-  const hasTodoWidget     = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'todo'))
   const hasCalendarWidget = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'calendar'))
+  const hasPasswordWidget = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'password'))
 
   const addWidget = (widgetType: WidgetType) => {
     const { addPersonalSection, addPersonalSectionFirst, addPersonalSectionAuto } = useStore.getState()
@@ -24,10 +24,11 @@ export default function AddSectionModal({ open, onClose }: Props) {
     const sameRow = maxX + 3 <= 12
 
     const config: Record<WidgetType, { title: string; icon: string; w: number; h: number }> = {
-      clock:    { title: 'Jam',        icon: '🕐', w: 3, h: 3 },
-      notes:    { title: 'Notes',      icon: '📝', w: 4, h: 5 },
-      todo:     { title: 'To-do List', icon: '📋', w: 4, h: 6 },
-      calendar: { title: 'Kalender',   icon: '📅', w: 4, h: 6 },
+      clock:    { title: 'Jam',         icon: '🕐', w: 3, h: 3 },
+      notes:    { title: 'Notes',       icon: '📝', w: 4, h: 5 },
+      todo:     { title: 'To-do List',  icon: '📋', w: 4, h: 6 },
+      calendar: { title: 'Kalender',    icon: '📅', w: 4, h: 6 },
+      password: { title: 'Kata Sandi',  icon: '🔐', w: 4, h: 6 },
     }
     const c = config[widgetType]
 
@@ -134,24 +135,6 @@ export default function AddSectionModal({ open, onClose }: Props) {
                 }}>
                 📝 Notes
               </button>
-              {/* Todo */}
-              <button
-                onClick={e => {
-                  e.stopPropagation()
-                  if (hasTodoWidget) { useStore.getState().toast('Todo list sudah ada — hanya boleh 1 todo list.', 'warn'); return }
-                  addWidget('todo')
-                }}
-                disabled={hasTodoWidget}
-                style={{
-                  flex: 1, padding: '8px 6px', borderRadius: 8,
-                  background: hasTodoWidget ? 'var(--bg4)' : 'var(--accent-light)',
-                  border: `1px solid ${hasTodoWidget ? 'var(--border)' : 'var(--accent)'}`,
-                  color: hasTodoWidget ? 'var(--silver3)' : 'var(--accent)',
-                  fontSize: 11, fontWeight: 700,
-                  cursor: hasTodoWidget ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
-                }}>
-                📋 Todo{hasTodoWidget ? ' (aktif)' : ''}
-              </button>
               {/* Kalender */}
               <button
                 onClick={e => {
@@ -169,6 +152,24 @@ export default function AddSectionModal({ open, onClose }: Props) {
                   cursor: hasCalendarWidget ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
                 }}>
                 📅 Kalender{hasCalendarWidget ? ' (aktif)' : ''}
+              </button>
+              {/* Kata Sandi (Password Vault) */}
+              <button
+                onClick={e => {
+                  e.stopPropagation()
+                  if (hasPasswordWidget) { useStore.getState().toast('Brankas kata sandi sudah ada — hanya boleh 1.', 'warn'); return }
+                  addWidget('password')
+                }}
+                disabled={hasPasswordWidget}
+                style={{
+                  flex: 1, padding: '8px 6px', borderRadius: 8,
+                  background: hasPasswordWidget ? 'var(--bg4)' : 'var(--accent-light)',
+                  border: `1px solid ${hasPasswordWidget ? 'var(--border)' : 'var(--accent)'}`,
+                  color: hasPasswordWidget ? 'var(--silver3)' : 'var(--accent)',
+                  fontSize: 11, fontWeight: 700,
+                  cursor: hasPasswordWidget ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
+                }}>
+                🔐 Sandi{hasPasswordWidget ? ' (aktif)' : ''}
               </button>
             </div>
           </div>

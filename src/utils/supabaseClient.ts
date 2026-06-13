@@ -75,6 +75,21 @@ export const signInWithGoogle = () =>
     options: { redirectTo: window.location.origin },
   })
 
+// ── Identity linking (bind Google ke akun lokal yang sudah login) ──
+// Memerlukan "Manual linking" aktif di Supabase Auth settings.
+export const linkGoogleIdentity = () =>
+  supabase.auth.linkIdentity({
+    provider: 'google',
+    options: { redirectTo: window.location.origin },
+  })
+
+// Daftar identity yang terhubung ke user saat ini (email, google, dll).
+export const getIdentities = () => supabase.auth.getUserIdentities()
+
+// Putuskan satu identity dari user saat ini.
+export const unlinkIdentity = (identity: Parameters<typeof supabase.auth.unlinkIdentity>[0]) =>
+  supabase.auth.unlinkIdentity(identity)
+
 // ── Fungsi Profil User ────────────────────────────────────────
 
 // Ambil profil satu user berdasarkan ID
@@ -114,7 +129,7 @@ export const updateProfile = async (
   updates: Partial<Pick<Profile,
     'role' | 'unit_id' | 'unit_scope' | 'region_scope' | 'branch_id' |
     'username' | 'full_name' | 'avatar_emoji' | 'avatar_url' | 'emoji' | 'appearance' |
-    'chat_enabled'
+    'chat_enabled' | 'google_email'
   >>
 ) => supabase.from('profiles')
     .update({ ...updates, updated_at: new Date().toISOString() })

@@ -66,8 +66,9 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
     const t = setInterval(() => setClockNow(new Date()), 1000)
     return () => clearInterval(t)
   }, [])
-  const clockDateStr = clockNow.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-  const clockTimeStr = clockNow.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const clockHH    = String(clockNow.getHours()).padStart(2, '0')
+  const clockMM    = String(clockNow.getMinutes()).padStart(2, '0')
+  const colonOn    = clockNow.getSeconds() % 2 === 0
 
   // Theme toggle — derive dari appearance store agar reaktif setelah initUser
   const DARK_THEMES = ['midnight', 'slate', 'obsidian', 'dark-mint', 'dark-soft', 'enterprise',
@@ -181,10 +182,10 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                 <span className="header-sub">
                   Selamat datang, {session?.username ?? ''}{emoji ? ` ${emoji}` : ''}
                 </span>
-                <span style={{ fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginTop: 1 }}>
-                  <span style={{ fontSize: 10, color: 'var(--silver3)' }}>📅 {clockDateStr}</span>
-                  <span style={{ fontSize: 10, color: 'var(--silver4)' }}>·</span>
-                  <span style={{ fontSize: 11, color: 'var(--silver2)', fontWeight: 600, letterSpacing: '0.3px' }}>🕐 {clockTimeStr}</span>
+                <span style={{ fontFamily: 'var(--mono)', display: 'flex', alignItems: 'baseline', marginTop: 2, fontSize: 17, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.5px', lineHeight: 1 }}>
+                  <span>{clockHH}</span>
+                  <span style={{ opacity: colonOn ? 1 : 0.25, transition: 'opacity 120ms', margin: '0 1px' }}>:</span>
+                  <span>{clockMM}</span>
                 </span>
               </div>
             </div>
