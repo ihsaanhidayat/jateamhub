@@ -255,6 +255,12 @@ input, textarea, select { font-family: var(--font); }
 .section-body::-webkit-scrollbar { display: none; }
 .section-body.collapsed { max-height: 0; opacity: 0; padding: 0; pointer-events: none; }
 .section-body.expanded  { max-height: none; overflow: visible; }
+/* Uniform link sections: fixed 5-row (5×5) body; scrolls past 25 items */
+.section-body.fixed5 {
+  height: calc(5 * (44px + 8px + 18px) + 16px);
+  max-height: calc(5 * (44px + 8px + 18px) + 16px);
+  overflow-y: auto;
+}
 
 /* Empty state */
 .section-empty {
