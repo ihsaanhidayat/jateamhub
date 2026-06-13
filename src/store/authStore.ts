@@ -248,9 +248,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!me) return 'Tidak ada sesi.'
     const { error } = await linkGoogleIdentity()
     if (error) {
-      // Manual linking nonaktif, atau akun Google sudah terpakai user lain.
-      if (/manual linking|identity is already linked|already linked|exists/i.test(error.message))
-        return 'Akun Google ini sudah terhubung ke user lain, atau penautan manual belum diaktifkan.'
+      const status = (error as any).status
+      // 404 / "manual linking" → the project flag is off (the common cause).
+      if (status === 404 || /manual linking|not.?found|disabled/i.test(error.message))
+        return 'Penautan manual belum aktif di Supabase. Aktifkan "Manual Linking" di Authentication settings.'
+      // 422 / "already" → this Google account is genuinely linked elsewhere.
+      if (status === 422 || /already|exists|linked/i.test(error.message))
+        return 'Akun Google ini sudah terhubung ke user lain.'
       return error.message
     }
     return null   // biasanya tidak tercapai — halaman sudah redirect
