@@ -15,7 +15,7 @@ import type { VaultEntry } from '../../types'
 const fmtModified = (ms?: number) =>
   ms ? new Date(ms).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : ''
 
-const IDLE_MS = 5 * 60_000
+const IDLE_MS = 3 * 60_000   // shorter idle auto-lock for the vault
 
 // ── Password generator ────────────────────────────────────────
 const SETS = { lower: 'abcdefghijkmnopqrstuvwxyz', upper: 'ABCDEFGHJKLMNPQRSTUVWXYZ', digit: '23456789', symbol: '!@#$%^&*-_=+?' }
@@ -75,6 +75,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   const [form, setForm] = useState({ label: '', username: '', password: '', url: '' })
   const [showPw, setShowPw] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
+  const [blurred, setBlurred] = useState(false)   // privacy screen when window unfocused
   const [showGen, setShowGen] = useState(false)
   const [genLen,  setGenLen]  = useState(16)
   const [genOpts, setGenOpts] = useState({ upper: true, digit: true, symbol: true })
@@ -103,15 +104,22 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
     idleTimer.current = setTimeout(doLock, IDLE_MS)
   }, [doLock])
 
-  // Lock on background + logout; cleanup timers
+  // Layered security: full lock when the tab is hidden / on logout; a privacy
+  // screen (blur) when the window merely loses focus; idle auto-lock.
   useEffect(() => {
     const onVis = () => { if (document.visibilityState === 'hidden' && isVaultUnlocked()) doLock() }
     const onLogout = () => doLock()
+    const onBlur = () => setBlurred(true)
+    const onFocus = () => setBlurred(false)
     document.addEventListener('visibilitychange', onVis)
     window.addEventListener('jateamhub-logout', onLogout)
+    window.addEventListener('blur', onBlur)
+    window.addEventListener('focus', onFocus)
     return () => {
       document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('jateamhub-logout', onLogout)
+      window.removeEventListener('blur', onBlur)
+      window.removeEventListener('focus', onFocus)
       if (idleTimer.current) clearTimeout(idleTimer.current)
       if (clipTimer.current) clearTimeout(clipTimer.current)
       clearVaultSession()
@@ -355,7 +363,14 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   const noAutofillPw: any = { ...noAutofill, autoComplete: 'new-password' }
 
   return (
-    <div onPointerDown={resetIdle} onKeyDown={resetIdle} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px' }}>
+    <div onPointerDown={resetIdle} onKeyDown={resetIdle} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px' }}>
+      {/* Privacy screen — hides entries the moment the window loses focus */}
+      {blurred && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: 'var(--bg2)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'var(--silver4)' }}>
+          <span style={{ color: 'var(--silver3)', display: 'flex' }}><IconLock size={22} /></span>
+          <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)' }}>Disembunyikan</span>
+        </div>
+      )}
       {/* Sticky top: toolbar (search · +add · lock) + collapsible add form */}
       <div style={{ position: 'sticky', top: 0, zIndex: 3, background: 'var(--bg2)', display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 4 }}>
         {/* Toolbar */}
@@ -366,7 +381,9 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
           </div>
           <button onClick={() => { if (showAdd) { setShowAdd(false); setShowGen(false); setForm({ label: '', username: '', password: '', url: '' }) } else setShowAdd(true) }}
             title={showAdd ? 'Tutup' : 'Tambahkan password'}
-            style={{ ...toolBtn, background: showAdd ? 'var(--accent)' : 'var(--bg4)', border: showAdd ? 'none' : '1px solid var(--border2)', color: showAdd ? 'white' : 'var(--silver3)' }}><IconPlus size={15} /></button>
+            style={{ ...toolBtn, background: showAdd ? 'var(--accent)' : 'var(--bg4)', border: showAdd ? 'none' : '1px solid var(--border2)', color: showAdd ? 'white' : 'var(--silver3)' }}>
+            <span style={{ display: 'flex', transition: 'transform 220ms cubic-bezier(.34,1.56,.64,1)', transform: showAdd ? 'rotate(45deg)' : 'none' }}><IconPlus size={15} /></span>
+          </button>
           <button onClick={doLock} title="Kunci" style={toolBtn}><IconLock size={14} /></button>
         </div>
 
@@ -411,7 +428,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
       {err && <div style={{ fontSize: 11, color: 'var(--red)' }}>{err}</div>}
 
       {/* Entry list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 320, overflowY: 'auto' }}>
+      <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 320, overflowY: 'auto' }}>
         {filtered.length === 0 && (
           <div style={{ fontSize: 11, color: 'var(--silver4)', textAlign: 'center', padding: '14px 0' }}>
             {entries.length === 0 ? 'Belum ada kata sandi. Tambah atau impor CSV.' : 'Tidak ada hasil.'}

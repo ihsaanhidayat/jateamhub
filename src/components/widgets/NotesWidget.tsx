@@ -3,13 +3,20 @@ import { useStore } from '../../store/dashboardStore'
 
 interface Props { sectionId: string }
 
+const fmtMod = (ms: number) => new Date(ms).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
 // Plain auto-saving notes — no lock/PIN. Content lives in items[0].desc.
 function NotesWidgetImpl({ sectionId }: Props) {
   const section  = useStore(s => s.personalSections.find(sec => sec.id === sectionId))
   const noteItem = section?.items?.[0]
+  const modKey   = `notes-modified-${sectionId}`
 
-  const [text,  setText]  = useState(noteItem?.desc ?? '')
-  const [saved, setSaved] = useState(true)
+  const [text,     setText]     = useState(noteItem?.desc ?? '')
+  const [saving,   setSaving]   = useState(false)
+  const [lastMod,  setLastMod]  = useState<number | null>(() => {
+    const v = localStorage.getItem(`notes-modified-${sectionId}`)
+    return v ? Number(v) : null
+  })
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -25,10 +32,12 @@ function NotesWidgetImpl({ sectionId }: Props) {
   useEffect(() => {
     const s = useStore.getState().personalSections.find(s => s.id === sectionId)
     setText(s?.items?.[0]?.desc ?? '')
+    const v = localStorage.getItem(`notes-modified-${sectionId}`)
+    setLastMod(v ? Number(v) : null)
   }, [sectionId])
 
   const handleChange = (val: string) => {
-    setText(val); setSaved(false)
+    setText(val); setSaving(true)
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
       const store = useStore.getState()
@@ -41,24 +50,14 @@ function NotesWidgetImpl({ sectionId }: Props) {
         store.addItem(sectionId, { title, url: '#', icon: '', desc: val, tags: [], newTab: false, useFavicon: false } as any)
       }
       store.syncPersonalToDb()
-      setSaved(true)
+      const now = Date.now()
+      localStorage.setItem(modKey, String(now))
+      setLastMod(now); setSaving(false)
     }, 600)
   }
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg2)', position: 'relative' }}>
-      {/* Status bar — sticky + fully opaque so the note never shows through it */}
-      <div style={{
-        padding: '4px 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-        fontSize: 9, fontFamily: 'var(--mono)', flexShrink: 0,
-        position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg2)',
-        boxShadow: '0 2px 8px -3px rgba(0,0,0,0.22)', borderBottom: '1px solid var(--border)',
-      }}>
-        <span style={{ color: saved ? 'var(--silver4)' : 'var(--accent)' }}>
-          {saved ? '✓ tersimpan' : '● menyimpan...'}
-        </span>
-      </div>
-
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg2)' }}>
       <textarea
         ref={textareaRef} value={text}
         onChange={e => { handleChange(e.target.value); autoGrow() }}
@@ -73,6 +72,20 @@ function NotesWidgetImpl({ sectionId }: Props) {
           backgroundAttachment: 'local',
         }}
       />
+
+      {/* Bottom status — only while saving; shows last-modified once saved */}
+      {(saving || lastMod) && (
+        <div style={{
+          padding: '3px 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          fontSize: 9, fontFamily: 'var(--mono)', flexShrink: 0, borderTop: '1px solid var(--border)',
+          background: 'var(--bg2)',
+          position: 'sticky', bottom: 0, zIndex: 5,
+        }}>
+          <span style={{ color: saving ? 'var(--accent)' : 'var(--silver4)' }}>
+            {saving ? '● menyimpan…' : `Diubah · ${fmtMod(lastMod!)}`}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
