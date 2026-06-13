@@ -93,6 +93,7 @@ export interface Section {
   accentColor?: string
   type?:        SectionType
   widgetType?:  WidgetType
+  updatedAt?:   number   // ms timestamp of the last content edit
 }
 
 // ── Appearance ────────────────────────────────

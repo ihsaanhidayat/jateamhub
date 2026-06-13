@@ -462,8 +462,9 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   // ── Update section pribadi ────────────────────────────────
   updatePersonalSection: (id, updates) => {
+    const touched = 'items' in updates ? { updatedAt: Date.now() } : {}
     const next = get().personalSections.map(s =>
-      s.id === id ? { ...s, ...updates } : s
+      s.id === id ? { ...s, ...updates, ...touched } : s
     )
     persistPersonal(next)
     set({ personalSections: next })
@@ -524,7 +525,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   addItem: (sectionId, data) => {
     const next = get().personalSections.map(s =>
       s.id === sectionId
-        ? { ...s, items: [...s.items, { id: 'i' + uid(), ...data }] }
+        ? { ...s, items: [...s.items, { id: 'i' + uid(), ...data }], updatedAt: Date.now() }
         : s
     )
     persistPersonal(next)
@@ -538,7 +539,8 @@ export const useStore = create<DashboardStore>((set, get) => ({
       if (s.id !== sectionId) return s
       return {
         ...s,
-        items: s.items.map((i: any) => i.id === itemId ? { id: itemId, ...data } : i)
+        items: s.items.map((i: any) => i.id === itemId ? { id: itemId, ...data } : i),
+        updatedAt: Date.now(),
       }
     })
     persistPersonal(next)
@@ -550,7 +552,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   deleteItem: (sectionId, itemId) => {
     const next = get().personalSections.map(s => {
       if (s.id !== sectionId) return s
-      return { ...s, items: s.items.filter(i => i.id !== itemId) }
+      return { ...s, items: s.items.filter(i => i.id !== itemId), updatedAt: Date.now() }
     })
     persistPersonal(next)
     set({ personalSections: next })
@@ -588,7 +590,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
         return { ...s, items: [...s.items, item] }
       }
       return s
-    })
+    }).map(s => (s.id === srcId || s.id === tgtId) ? { ...s, updatedAt: Date.now() } : s)
     persistPersonal(next)
     set({ personalSections: next })
     get().syncPersonalToDb()

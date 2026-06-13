@@ -8,6 +8,52 @@ import { REGIONS, UNITS } from '../../types'
 import { updateProfile } from '../../utils/supabaseClient'
 import type { Profile } from '../../utils/supabaseClient'
 import { useUserManagement, EMOJI_PRESETS } from '../../hooks/useUserManagement'
+import { useI18n, useT } from '../../utils/i18n'
+import { IconX } from '../ui/icons'
+
+const APP_VERSION = '3.0.0'
+
+// Consistent close/clear button.
+const closeBtn: React.CSSProperties = {
+  width: 28, height: 28, flexShrink: 0, borderRadius: 8, background: 'none', border: 'none',
+  cursor: 'pointer', color: 'var(--silver4)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+}
+
+// Preferences: language · notifications · version
+function Preferences() {
+  const lang = useI18n(s => s.lang)
+  const setLang = useI18n(s => s.setLang)
+  const t = useT()
+  const [notif, setNotif] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'denied')
+  const askNotif = async () => { if ('Notification' in window) setNotif(await Notification.requestPermission()) }
+  const row: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 0', borderTop: '1px solid var(--border)' }
+  return (
+    <div style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 10, padding: '4px 14px 10px' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--silver4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '10px 0 0' }}>Preferensi</div>
+      {/* Language */}
+      <div style={{ ...row, borderTop: 'none' }}>
+        <span style={{ fontSize: 13, color: 'var(--silver)', fontWeight: 500 }}>🌐 {t('language')}</span>
+        <div style={{ display: 'flex', gap: 3, background: 'var(--bg)', borderRadius: 7, padding: 3 }}>
+          {(['id', 'en'] as const).map(l => (
+            <button key={l} onClick={() => setLang(l)} style={{ height: 24, padding: '0 12px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', background: lang === l ? 'var(--accent)' : 'transparent', color: lang === l ? 'white' : 'var(--silver4)' }}>{l.toUpperCase()}</button>
+          ))}
+        </div>
+      </div>
+      {/* Notifications */}
+      <div style={row}>
+        <span style={{ fontSize: 13, color: 'var(--silver)', fontWeight: 500 }}>🔔 {t('notif')}</span>
+        {notif === 'granted'
+          ? <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green, #16A34A)', fontFamily: 'var(--mono)' }}>✓ {t('notif.on')}</span>
+          : <button onClick={askNotif} style={{ height: 26, padding: '0 12px', background: 'var(--accent-light)', border: '1px solid var(--accent-soft)', borderRadius: 7, color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>{t('notif.off')} · Aktifkan</button>}
+      </div>
+      {/* Version */}
+      <div style={row}>
+        <span style={{ fontSize: 13, color: 'var(--silver)', fontWeight: 500 }}>ℹ️ {t('version')}</span>
+        <span style={{ fontSize: 11, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>v{APP_VERSION}</span>
+      </div>
+    </div>
+  )
+}
 
 // ── Detail Info — collapsible ─────────────────────────────────
 function DetailInfo({ profile }: { profile: any }) {
@@ -80,7 +126,7 @@ function ChangePwButton({ profileId, username, iconOnly }: { profileId?: string;
           }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>Ganti Password</div>
-              <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 16 }}>✕</button>
+              <button onClick={() => setOpen(false)} aria-label="Tutup" style={closeBtn}><IconX size={14} /></button>
             </div>
             <div style={{ padding: '20px' }}>
               <ChangePasswordSection profileId={profileId} username={username} onDone={() => setOpen(false)} />
@@ -420,7 +466,7 @@ export default function ProfilePage({ onClose }: Props) {
                 color: 'var(--red)', fontSize: 12, fontWeight: 700,
                 cursor: 'pointer', fontFamily: 'var(--font)',
               }}>⏻ Sign Out</button>
-            <button onClick={onClose} className="close-btn">×</button>
+            <button onClick={onClose} aria-label="Tutup" className="close-btn"><IconX size={15} /></button>
           </div>
         </div>
 
@@ -519,7 +565,7 @@ export default function ProfilePage({ onClose }: Props) {
                     <button onClick={handleSaveName} disabled={nameSaving} style={{ height: 36, padding: '0 14px', background: 'var(--accent)', border: 'none', borderRadius: 8, color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                       {nameSaving ? '...' : 'Simpan'}
                     </button>
-                    <button onClick={() => setEditingName(false)} style={{ height: 36, padding: '0 10px', background: 'none', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--silver3)', cursor: 'pointer' }}>✕</button>
+                    <button onClick={() => setEditingName(false)} aria-label="Batal" style={{ width: 36, height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--silver3)', cursor: 'pointer' }}><IconX size={13} /></button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -537,11 +583,14 @@ export default function ProfilePage({ onClose }: Props) {
               {/* ── Akun Terhubung — bind/unbind Google ── */}
               <ConnectedAccounts />
 
+              {/* ── Preferensi — bahasa, notifikasi, versi ── */}
+              <Preferences />
+
               {/* Preview foto fullscreen */}
               {showAvatarPreview && profile?.avatar_url && (
                 <div onClick={() => setShowAvatarPreview(false)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
                   <img src={profile.avatar_url} alt="Foto profil" style={{ maxWidth: '85vw', maxHeight: '85vh', borderRadius: 16 }} />
-                  <button onClick={() => setShowAvatarPreview(false)} style={{ position: 'absolute', top: 20, right: 20, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: 18, cursor: 'pointer' }}>✕</button>
+                  <button onClick={() => setShowAvatarPreview(false)} aria-label="Tutup" style={{ position: 'absolute', top: 20, right: 20, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconX size={16} /></button>
                 </div>
               )}
             </div>

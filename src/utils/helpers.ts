@@ -30,6 +30,14 @@ export const getFaviconSources = (url: string): string[] => {
   ]
 }
 
+// Deterministic 2-stop gradient + initial for sites without a real favicon.
+export const gradientFor = (seed: string): { from: string; to: string } => {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0
+  const hue = h % 360
+  return { from: `hsl(${hue} 68% 56%)`, to: `hsl(${(hue + 42) % 360} 72% 46%)` }
+}
+
 export const highlight = (text: string, query: string): string => {
   // Escape HTML dulu sebelum inject — cegah XSS via item title
   const escaped = text

@@ -9,6 +9,7 @@ import RegisterPage from './components/layout/RegisterPage'
 import Header       from './components/layout/Header'
 import AnnouncementBanner from './components/layout/AnnouncementBanner'
 import GridLayout   from './components/layout/GridLayout'
+import AppFooter    from './components/layout/AppFooter'
 import OfflineBar   from './components/ui/OfflineBar'
 import ToastContainer from './components/ui/Toast'
 // Lazy load komponen berat
@@ -21,7 +22,7 @@ const ForceChangePasswordModal = lazy(() => import('./components/ui/ForceChangeP
 const InstallPrompt             = lazy(() => import('./components/ui/InstallPrompt'))
 const IdleSessionGuard          = lazy(() => import('./components/ui/IdleSessionGuard'))
 const NotificationBanner        = lazy(() => import('./components/ui/NotificationBanner'))
-const TaskListPage              = lazy(() => import('./pages/TaskListPage'))
+const ActivityModal            = lazy(() => import('./components/layout/ActivityModal'))
 const ChatPage                  = lazy(() => import('./pages/ChatPage'))
 import DashboardSkeleton from './components/ui/DashboardSkeleton'
 const OnboardingOverlay        = lazy(() => import('./components/ui/OnboardingOverlay'))
@@ -45,18 +46,18 @@ export default function App() {
   const [importLinksOpen, setImportLinksOpen] = useState(false)
   const [coffeeOpen,     setCoffeeOpen]     = useState(false)
   // Hash-based routing — wait for auth to initialize before restoring #chat
-  const [taskListOpen, setTaskListOpen] = useState(() => window.location.hash === '#tasks')
+  const [activityOpen, setActivityOpen] = useState(() => window.location.hash === '#activity')
   const [chatOpen,     setChatOpen]     = useState(false)
 
-  const openTaskList  = () => { window.location.hash = 'tasks'; setTaskListOpen(true) }
-  const closeTaskList = () => { window.location.hash = ''; setTaskListOpen(false) }
+  const openActivity  = () => { window.location.hash = 'activity'; setActivityOpen(true) }
+  const closeActivity = () => { window.location.hash = ''; setActivityOpen(false) }
   const openChat      = () => { window.location.hash = 'chat'; setChatOpen(true) }
   const closeChat     = () => { window.location.hash = ''; setChatOpen(false) }
 
   // Listen to browser back/forward
   useEffect(() => {
     const handleHash = () => {
-      setTaskListOpen(window.location.hash === '#tasks')
+      setActivityOpen(window.location.hash === '#activity')
       setChatOpen(window.location.hash === '#chat')
     }
     window.addEventListener('hashchange', handleHash)
@@ -333,7 +334,7 @@ export default function App() {
         onOpenAdvanced={() => setProfileOpen(true)}
         onAddSection={() => setAddSectionOpen(true)}
         onImportLinks={() => setImportLinksOpen(true)}
-        onOpenTaskList={openTaskList}
+        onOpenActivity={openActivity}
         onOpenChat={openChat}
       />
 
@@ -385,6 +386,8 @@ export default function App() {
         <GridLayout onAddSection={() => setAddSectionOpen(true)} />
       </main>
 
+      {profile && <AppFooter />}
+
       <Suspense fallback={null}>
         <AddSectionModal open={addSectionOpen} onClose={() => setAddSectionOpen(false)} />
         <ImportLinksModal open={importLinksOpen} onClose={() => setImportLinksOpen(false)} />
@@ -423,9 +426,9 @@ export default function App() {
           />
         )}
       </Suspense>
-      {taskListOpen && (
+      {activityOpen && (
         <Suspense fallback={null}>
-          <TaskListPage onClose={closeTaskList} />
+          <ActivityModal onClose={closeActivity} />
         </Suspense>
       )}
       {chatOpen && (

@@ -3,20 +3,13 @@ import { useStore } from '../../store/dashboardStore'
 
 interface Props { sectionId: string }
 
-const fmtMod = (ms: number) => new Date(ms).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-
 // Plain auto-saving notes — no lock/PIN. Content lives in items[0].desc.
 function NotesWidgetImpl({ sectionId }: Props) {
   const section  = useStore(s => s.personalSections.find(sec => sec.id === sectionId))
   const noteItem = section?.items?.[0]
-  const modKey   = `notes-modified-${sectionId}`
 
-  const [text,     setText]     = useState(noteItem?.desc ?? '')
-  const [saving,   setSaving]   = useState(false)
-  const [lastMod,  setLastMod]  = useState<number | null>(() => {
-    const v = localStorage.getItem(`notes-modified-${sectionId}`)
-    return v ? Number(v) : null
-  })
+  const [text,   setText]   = useState(noteItem?.desc ?? '')
+  const [saving, setSaving] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -32,8 +25,6 @@ function NotesWidgetImpl({ sectionId }: Props) {
   useEffect(() => {
     const s = useStore.getState().personalSections.find(s => s.id === sectionId)
     setText(s?.items?.[0]?.desc ?? '')
-    const v = localStorage.getItem(`notes-modified-${sectionId}`)
-    setLastMod(v ? Number(v) : null)
   }, [sectionId])
 
   const handleChange = (val: string) => {
@@ -50,9 +41,7 @@ function NotesWidgetImpl({ sectionId }: Props) {
         store.addItem(sectionId, { title, url: '#', icon: '', desc: val, tags: [], newTab: false, useFavicon: false } as any)
       }
       store.syncPersonalToDb()
-      const now = Date.now()
-      localStorage.setItem(modKey, String(now))
-      setLastMod(now); setSaving(false)
+      setSaving(false)
     }, 600)
   }
 
@@ -73,17 +62,10 @@ function NotesWidgetImpl({ sectionId }: Props) {
         }}
       />
 
-      {/* Bottom status — only while saving; shows last-modified once saved */}
-      {(saving || lastMod) && (
-        <div style={{
-          padding: '3px 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          fontSize: 9, fontFamily: 'var(--mono)', flexShrink: 0, borderTop: '1px solid var(--border)',
-          background: 'var(--bg2)',
-          position: 'sticky', bottom: 0, zIndex: 5,
-        }}>
-          <span style={{ color: saving ? 'var(--accent)' : 'var(--silver4)' }}>
-            {saving ? '● menyimpan…' : `Diubah · ${fmtMod(lastMod!)}`}
-          </span>
+      {/* Saving indicator — transient; the section's last-modified footer shows the rest */}
+      {saving && (
+        <div style={{ padding: '3px 10px', display: 'flex', justifyContent: 'flex-end', fontSize: 9, fontFamily: 'var(--mono)', flexShrink: 0, color: 'var(--accent)', background: 'var(--bg2)', position: 'sticky', bottom: 0, zIndex: 5 }}>
+          ● menyimpan…
         </div>
       )}
     </div>

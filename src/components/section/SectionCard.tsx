@@ -439,6 +439,17 @@ export default memo(function SectionCard({
             }}>{isSyncing ? '⏳ Menyimpan...' : '✓ Simpan'}</button>
         </div>
       )}
+
+      {/* Last-modified footer — pinned, full width */}
+      {section.updatedAt && !effectiveCollapsed && (
+        <div style={{
+          flexShrink: 0, padding: '3px 12px', borderTop: '1px solid var(--border)',
+          background: 'var(--bg2)', fontSize: 9, fontFamily: 'var(--mono)',
+          color: 'var(--silver4)', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          Diubah · {new Date(section.updatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+        </div>
+      )}
     </div>
 
     {/* Widget footer — fix di bawah, tidak ikut scroll */}

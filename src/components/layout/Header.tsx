@@ -7,21 +7,23 @@ import { sanitizePage } from '../../utils/security'
 import { uploadAvatar, updateProfile } from '../../utils/supabaseClient'
 import AvatarCropModal from '../ui/AvatarCropModal'
 import { IconSearch, IconX, IconUpload, IconPencil, IconSun, IconMoon } from '../ui/icons'
+import { useT } from '../../utils/i18n'
 
 interface Props {
   onToggleOptions:  () => void
   optionsOpen:      boolean
-  onOpenTaskList?:  () => void
+  onOpenActivity?:  () => void
   onOpenChat?:      () => void
   onOpenAdvanced:  () => void
   onAddSection:    () => void
   onImportLinks:   () => void
 }
 
-export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks, onOpenTaskList, onOpenChat }: Props) {
+export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, onAddSection, onImportLinks, onOpenActivity, onOpenChat }: Props) {
   const editMode    = useStore(s => s.editMode)
   const searchQuery = useStore(s => s.searchQuery)
   const { profile: session } = useAuthStore()
+  const t = useT()
 
   const [profileDropdown, setProfileDropdown] = useState(false)
   const [cropDataUrl,     setCropDataUrl]     = useState<string | null>(null)
@@ -182,7 +184,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
               <h1 className="header-title">JateamHub</h1>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
                 <span className="header-sub">
-                  Selamat datang, {session?.username ?? ''}{emoji ? ` ${emoji}` : ''}
+                  {t('greeting')}, {session?.username ?? ''}{emoji ? ` ${emoji}` : ''}
                 </span>
                 <span className="desktop-only" style={{ fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontSize: 12, fontWeight: 700, lineHeight: 1 }}>
                   <span style={{ color: 'var(--accent)', letterSpacing: '0.3px' }}>
@@ -229,7 +231,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                       ref={searchRef}
                       value={searchQuery}
                       onChange={e => useStore.getState().setSearch(e.target.value)}
-                      placeholder="Cari link..."
+                      placeholder={t('search.link')}
                       autoComplete="off"
                       spellCheck={false}
                       tabIndex={searchOpen ? 0 : -1}
@@ -362,18 +364,18 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                 </div>
                 <button className="preview-dropdown-item"
                   onClick={() => { onOpenAdvanced(); setProfileDropdown(false) }}>
-                  👤 Lihat Profil Saya
+                  👤 {t('profile.view')}
                 </button>
-                {onOpenTaskList && (
+                {onOpenActivity && (
                   <button className="preview-dropdown-item"
-                    onClick={() => { onOpenTaskList(); setProfileDropdown(false) }}>
-                    📋 Riwayat Task
+                    onClick={() => { onOpenActivity(); setProfileDropdown(false) }}>
+                    🕑 {t('activity')}
                   </button>
                 )}
                 <div className="preview-dropdown-divider" />
                 <button className="preview-dropdown-item danger"
                   onClick={() => useAuthStore.getState().logout()}>
-                  ⏻ Sign Out
+                  ⏻ {t('signout')}
                 </button>
               </div>
             )}

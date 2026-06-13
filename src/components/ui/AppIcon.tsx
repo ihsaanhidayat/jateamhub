@@ -1,5 +1,5 @@
 import { useState, memo } from 'react'
-import { getFaviconSources, isValidUrl } from '../../utils/helpers'
+import { getFaviconSources, isValidUrl, gradientFor, getDomainFromUrl } from '../../utils/helpers'
 import type { LinkItem, IconSize } from '../../types'
 import { ICON_SIZE_MAP } from '../../types'
 
@@ -79,13 +79,20 @@ export default memo(function AppIcon({ item, iconSize, faviconEnabled, className
     )
   }
 
-  // 4. Fallback: generic link icon SVG
+  // 4. Fallback: a colorful gradient tile with the site's initial.
+  const seed = getDomainFromUrl(item.url) || item.title || '?'
+  const g = gradientFor(seed)
+  const initial = (item.title?.trim()?.[0] || seed.replace(/^www\./, '')[0] || '?').toUpperCase()
   return (
-    <div style={{ ...wrapStyle, background: 'var(--accent-light)', border: '1px solid var(--border2)', borderRadius: 10 }} className={className}>
-      <svg width={sizes.img * 0.6} height={sizes.img * 0.6} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-      </svg>
+    <div style={wrapStyle} className={className}>
+      <div style={{
+        width: sizes.wrapper, height: sizes.wrapper, borderRadius: '26%',
+        background: `linear-gradient(135deg, ${g.from}, ${g.to})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff', fontWeight: 800, fontSize: Math.round(sizes.wrapper * 0.5),
+        lineHeight: 1, boxShadow: 'inset 0 1px 1px rgba(255,255,255,.25), 0 1px 3px rgba(0,0,0,.18)',
+        fontFamily: 'var(--font)', userSelect: 'none',
+      }}>{initial}</div>
     </div>
   )
 })
