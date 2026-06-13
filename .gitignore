@@ -41,3 +41,6 @@ Thumbs.db
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+# Supabase CLI scratch
+supabase/.temp/
