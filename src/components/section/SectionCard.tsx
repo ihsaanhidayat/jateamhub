@@ -67,17 +67,6 @@ export default memo(function SectionCard({
   const canEditSection = !isShared
   const canFocus = editMode && !isShared
 
-  // Force re-render saat notes mode toggle dari header — hanya untuk section ini
-  const [, forceRender] = useState(0)
-  useEffect(() => {
-    const h = (e: Event) => {
-      const sid = (e as CustomEvent).detail?.sectionId
-      if (!sid || sid === section.id) forceRender(n => n + 1)
-    }
-    window.addEventListener('notes-mode-changed', h)
-    return () => window.removeEventListener('notes-mode-changed', h)
-  }, [section.id])
-
   const [confirmDel, setConfirmDel] = useState<{
     open: boolean; type: 'section' | 'item'; itemId?: string; msg: string
   }>({ open: false, type: 'section', msg: '' })

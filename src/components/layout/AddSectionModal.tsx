@@ -16,7 +16,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
   const hasPasswordWidget = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'password'))
 
   const addWidget = (widgetType: WidgetType) => {
-    const { addPersonalSection, addPersonalSectionFirst, addPersonalSectionAuto } = useStore.getState()
+    const { addPersonalSection } = useStore.getState()
     const current = useStore.getState().personalSections
     const maxY    = current.reduce((m, s) => Math.max(m, s.layout.y + s.layout.h), 0)
     const lastRow = current.filter(s => s.layout.y + s.layout.h >= maxY)
@@ -44,11 +44,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
       type:       'widget' as const,
       widgetType,
     }
-    if (widgetType === 'todo') {
-      addPersonalSectionFirst(sectionData)
-    } else {
-      addPersonalSection(sectionData)
-    }
+    addPersonalSection(sectionData)
     onClose()
   }
 

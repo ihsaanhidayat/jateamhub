@@ -91,7 +91,12 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const addTimeRef = useRef<HTMLInputElement>(null)
   const lastTap    = useRef<{ date: string; t: number }>({ date: '', t: 0 })
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
 
   // ── Load + persist events ───────────────────────────────────────────
   const rawDesc = useStore(s => {

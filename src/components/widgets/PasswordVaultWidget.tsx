@@ -212,6 +212,8 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
       const list = await decryptVault(blob)
       setEntries(list); setLocked(false); setPin(''); resetIdle()
     } else {
+      // Vault wiped elsewhere (e.g. superadmin reset) → go to first-run, not "wrong PIN".
+      if (!(await vaultExists())) { setHasVault(false); setPin(''); setErr(''); failsRef.current = 0; return }
       failsRef.current += 1
       const n = failsRef.current
       setPin('')

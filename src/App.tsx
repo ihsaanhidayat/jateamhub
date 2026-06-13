@@ -19,7 +19,6 @@ const AddSectionModal          = lazy(() => import('./components/layout/AddSecti
 const ImportLinksModal         = lazy(() => import('./components/ui/ImportLinksModal'))
 const ForceChangePasswordModal = lazy(() => import('./components/ui/ForceChangePasswordModal'))
 const InstallPrompt             = lazy(() => import('./components/ui/InstallPrompt'))
-const TodoReminderModal         = lazy(() => import('./components/ui/TodoReminderModal'))
 const IdleSessionGuard          = lazy(() => import('./components/ui/IdleSessionGuard'))
 const NotificationBanner        = lazy(() => import('./components/ui/NotificationBanner'))
 const TaskListPage              = lazy(() => import('./pages/TaskListPage'))
@@ -435,7 +434,6 @@ export default function App() {
         </Suspense>
       )}
       <Suspense fallback={null}>
-        <TodoReminderModal />
         <IdleSessionGuard />
         <InstallPrompt />
         {profile && <NotificationBanner userId={profile.id} />}

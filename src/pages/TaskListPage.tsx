@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useStore } from '../store/dashboardStore'
 import { getTodoHistory, supabase } from '../utils/supabaseClient'
-import type { TodoHistory, TodoItem } from '../types'
+import type { TodoHistory } from '../types'
 
 interface Props { onClose: () => void }
 type Filter = 'all' | 'done' | 'overdue'
@@ -88,21 +88,30 @@ export default function TaskListPage({ onClose }: Props) {
     setUndoing(true)
     const toRestore = history.filter(h => selected.has(h.id))
     await supabase.from('todo_history').delete().in('id', toRestore.map(h => h.id))
+    // Restore into the Calendar (the Todo widget was retired) as events.
     const store = useStore.getState()
-    const todoSection = store.personalSections.find((s: any) => s.widgetType === 'todo')
-    if (todoSection) {
-      const existing: TodoItem[] = (() => { try { return JSON.parse(todoSection.items?.[0]?.desc ?? '[]') } catch { return [] } })()
-      const restored: TodoItem[] = toRestore.map(h => ({
-        id: crypto.randomUUID(), text: h.task_text, done: false,
-        createdAt: Date.now(), date: h.date, dueTime: h.due_date ?? undefined,
+    let cal = store.personalSections.find((s: any) => s.widgetType === 'calendar')
+    if (!cal) {
+      store.addPersonalSection({
+        title: 'Kalender', icon: '📅', subtitle: '', items: [],
+        layout: { x: 0, y: 0, w: 4, h: 6 }, visibility: 'all',
+        targetUnits: [], pageId: 'beranda', type: 'widget', widgetType: 'calendar',
+      } as any)
+      cal = useStore.getState().personalSections.find((s: any) => s.widgetType === 'calendar')
+    }
+    if (cal) {
+      let existing: any[] = []
+      try { existing = JSON.parse(cal.items?.[0]?.desc ?? '[]') } catch {}
+      const restored = toRestore.map(h => ({
+        id: crypto.randomUUID(), date: h.date, title: h.task_text,
+        time: h.due_date ?? undefined, kind: 'event', createdAt: Date.now(),
       }))
       const next = [...existing, ...restored]
-      const json = JSON.stringify(next)
-      if (todoSection.items.length > 0) {
-        store.updateItem(todoSection.id, todoSection.items[0].id, { ...todoSection.items[0], desc: json, title: 'todo-data' })
-      } else {
-        store.addItem(todoSection.id, { title: 'todo-data', url: '#', icon: '', desc: json, tags: [], newTab: false, useFavicon: false } as any)
-      }
+      const item0 = cal.items[0] ?? { id: `cal-${cal.id}`, title: '', url: '', icon: '', desc: '', tags: [], newTab: false, iconUrl: '', useFavicon: false }
+      store.updatePersonalSection(cal.id, {
+        items: [{ ...item0, desc: JSON.stringify(next) }, ...cal.items.slice(1)],
+        subtitle: `${next.length} agenda`,
+      })
       await store.syncPersonalToDb()
     }
     setSelected(new Set()); setUndoing(false); loadHistory()
