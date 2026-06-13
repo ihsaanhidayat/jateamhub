@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useChatStore } from '../../store/chatStore'
+import { useT } from '../../utils/i18n'
 import { messagePreview } from '../../utils/chatText'
 import EmojiPicker from './EmojiPicker'
 
@@ -9,6 +10,7 @@ const MAX_MB = 50
 interface Props { senderId: string; otherName?: string }
 
 export default function ChatInput({ senderId, otherName }: Props) {
+  const t = useT()
   const sendText      = useChatStore(s => s.sendText)
   const sendFile      = useChatStore(s => s.sendFile)
   const sending       = useChatStore(s => s.sending)
@@ -308,7 +310,7 @@ export default function ChatInput({ senderId, otherName }: Props) {
                   el.style.height = Math.min(el.scrollHeight, 120) + 'px'
                 }}
                 onKeyDown={handleKey}
-                placeholder="Ketik pesan..."
+                placeholder={t('chat.type')}
                 rows={1}
                 // NOTE: never disable while sending — disabling blurs the field and
                 // collapses the mobile keyboard, causing the up/down flicker.

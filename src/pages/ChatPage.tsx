@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
+import { useT } from '../utils/i18n'
 import { ensureNotifyPermission, primeAudio } from '../utils/notify'
 import { registerPushSubscription } from '../utils/push'
 import ConversationList from '../components/chat/ConversationList'
@@ -12,6 +13,7 @@ import ForwardModal from '../components/chat/ForwardModal'
 interface Props { onClose: () => void }
 
 export default function ChatPage({ onClose }: Props) {
+  const t = useT()
   const { profile } = useAuthStore()
   const enabled           = useChatStore(s => s.enabled)
   const isLocked          = useChatStore(s => s.isLocked)
@@ -241,9 +243,9 @@ export default function ChatPage({ onClose }: Props) {
                 }}>
                   <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)' }}>Chat internal tim</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)' }}>{t('chat.team')}</div>
                 <div style={{ fontSize: 13, color: 'var(--silver4)', lineHeight: 1.5 }}>
-                  Pilih percakapan di samping, atau mulai yang baru. Pesan teks diamankan end-to-end.
+                  {t('chat.pick')}
                 </div>
               </div>
             </div>

@@ -96,6 +96,18 @@ const DICT: Record<string, { id: string; en: string }> = {
   'item.edit':      { id: 'Edit Link', en: 'Edit Link' },
   'item.title':     { id: 'Judul', en: 'Title' },
   'item.url':       { id: 'URL', en: 'URL' },
+  'item.name':      { id: 'Nama Link *', en: 'Link Name *' },
+  'item.urlreq':    { id: 'URL *', en: 'URL *' },
+  'item.popup':     { id: 'Teks popup (hover)', en: 'Hover text' },
+  'item.icon':      { id: 'Custom Icon URL (opsional)', en: 'Custom Icon URL (optional)' },
+  'confirm.del':    { id: 'Hapus?', en: 'Delete?' },
+  'yes':            { id: 'Ya', en: 'Yes' },
+  'no':             { id: 'Tidak', en: 'No' },
+
+  // Chat
+  'chat.type':      { id: 'Ketik pesan...', en: 'Type a message...' },
+  'chat.team':      { id: 'Chat internal tim', en: 'Team chat' },
+  'chat.pick':      { id: 'Pilih percakapan di samping, atau mulai yang baru. Pesan teks diamankan end-to-end.', en: 'Pick a conversation, or start a new one. Text messages are end-to-end encrypted.' },
 }
 
 interface I18nState { lang: Lang; setLang: (l: Lang) => void }
