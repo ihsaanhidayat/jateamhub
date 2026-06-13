@@ -119,8 +119,12 @@ export async function unlockVault(pin: string): Promise<boolean> {
       .from('vault_keys').select('salt,iv,verifier').eq('user_id', _userId).maybeSingle()
     if (!data) return false
     const key = await deriveKey(pin, b64ToBytes(data.salt))
-    const token = await decWithKey(key, data.verifier)   // throws if wrong PIN
-    if (token !== VERIFIER_TOKEN) return false
+    // The verifier was encrypted with a SEPARATE iv (stored in data.iv), not the
+    // packed iv‖ct format — decrypt with that iv. (Mismatch here was the bug that
+    // rejected the correct PIN.) Throws on a wrong PIN.
+    const pt = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: b64ToBytes(data.iv) }, key, b64ToBytes(data.verifier))
+    if (dtxt.decode(pt) !== VERIFIER_TOKEN) return false
     _vaultKey = key
     return true
   } catch {

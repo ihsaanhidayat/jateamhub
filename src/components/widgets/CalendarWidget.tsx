@@ -1,6 +1,7 @@
 import { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useStore } from '../../store/dashboardStore'
-import { hijriDate, weton, dateFromYmd } from '../../utils/dates'
+import { hijriDayMonth, hijriMonthYear, weton, dateFromYmd } from '../../utils/dates'
+import { holidayOn } from '../../utils/holidays'
 import type { CalendarEvent, CalendarKind } from '../../types'
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -194,6 +195,12 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
     }
   }
 
+  // ── Secondary calendar toggles (independent, persisted) ─────────────
+  const [hijriOn,   setHijriOn]   = useState(() => localStorage.getItem('cal-hijri') === '1')
+  const [pasaranOn, setPasaranOn] = useState(() => localStorage.getItem('cal-pasaran') === '1')
+  const toggleHijri   = () => setHijriOn(v => { const n = !v; localStorage.setItem('cal-hijri', n ? '1' : '0'); return n })
+  const togglePasaran = () => setPasaranOn(v => { const n = !v; localStorage.setItem('cal-pasaran', n ? '1' : '0'); return n })
+
   // ── Derived ──────────────────────────────────────────────────────────
   const cells = buildGrid(viewYear, viewMonth)
   const isTodayStr = today()
@@ -201,6 +208,8 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const cellSize = isExpanded ? 40 : 30
   const notifOff = typeof Notification !== 'undefined' && Notification.permission === 'default'
   const selDate = dateFromYmd(selectedDate)
+  const selHoliday = holidayOn(selectedDate)
+  const viewHijriMY = hijriOn ? hijriMonthYear(new Date(viewYear, viewMonth, 15)) : ''
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '8px 10px', gap: 6 }}>
@@ -217,8 +226,13 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
         <button onClick={prevMonth} style={navBtn} aria-label="Bulan sebelumnya">‹</button>
-        <div style={{ flex: 1, textAlign: 'center', minWidth: 0, fontSize: 12.5, fontWeight: 800, color: 'var(--silver)', fontFamily: 'var(--font)', letterSpacing: '-0.2px' }}>
-          {MONTH_NAMES[viewMonth]} {viewYear}
+        <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--silver)', fontFamily: 'var(--font)', letterSpacing: '-0.2px' }}>
+            {MONTH_NAMES[viewMonth]} {viewYear}
+          </div>
+          {viewHijriMY && (
+            <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', marginTop: 1 }}>{viewHijriMY}</div>
+          )}
         </div>
         <button onClick={nextMonth} style={navBtn} aria-label="Bulan berikutnya">›</button>
         <button onClick={goToday} style={{
@@ -227,6 +241,19 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
           border: '1px solid color-mix(in srgb, ' + RED + ' 25%, transparent)',
           borderRadius: 6, padding: '3px 8px', cursor: 'pointer', flexShrink: 0, fontFamily: 'var(--font)',
         }}>Hari ini</button>
+      </div>
+
+      {/* Secondary-calendar toggles */}
+      <div style={{ display: 'flex', gap: 6, flexShrink: 0, justifyContent: 'center' }}>
+        {([['Hijriah', hijriOn, toggleHijri], ['Pasaran', pasaranOn, togglePasaran]] as const).map(([label, on, fn]) => (
+          <button key={label} onClick={fn} style={{
+            fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', cursor: 'pointer',
+            padding: '2px 9px', borderRadius: 99,
+            border: `1px solid ${on ? 'color-mix(in srgb, ' + RED + ' 40%, transparent)' : 'var(--border2)'}`,
+            background: on ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg4)',
+            color: on ? RED : 'var(--silver4)',
+          }}>{on ? '● ' : '○ '}{label}</button>
+        ))}
       </div>
 
       {/* Day header row */}
@@ -239,20 +266,24 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
       {/* Calendar grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, flexShrink: 0 }}>
         {cells.map((cell, i) => {
-          const isTd  = cell.date === isTodayStr
-          const isSel = cell.date === selectedDate
-          const has   = (eventsByDate.get(cell.date)?.length ?? 0) > 0
+          const isTd   = cell.date === isTodayStr
+          const isSel  = cell.date === selectedDate
+          const has    = (eventsByDate.get(cell.date)?.length ?? 0) > 0
+          const holi   = holidayOn(cell.date)
+          const isSun  = i % 7 === 0
+          const redDay = (!!holi || isSun) && cell.curr
           return (
             <button
               key={i}
               onClick={() => onCellTap(cell.date)}
               onDoubleClick={() => { if (!isMobile) openAdd(cell.date) }}
+              title={holi ?? undefined}
               style={{
                 position: 'relative', height: cellSize, borderRadius: 8,
                 border: isSel ? '1px solid var(--border2)' : '1px solid transparent',
                 background: isSel ? 'var(--bg4)' : 'transparent',
                 cursor: 'pointer', padding: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
               }}
             >
               {has && (
@@ -265,9 +296,10 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
               )}
               <span style={{
                 fontSize: 11, fontWeight: isTd ? 800 : cell.curr ? 600 : 400,
-                color: isTd ? RED : cell.curr ? 'var(--silver)' : 'var(--silver4)',
+                color: isTd ? RED : redDay ? RED : cell.curr ? 'var(--silver)' : 'var(--silver4)',
                 lineHeight: 1, zIndex: 1,
               }}>{Number(cell.date.split('-')[2])}</span>
+              {holi && cell.curr && <span style={{ width: 3, height: 3, borderRadius: '50%', background: RED, zIndex: 1 }} />}
             </button>
           )
         })}
@@ -278,10 +310,16 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
         {/* Simplified date + Hijri + Weton */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0, gap: 8 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--silver2)', fontFamily: 'var(--font)' }}>{formatDisplayDate(selectedDate)}</div>
-            <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              ☪ {hijriDate(selDate)} · {weton(selDate)}
-            </div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: selHoliday ? RED : 'var(--silver2)', fontFamily: 'var(--font)' }}>{formatDisplayDate(selectedDate)}</div>
+            {hijriOn && (
+              <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>☪ {hijriDayMonth(selDate)}</div>
+            )}
+            {pasaranOn && (
+              <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>ꦮ {weton(selDate)}</div>
+            )}
+            {selHoliday && (
+              <div style={{ fontSize: 9.5, color: RED, fontWeight: 700, fontFamily: 'var(--mono)', marginTop: 2, whiteSpace: 'normal', lineHeight: 1.3 }}>🔴 {selHoliday}</div>
+            )}
           </div>
           <button onClick={() => (showAddForm ? closeAdd() : openAdd())}
             style={{ fontSize: 10, fontWeight: 700, color: RED, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: 0, flexShrink: 0, whiteSpace: 'nowrap' }}>

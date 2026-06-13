@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
+import { supabase } from '../../utils/supabaseClient'
+import { IconEye, IconEyeOff } from '../ui/icons'
 import {
   vaultExists, createVault, unlockVault, encryptVault, decryptVault,
-  isVaultUnlocked, clearVaultSession, resetVault,
+  isVaultUnlocked, clearVaultSession,
 } from '../../utils/vaultCrypto'
 import type { VaultEntry } from '../../types'
 
@@ -88,7 +90,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   const [pin2,     setPin2]     = useState('')
   const [busy,     setBusy]     = useState(false)
   const [err,      setErr]      = useState('')
-  const [confirmReset, setConfirmReset] = useState(false)
+  const [showPin,  setShowPin]  = useState(false)
 
   // rate limiting
   const failsRef = useRef(0)
@@ -255,17 +257,18 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
 
   const useGenerated = () => { setForm(f => ({ ...f, password: genPassword(genLen, genOpts) })); setShowGen(false) }
 
-  // Forgot-PIN: wipe the vault (entries unrecoverable) and return to setup.
-  const handleReset = async () => {
+  // Forgot-PIN reset is NOT a bare button — it must re-authenticate through the
+  // user's linked Google account (Google enforces its own 2FA on prompt=login).
+  // The actual wipe runs in authStore after the redirect returns.
+  const startGoogleReset = async () => {
     setBusy(true)
-    await resetVault()
-    const store = useStore.getState()
-    const s = store.personalSections.find(x => x.id === sectionId)
-    if (s?.items?.length) store.updateItem(sectionId, s.items[0].id, { ...s.items[0], desc: '' })
-    store.updatePersonalSection(sectionId, { subtitle: '' })
-    store.syncPersonalToDb()
-    setBusy(false); setConfirmReset(false)
-    setHasVault(false); setLocked(true); setEntries([]); setPin(''); setErr('')
+    sessionStorage.setItem('vault-reset-pending', JSON.stringify({ sectionId, at: Date.now() }))
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { queryParams: { prompt: 'login' }, redirectTo: window.location.origin },
+    })
+    if (error) { sessionStorage.removeItem('vault-reset-pending'); setBusy(false); setErr('Gagal membuka login Google.') }
+    // success → browser redirects to Google
   }
 
   const onImport = async (file: File) => {
@@ -287,6 +290,26 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
     gap: 10, padding: 22, minHeight: 220, textAlign: 'center',
   }
 
+  // PIN field with a show/hide eye toggle.
+  const renderPin = (p: { value: string; onChange: (v: string) => void; placeholder: string; autoFocus?: boolean; onEnter?: () => void }) => (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <input
+        type={showPin ? 'text' : 'password'}
+        value={p.value} autoFocus={p.autoFocus}
+        onChange={e => { p.onChange(e.target.value); setErr('') }}
+        onKeyDown={e => { if (e.key === 'Enter' && p.onEnter) p.onEnter() }}
+        placeholder={p.placeholder}
+        style={{ ...inp, paddingRight: 36, borderColor: err ? 'var(--red)' : 'var(--border2)' }}
+      />
+      <button type="button" onClick={() => setShowPin(v => !v)} title={showPin ? 'Sembunyikan' : 'Tampilkan'}
+        style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)', display: 'flex', alignItems: 'center', padding: 3 }}>
+        {showPin ? <IconEyeOff size={15} /> : <IconEye size={15} />}
+      </button>
+    </div>
+  )
+
+  const googleEmail = (profile as any)?.google_email as string | undefined
+
   // ── Render: loading ─────────────────────────────────────────
   if (hasVault === null) {
     return <div style={{ minHeight: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -303,11 +326,8 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
         <div style={{ fontSize: 11, color: 'var(--silver4)', lineHeight: 1.5, maxWidth: 240 }}>
           Min. 6 karakter. Mengenkripsi semua kata sandi. <b>Tidak bisa dipulihkan tanpa PIN ini.</b>
         </div>
-        <input type="password" value={pin} onChange={e => { setPin(e.target.value); setErr('') }} placeholder="PIN baru"
-          style={{ ...inp, borderColor: err ? 'var(--red)' : 'var(--border2)' }} />
-        <input type="password" value={pin2} onChange={e => { setPin2(e.target.value); setErr('') }}
-          onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="Konfirmasi PIN"
-          style={{ ...inp, borderColor: err ? 'var(--red)' : 'var(--border2)' }} />
+        {renderPin({ value: pin, onChange: setPin, placeholder: 'PIN baru' })}
+        {renderPin({ value: pin2, onChange: setPin2, placeholder: 'Konfirmasi PIN', onEnter: handleCreate })}
         {err && <span style={{ fontSize: 11, color: 'var(--red)' }}>{err}</span>}
         <button onClick={handleCreate} disabled={busy || pin.length < 6}
           style={{ width: '100%', height: 34, background: pin.length >= 6 ? 'var(--accent)' : 'var(--border2)', border: 'none', borderRadius: 7, color: 'white', fontSize: 12, fontWeight: 700, cursor: busy ? 'wait' : 'pointer', fontFamily: 'var(--font)' }}>
@@ -327,10 +347,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
           <span style={{ fontSize: 11, color: 'var(--red)' }}>Coba lagi dalam {lockoutRem}s</span>
         ) : (
           <>
-            <input type="password" value={pin} autoFocus
-              onChange={e => { setPin(e.target.value); setErr('') }}
-              onKeyDown={e => e.key === 'Enter' && handleUnlock()} placeholder="PIN brankas"
-              style={{ ...inp, borderColor: err ? 'var(--red)' : 'var(--border2)' }} />
+            {renderPin({ value: pin, onChange: setPin, placeholder: 'PIN brankas', autoFocus: true, onEnter: handleUnlock })}
             {err && <span style={{ fontSize: 11, color: 'var(--red)' }}>{err}</span>}
           </>
         )}
@@ -339,22 +356,27 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
           {busy ? 'Membuka...' : 'Buka'}
         </button>
 
-        {/* Forgot PIN → wipe reset */}
-        {!confirmReset ? (
-          <button onClick={() => setConfirmReset(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 10.5, textDecoration: 'underline', fontFamily: 'var(--font)' }}>
-            Lupa PIN? Reset brankas
-          </button>
-        ) : (
-          <div style={{ width: '100%', padding: 9, background: 'color-mix(in srgb, var(--red) 7%, var(--bg4))', border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 7 }}>
-            <span style={{ fontSize: 10.5, color: 'var(--red)', lineHeight: 1.45 }}>
-              Reset menghapus <b>semua kata sandi</b> di brankas ini secara permanen. Lanjutkan?
+        {/* Forgot PIN → reset ONLY via Google re-auth (2FA enforced by Google) */}
+        <div style={{ width: '100%', marginTop: 4, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {googleEmail ? (
+            <>
+              <button onClick={startGoogleReset} disabled={busy} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', height: 32, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--silver2)', fontSize: 11, fontWeight: 600, cursor: busy ? 'wait' : 'pointer', fontFamily: 'var(--font)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"/></svg>
+                Lupa PIN? Reset lewat Akun Google
+              </button>
+              <span style={{ fontSize: 9.5, color: 'var(--silver4)', lineHeight: 1.4 }}>
+                Verifikasi ulang Google (+ 2FA) wajib. Reset menghapus semua kata sandi permanen.
+              </span>
+              <span style={{ fontSize: 9.5, color: 'var(--green, #16A34A)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                ✓ Tersinkron: {googleEmail}
+              </span>
+            </>
+          ) : (
+            <span style={{ fontSize: 10, color: 'var(--silver4)', lineHeight: 1.4 }}>
+              Lupa PIN? Hubungkan <b>Akun Google</b> di Profil dulu untuk bisa reset brankas dengan aman.
             </span>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={() => setConfirmReset(false)} disabled={busy} style={{ flex: 1, height: 28, background: 'none', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
-              <button onClick={handleReset} disabled={busy} style={{ flex: 1, height: 28, background: 'var(--red)', border: 'none', borderRadius: 6, color: 'white', fontSize: 11, fontWeight: 700, cursor: busy ? 'wait' : 'pointer', fontFamily: 'var(--font)' }}>{busy ? '...' : 'Reset'}</button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     )
   }

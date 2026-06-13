@@ -155,7 +155,7 @@ function ConnectedAccounts() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, color: 'var(--silver)', fontWeight: 600 }}>Google</div>
           <div style={{ fontSize: 11, color: linked ? 'var(--green, #16A34A)' : 'var(--silver4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {linked ? `Terhubung · ${profile?.google_email}` : 'Belum terhubung'}
+            {linked ? `✓ Tersinkron ke akun Google: ${profile?.google_email}` : 'Belum tersinkron'}
           </div>
         </div>
         {linked ? (

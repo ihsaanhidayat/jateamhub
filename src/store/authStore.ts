@@ -42,6 +42,24 @@ interface AuthState {
   removeUser:  (userId: string) => Promise<string | null>
 }
 
+// After a Google re-auth triggered for a vault reset, complete the wipe.
+// Gated: a fresh google-provider session + a non-stale pending flag (<5 min).
+async function completeVaultResetIfPending(
+  toast: ((m: string, t?: 'success' | 'error' | 'warn') => void) | null,
+) {
+  const raw = sessionStorage.getItem('vault-reset-pending')
+  if (!raw) return
+  let info: { sectionId: string; at: number } | null = null
+  try { info = JSON.parse(raw) } catch {}
+  if (!info || Date.now() - info.at > 5 * 60_000) { sessionStorage.removeItem('vault-reset-pending'); return }
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.user?.app_metadata?.provider !== 'google') return   // require fresh Google auth
+  sessionStorage.removeItem('vault-reset-pending')
+  const { resetVault } = await import('../utils/vaultCrypto')
+  const ok = await resetVault()
+  toast?.(ok ? 'Brankas direset. Buka brankas untuk membuat PIN baru.' : 'Reset brankas gagal.', ok ? 'success' : 'error')
+}
+
 // Simpan subscription di luar store agar bisa cleanup
 let authSubscription: { unsubscribe: () => void } | null = null
 // Track pending signOut — login() harus tunggu ini selesai sebelum signIn()
@@ -92,6 +110,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (!session?.user) {
         set({ profile: null, loading: false, initialized: true })
       } else {
+        // Complete a pending vault reset (Google re-auth) BEFORE widgets mount,
+        // so the vault opens in fresh create-PIN state with no race.
+        await completeVaultResetIfPending(get()._toast)
         const profile = await getProfile(session.user.id)
         if (profile) {
           set({ profile, loading: false, initialized: true })

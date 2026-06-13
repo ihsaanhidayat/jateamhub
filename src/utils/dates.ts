@@ -17,6 +17,22 @@ export function hijriDate(d: Date): string {
   catch { return '' }
 }
 
+function hijriParts(d: Date): { day: string; month: string; year: string } {
+  const parts = hijriFormatter().formatToParts(d)
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? ''
+  return { day: get('day'), month: get('month'), year: get('year') }
+}
+// e.g. "1 Zulhijah"
+export function hijriDayMonth(d: Date): string {
+  const p = hijriParts(d)
+  return p.day && p.month ? `${p.day} ${p.month}` : ''
+}
+// e.g. "Muharam 1448 H"
+export function hijriMonthYear(d: Date): string {
+  const p = hijriParts(d)
+  return p.month && p.year ? `${p.month} ${p.year} H` : ''
+}
+
 // ── Javanese Weton (dino + pasaran) ───────────────────────────
 const DINO    = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
 const PASARAN = ['Legi', 'Pahing', 'Pon', 'Wage', 'Kliwon']
