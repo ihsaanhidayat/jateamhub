@@ -2,6 +2,7 @@
 // ADD SECTION MODAL — pilihan Section atau Widget
 // ─────────────────────────────────────────────────────────────
 import { useStore } from '../../store/dashboardStore'
+import { useT } from '../../utils/i18n'
 import type { Section, WidgetType } from '../../types'
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function AddSectionModal({ open, onClose }: Props) {
+  const t = useT()
   // Granular selectors — hanya re-render saat sections berubah
   const hasClockWidget    = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'clock'))
   const hasCalendarWidget = useStore(s => s.personalSections.some(sec => sec.type === 'widget' && sec.widgetType === 'calendar'))
@@ -118,7 +120,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
                   fontSize: 11, fontWeight: 700, cursor: hasClockWidget ? 'not-allowed' : 'pointer',
                   fontFamily: 'var(--font)',
                 }}>
-                🕐 Jam{hasClockWidget ? ' (aktif)' : ''}
+                🕐 {t("w.clock")}{hasClockWidget ? " (aktif)" : ""}
               </button>
               {/* Notes */}
               <button
@@ -129,7 +131,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
                   color: 'var(--accent)', fontSize: 11, fontWeight: 700,
                   cursor: 'pointer', fontFamily: 'var(--font)',
                 }}>
-                📝 Notes
+                📝 {t("w.notes")}
               </button>
               {/* Kalender */}
               <button
@@ -147,7 +149,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
                   fontSize: 11, fontWeight: 700,
                   cursor: hasCalendarWidget ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
                 }}>
-                📅 Kalender{hasCalendarWidget ? ' (aktif)' : ''}
+                📅 {t("w.calendar")}{hasCalendarWidget ? " (aktif)" : ""}
               </button>
               {/* Kata Sandi (Password Vault) */}
               <button
@@ -165,7 +167,7 @@ export default function AddSectionModal({ open, onClose }: Props) {
                   fontSize: 11, fontWeight: 700,
                   cursor: hasPasswordWidget ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
                 }}>
-                🔐 Sandi{hasPasswordWidget ? ' (aktif)' : ''}
+                🔐 {t("w.password")}{hasPasswordWidget ? " (aktif)" : ""}
               </button>
             </div>
           </div>

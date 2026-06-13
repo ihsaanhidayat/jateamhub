@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../utils/supabaseClient'
+import { useT } from '../../utils/i18n'
 import {
   IconEye, IconEyeOff, IconLock, IconCopy, IconCheck,
   IconEdit, IconTrash, IconGlobe, IconRefresh, IconSearch, IconPlus,
@@ -47,6 +48,7 @@ function strength(pw: string): { label: string; color: string; pct: number } {
 }
 
 function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
+  const t = useT()
   const { profile } = useAuthStore()
   const setNotesLockActive = useStore(s => (s as any).setNotesLockActive)
 
@@ -291,7 +293,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
     return (
       <div style={overlay}>
         <span style={{ color: 'var(--accent)', display: 'flex' }}><IconLock size={28} /></span>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)' }}>Buat PIN Brankas</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)' }}>{t("v.createpin")}</div>
         <div style={{ fontSize: 11, color: 'var(--silver4)', lineHeight: 1.5, maxWidth: 240 }}>
           Min. 6 karakter. Mengenkripsi semua kata sandi. <b>Tidak bisa dipulihkan tanpa PIN ini.</b>
         </div>
@@ -311,7 +313,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
     return (
       <div style={overlay}>
         <span style={{ color: 'var(--silver3)', display: 'flex' }}><IconLock size={28} /></span>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)' }}>Brankas Terkunci</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)' }}>{t("v.locked")}</div>
         {lockoutRem > 0 ? (
           <span style={{ fontSize: 11, color: 'var(--red)' }}>Coba lagi dalam {lockoutRem}s</span>
         ) : (
@@ -322,7 +324,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
         )}
         <button onClick={handleUnlock} disabled={busy || !pin || lockoutRem > 0}
           style={{ width: '100%', height: 34, background: 'var(--accent)', border: 'none', borderRadius: 7, color: 'white', fontSize: 12, fontWeight: 700, cursor: busy ? 'wait' : 'pointer', fontFamily: 'var(--font)', opacity: (!pin || lockoutRem > 0) ? 0.6 : 1 }}>
-          {busy ? 'Membuka...' : 'Buka'}
+          {busy ? t("v.opening") : t("v.open")}
         </button>
 
         {/* Forgot PIN → reset ONLY via Google re-auth (2FA enforced by Google) */}
@@ -368,7 +370,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
       {blurred && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: 'var(--bg2)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'var(--silver4)' }}>
           <span style={{ color: 'var(--silver3)', display: 'flex' }}><IconLock size={22} /></span>
-          <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)' }}>Disembunyikan</span>
+          <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)' }}>{t("v.hidden")}</span>
         </div>
       )}
       {/* Sticky top: toolbar (search · +add · lock) + collapsible add form */}
@@ -377,27 +379,27 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <div style={{ position: 'relative', flex: 1 }}>
             <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--silver4)', display: 'flex', pointerEvents: 'none' }}><IconSearch size={13} /></span>
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari..." {...noAutofill} style={{ ...inp, height: 30, paddingLeft: 28 }} />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder={t("v.search")} {...noAutofill} style={{ ...inp, height: 30, paddingLeft: 28 }} />
           </div>
           <button onClick={() => { if (showAdd) { setShowAdd(false); setShowGen(false); setForm({ label: '', username: '', password: '', url: '' }) } else setShowAdd(true) }}
             title={showAdd ? 'Tutup' : 'Tambahkan password'}
             style={{ ...toolBtn, background: showAdd ? 'var(--accent)' : 'var(--bg4)', border: showAdd ? 'none' : '1px solid var(--border2)', color: showAdd ? 'white' : 'var(--silver3)' }}>
             <span style={{ display: 'flex', transition: 'transform 220ms cubic-bezier(.34,1.56,.64,1)', transform: showAdd ? 'rotate(45deg)' : 'none' }}><IconPlus size={15} /></span>
           </button>
-          <button onClick={doLock} title="Kunci" style={toolBtn}><IconLock size={14} /></button>
+          <button onClick={doLock} title={t("v.lock")} style={toolBtn}><IconLock size={14} /></button>
         </div>
 
         {/* Collapsible add form */}
         {showAdd && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: 6, background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 8, flexShrink: 0, animation: 'slideDown 150ms ease' }}>
             <div style={{ display: 'flex', gap: 5 }}>
-              <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Nama situs" autoFocus {...noAutofill} style={{ ...miniInp, flex: 1 }} />
-              <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username / email" {...noAutofill} style={{ ...miniInp, flex: 1 }} />
+              <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder={t("v.sitename")} autoFocus {...noAutofill} style={{ ...miniInp, flex: 1 }} />
+              <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder={t("v.username")} {...noAutofill} style={{ ...miniInp, flex: 1 }} />
             </div>
             <div style={{ display: 'flex', gap: 5 }}>
               <input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                 onKeyDown={e => { if (e.key === 'Enter' && canAdd) addEntry() }}
-                placeholder="Kata sandi" type={showPw ? 'text' : 'password'} {...noAutofillPw} style={{ ...miniInp, flex: 1 }} />
+                placeholder={t("v.password")} type={showPw ? 'text' : 'password'} {...noAutofillPw} style={{ ...miniInp, flex: 1 }} />
               <button onClick={() => setShowPw(v => !v)} title={showPw ? 'Sembunyikan' : 'Tampilkan'} style={miniBtn}>{showPw ? <IconEyeOff size={13} /> : <IconEye size={13} />}</button>
               <button onClick={() => setShowGen(v => !v)} title="Buat kata sandi" style={{ ...miniBtn, color: showGen ? 'var(--accent)' : 'var(--silver3)' }}><IconRefresh size={13} /></button>
               <button onClick={addEntry} disabled={!canAdd} title="Simpan" style={{ ...miniBtn, background: canAdd ? 'var(--accent)' : 'var(--bg)', border: canAdd ? 'none' : '1px solid var(--border2)', color: canAdd ? 'white' : 'var(--silver4)', cursor: canAdd ? 'pointer' : 'not-allowed' }}><IconCheck size={14} /></button>

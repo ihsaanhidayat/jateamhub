@@ -8,6 +8,7 @@ import { highlight } from '../../utils/helpers'
 import AppIcon from '../ui/AppIcon'
 import { sanitizeUrl } from '../../utils/security'
 import { IconEdit, IconTrash, IconSettings, IconMaximize, IconMinimize } from '../ui/icons'
+import { useT } from '../../utils/i18n'
 
 interface Props {
   section:              Section
@@ -43,6 +44,7 @@ export default memo(function SectionCard({
   onEditSection, onEditItem, onAddItem, onDeleteSection,
   onSave, onCancel,
 }: Props) {
+  const t = useT()
   // Granular selectors — SectionCard hanya re-render saat data relevan berubah
   const editMode      = useStore(s => s.editMode)
   const searchQuery   = useStore(s => s.searchQuery)
@@ -294,7 +296,7 @@ export default memo(function SectionCard({
         {!widgetContent && filteredItems.length === 0 && !editMode && (
           <div className="section-empty">
             <span className="section-empty-icon">🔗</span>
-            <span className="section-empty-text">Belum ada link</span>
+            <span className="section-empty-text">{t('sec.empty')}</span>
           </div>
         )}
         {/* Widget content override */}
@@ -447,7 +449,7 @@ export default memo(function SectionCard({
           background: 'var(--bg2)', fontSize: 9, fontFamily: 'var(--mono)',
           color: 'var(--silver4)', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>
-          Diubah · {new Date(section.updatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          {t('sec.modified')} · {new Date(section.updatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
         </div>
       )}
     </div>

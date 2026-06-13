@@ -5,6 +5,7 @@ import { signInWithGoogleCalendar } from '../../utils/supabaseClient'
 import { hijriDate, weton, dateFromYmd } from '../../utils/dates'
 import { holidayOn, holidaysForYear } from '../../utils/holidays'
 import { gcalReady, listEvents, pushEvent, patchEvent, deleteEvent as gcalDeleteEvent, type GEvent } from '../../utils/gcal'
+import { useT } from '../../utils/i18n'
 import { IconChevL, IconChevR, IconClock, IconPlus, IconEdit, IconTrash, IconCheck, IconSearch, IconX } from '../ui/icons'
 import type { CalendarEvent, CalendarKind } from '../../types'
 
@@ -41,6 +42,7 @@ function buildGrid(year: number, month: number) {
 interface Props { sectionId: string; isExpanded?: boolean }
 
 export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
+  const t = useT()
   const now = new Date()
   const [viewYear,     setViewYear]     = useState(now.getFullYear())
   const [viewMonth,    setViewMonth]    = useState(now.getMonth())
@@ -253,7 +255,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
         </div>
         {confirmDelId === ev.id ? (
           <>
-            <span style={{ fontSize: 9.5, color: RED, fontWeight: 700, flexShrink: 0 }}>Hapus?</span>
+            <span style={{ fontSize: 9.5, color: RED, fontWeight: 700, flexShrink: 0 }}>{t("cal.delq")}</span>
             <button onClick={() => { deleteEvent(ev.id); setConfirmDelId(null) }} title="Ya, hapus" style={{ ...iconBtnSt, color: RED }}><IconCheck size={13} /></button>
             <button onClick={() => setConfirmDelId(null)} title="Batal" style={iconBtnSt}><IconX size={13} /></button>
           </>
@@ -284,7 +286,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
         <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 800, color: 'var(--silver)', fontFamily: 'var(--font)', letterSpacing: '-0.3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {MONTH_NAMES[viewMonth]} <span style={{ color: 'var(--silver4)', fontWeight: 700 }}>{viewYear}</span>
         </div>
-        <button onClick={goToday} title="Hari ini" style={{
+        <button onClick={goToday} title={t('cal.today')} style={{
           width: 8, height: 8, borderRadius: '50%', padding: 0, flexShrink: 0, marginRight: 2,
           background: 'var(--accent)', border: 'none', cursor: 'pointer',
           boxShadow: '0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)',
@@ -363,7 +365,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
               {syncing
                 ? <span style={{ width: 11, height: 11, border: '2px solid var(--border2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
                 : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>}
-              Sinkron
+              {t('cal.sync')}
             </button>
           )}
           <button onClick={() => setShowTools(v => { if (v) { setQuery(''); setLiburFilter(false) } return !v })} title="Cari & filter"
@@ -373,18 +375,18 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
           <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0, animation: 'slideDown 130ms ease' }}>
             <div style={{ position: 'relative', flex: 1 }}>
               <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--silver4)', display: 'flex', pointerEvents: 'none' }}><IconSearch size={12} /></span>
-              <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari agenda…"
+              <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder={t("cal.search")}
                 style={{ width: '100%', height: 26, padding: '0 8px 0 26px', boxSizing: 'border-box', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 7, fontSize: 11, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none' }} />
             </div>
             <button onClick={() => { setLiburFilter(v => !v); setLiburPage(upcomingHolidayPage(viewYear)) }} title="Libur nasional"
-              style={{ height: 26, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', flexShrink: 0, border: `1px solid ${liburFilter ? 'color-mix(in srgb, ' + RED + ' 40%, transparent)' : 'var(--border2)'}`, background: liburFilter ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg4)', color: liburFilter ? RED : 'var(--silver4)' }}>Libur</button>
+              style={{ height: 26, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', flexShrink: 0, border: `1px solid ${liburFilter ? 'color-mix(in srgb, ' + RED + ' 40%, transparent)' : 'var(--border2)'}`, background: liburFilter ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg4)', color: liburFilter ? RED : 'var(--silver4)' }}>{t("cal.holiday")}</button>
           </div>
         )}
 
         {/* Discard confirm */}
         {discardConfirm && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 7, flexShrink: 0 }}>
-            <span style={{ fontSize: 11, color: 'var(--silver2)', flex: 1 }}>Buang masukan?</span>
+            <span style={{ fontSize: 11, color: 'var(--silver2)', flex: 1 }}>{t("cal.discard")}</span>
             <button onClick={() => { setShowAddForm(false); setDiscardConfirm(false); setNewTitle(''); setNewTime('') }} style={{ height: 22, padding: '0 8px', background: 'var(--red)', border: 'none', borderRadius: 5, color: 'white', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Ya</button>
             <button onClick={() => setDiscardConfirm(false)} style={{ height: 22, padding: '0 8px', background: 'none', border: '1px solid var(--border2)', borderRadius: 5, color: 'var(--silver3)', fontSize: 10, cursor: 'pointer', fontFamily: 'var(--font)' }}>Tidak</button>
           </div>
@@ -394,7 +396,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
         {showAddForm && !discardConfirm && (
           <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: 6, background: 'var(--bg4)', borderRadius: 8, border: '1px solid var(--border2)', flexShrink: 0, animation: 'slideDown 150ms ease' }}>
             <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addEvent() }}
-              placeholder="Judul event…"
+              placeholder={t("cal.title")}
               style={{ flex: '1 1 90px', minWidth: 80, height: 28, padding: '0 9px', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 11.5, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box' }} />
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <button onClick={() => addTimeRef.current?.showPicker?.()} title="Pilih jam"
@@ -449,7 +451,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
                   {pages > 1 && (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '7px 0 2px', flexShrink: 0 }}>
                       <button onClick={() => setLiburPage(Math.max(0, page - 1))} disabled={page === 0} style={pageBtn(page === 0)}><IconChevL size={13} /></button>
-                      <span style={{ fontSize: 9.5, color: 'var(--silver3)', fontFamily: 'var(--mono)', fontWeight: 700 }}>Hal. {page + 1} / {pages}</span>
+                      <span style={{ fontSize: 9.5, color: 'var(--silver3)', fontFamily: 'var(--mono)', fontWeight: 700 }}>{t("cal.page")} {page + 1} / {pages}</span>
                       <button onClick={() => setLiburPage(Math.min(pages - 1, page + 1))} disabled={page >= pages - 1} style={pageBtn(page >= pages - 1)}><IconChevR size={13} /></button>
                     </div>
                   )}
@@ -466,7 +468,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
                   </div>
                 )}
                 {selectedEvs.length === 0 && gDayEvents.length === 0 && !selHoliday && !showAddForm && (
-                  <Empty text={`Tidak ada agenda · ${isMobile ? 'ketuk' : 'klik'} dua kali tanggal`} />
+                  <Empty text={`${t('cal.noagenda')} · ${isMobile ? 'ketuk' : 'klik'} dua kali tanggal`} />
                 )}
                 {selectedEvs.map(ev => renderEntry(ev, false))}
                 {/* Google-origin events (read-only) */}

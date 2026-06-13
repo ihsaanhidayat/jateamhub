@@ -14,6 +14,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
+import { useT } from '../../utils/i18n'
 import SectionCard from '../section/SectionCard'
 import type { Section } from '../../types'
 import NotesWidget from '../widgets/NotesWidget'
@@ -140,6 +141,7 @@ const useIsMobile = () => {
 
 // ── Collapsible group header (Widget / Section) ──────────────
 function GroupHeader({ label, count, collapsed, onToggle }: { label: string; count: number; collapsed: boolean; onToggle: () => void }) {
+  const t = useT()
   return (
     <button
       onClick={onToggle}
@@ -155,7 +157,7 @@ function GroupHeader({ label, count, collapsed, onToggle }: { label: string; cou
       <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', fontFamily: 'var(--mono)' }}>{label}</span>
       <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: 'var(--bg4)', color: 'var(--silver3)', border: '1px solid var(--border)', fontFamily: 'var(--mono)' }}>{count}</span>
       <span style={{ flex: 1, height: 1, background: 'var(--border)', marginLeft: 4 }} />
-      <span style={{ fontSize: 10, color: 'var(--silver4)', fontWeight: 600 }}>{collapsed ? 'Tampilkan' : 'Sembunyikan'}</span>
+      <span style={{ fontSize: 10, color: 'var(--silver4)', fontWeight: 600 }}>{collapsed ? t('group.show') : t('group.hide')}</span>
     </button>
   )
 }
@@ -163,6 +165,7 @@ function GroupHeader({ label, count, collapsed, onToggle }: { label: string; cou
 // ── Main component ───────────────────────────────────────────
 export default function GridLayout({ onAddSection }: { onAddSection?: () => void }) {
   // Granular selectors — hanya re-render saat data ini berubah
+  const t = useT()
   const personalSections  = useStore(s => s.personalSections)
   const sharedSections    = useStore(s => s.sharedSections)
   const editMode          = useStore(s => s.editMode)
@@ -437,7 +440,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                 {/* ── WIDGET GROUP ── */}
                 {widgetSecs.length > 0 && (
                   <>
-                    <GroupHeader label="Widget" count={widgetSecs.length} collapsed={widgetsCollapsed} onToggle={toggleWidgets} />
+                    <GroupHeader label={t('group.widget')} count={widgetSecs.length} collapsed={widgetsCollapsed} onToggle={toggleWidgets} />
                     {!widgetsCollapsed && (
                       <div className="dashboard-grid">{widgetSecs.map(renderPersonal)}</div>
                     )}
@@ -447,7 +450,7 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
                 {/* ── SECTION GROUP (shared + personal links) ── */}
                 {(linkSecs.length > 0 || sharedVis.length > 0) && (
                   <>
-                    <GroupHeader label="Section" count={sharedVis.length + linkSecs.length} collapsed={sectionsCollapsed} onToggle={toggleSections} />
+                    <GroupHeader label={t('group.section')} count={sharedVis.length + linkSecs.length} collapsed={sectionsCollapsed} onToggle={toggleSections} />
                     {!sectionsCollapsed && (
                       <div className="dashboard-grid dashboard-grid--sections">
                         {sharedVis.map(section => (
