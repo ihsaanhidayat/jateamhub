@@ -34,6 +34,8 @@ interface AuthState {
   reconcileGoogleEmail:     () => Promise<void>
   logout:                   () => void
 
+  resetUserVault: (userId: string) => Promise<string | null>
+
   loadUsers:   (force?: boolean) => Promise<void>
   addUser:     (username: string, password: string, role: Role, unitId: string, regionScope?: string, unitScope?: string) => Promise<string | null>
   updateUser:  (userId: string, role: Role, unitId: string, newPassword?: string, emoji?: string, regionScope?: string, unitScope?: string) => Promise<string | null>
@@ -301,6 +303,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       })
       authSubscription = subscription
     })
+  },
+
+  // ── Superadmin: wipe a user's password vault ──────────────
+  // Deletes their vault_keys row (requires the superadmin DELETE policy on
+  // vault_keys). The user's stale encrypted blob becomes undecryptable, so
+  // they get a fresh first-run. Wipe-only — old passwords are unrecoverable.
+  resetUserVault: async (userId) => {
+    const me = get().profile
+    if (!me) return 'Tidak ada sesi.'
+    if (me.role !== 'superadmin') return 'Hanya superadmin yang bisa reset brankas.'
+    const { error } = await supabase.from('vault_keys').delete().eq('user_id', userId)
+    if (error) return error.message
+    void logAudit('vault.reset', { target_type: 'user', target_id: userId })
+    return null
   },
 
   // ── Load users ────────────────────────────────────────────

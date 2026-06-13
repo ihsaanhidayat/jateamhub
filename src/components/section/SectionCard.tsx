@@ -7,7 +7,7 @@ import type { Section, LinkItem, AppearanceSettings } from '../../types'
 import { highlight } from '../../utils/helpers'
 import AppIcon from '../ui/AppIcon'
 import { sanitizeUrl } from '../../utils/security'
-import { IconEdit, IconTrash, IconSettings, IconLock, IconUnlock, IconMaximize, IconMinimize } from '../ui/icons'
+import { IconEdit, IconTrash, IconSettings, IconMaximize, IconMinimize } from '../ui/icons'
 
 interface Props {
   section:              Section
@@ -283,43 +283,6 @@ export default memo(function SectionCard({
               style={{ fontSize: 11 }}
             >{isExpanded ? <IconMinimize /> : <IconMaximize />}</button>
           )}
-
-          {/* Notes lock toggle in header */}
-          {(section as any).widgetType === 'notes' && !editMode && session?.username && (() => {
-            const mk = `notes-mode-${session.username}-${section.id}`
-            const lk = `notes-locked-${session.username}-${section.id}`
-            const mode = localStorage.getItem(mk) ?? 'open'
-            const isLocked = localStorage.getItem(lk) === 'true'
-
-            const handleGembok = (e: React.MouseEvent) => {
-              e.stopPropagation()
-              const ev = new CustomEvent('notes-mode-changed', { detail: { sectionId: section.id } })
-              if (mode === 'open') {
-                localStorage.setItem(mk, 'lock')
-                localStorage.setItem(lk, 'true')
-                window.dispatchEvent(ev)
-              } else if (mode === 'lock' && !isLocked) {
-                localStorage.setItem(lk, 'true')
-                sessionStorage.removeItem(`notes-session-${session.username}-${section.id}`)
-                window.dispatchEvent(ev)
-              } else if (mode === 'lock' && isLocked) {
-                // Locked → tell widget to show PIN dialog
-                window.dispatchEvent(new CustomEvent('notes-request-unlock', { detail: { sectionId: section.id } }))
-              }
-            }
-
-            return (
-              <button onClick={handleGembok} style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 13, padding: '2px 4px', borderRadius: 4,
-              }} title={
-                mode === 'open' ? 'Kunci catatan' :
-                !isLocked ? 'Kunci kembali' : 'Terkunci — buka di dalam widget'
-              }>
-                {mode === 'lock' ? <IconLock /> : <IconUnlock />}
-              </button>
-            )
-          })()}
 
           {/* Collapse button — selalu ada */}
           <button

@@ -69,6 +69,20 @@ export async function vaultExists(): Promise<boolean> {
   return !!data
 }
 
+// Wipe the vault for the current user (forgot-PIN reset). The encrypted
+// entries become unrecoverable — this is wipe-only by design.
+export async function resetVault(): Promise<boolean> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return false
+    await supabase.from('vault_keys').delete().eq('user_id', session.user.id)
+    clearVaultSession()
+    return true
+  } catch (e) {
+    console.warn('resetVault failed', e); return false
+  }
+}
+
 // First-time setup: derive the key from the new PIN and escrow {salt,iv,verifier}.
 export async function createVault(pin: string): Promise<boolean> {
   try {

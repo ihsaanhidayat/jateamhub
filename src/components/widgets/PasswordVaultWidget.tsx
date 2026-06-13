@@ -3,9 +3,12 @@ import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import {
   vaultExists, createVault, unlockVault, encryptVault, decryptVault,
-  isVaultUnlocked, clearVaultSession,
+  isVaultUnlocked, clearVaultSession, resetVault,
 } from '../../utils/vaultCrypto'
 import type { VaultEntry } from '../../types'
+
+const fmtModified = (ms?: number) =>
+  ms ? new Date(ms).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : ''
 
 const IDLE_MS = 5 * 60_000
 
@@ -85,6 +88,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   const [pin2,     setPin2]     = useState('')
   const [busy,     setBusy]     = useState(false)
   const [err,      setErr]      = useState('')
+  const [confirmReset, setConfirmReset] = useState(false)
 
   // rate limiting
   const failsRef = useRef(0)
@@ -249,6 +253,19 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
 
   const useGenerated = () => { setForm(f => ({ ...f, password: genPassword(genLen, genOpts) })); setShowGen(false) }
 
+  // Forgot-PIN: wipe the vault (entries unrecoverable) and return to setup.
+  const handleReset = async () => {
+    setBusy(true)
+    await resetVault()
+    const store = useStore.getState()
+    const s = store.personalSections.find(x => x.id === sectionId)
+    if (s?.items?.length) store.updateItem(sectionId, s.items[0].id, { ...s.items[0], desc: '' })
+    store.updatePersonalSection(sectionId, { subtitle: '' })
+    store.syncPersonalToDb()
+    setBusy(false); setConfirmReset(false)
+    setHasVault(false); setLocked(true); setEntries([]); setPin(''); setErr('')
+  }
+
   const onImport = async (file: File) => {
     const text = await file.text()
     const imported = parseCsv(text)
@@ -319,6 +336,23 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
           style={{ width: '100%', height: 34, background: 'var(--accent)', border: 'none', borderRadius: 7, color: 'white', fontSize: 12, fontWeight: 700, cursor: busy ? 'wait' : 'pointer', fontFamily: 'var(--font)', opacity: (!pin || lockoutRem > 0) ? 0.6 : 1 }}>
           {busy ? 'Membuka...' : 'Buka'}
         </button>
+
+        {/* Forgot PIN → wipe reset */}
+        {!confirmReset ? (
+          <button onClick={() => setConfirmReset(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', fontSize: 10.5, textDecoration: 'underline', fontFamily: 'var(--font)' }}>
+            Lupa PIN? Reset brankas
+          </button>
+        ) : (
+          <div style={{ width: '100%', padding: 9, background: 'color-mix(in srgb, var(--red) 7%, var(--bg4))', border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <span style={{ fontSize: 10.5, color: 'var(--red)', lineHeight: 1.45 }}>
+              Reset menghapus <b>semua kata sandi</b> di brankas ini secara permanen. Lanjutkan?
+            </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setConfirmReset(false)} disabled={busy} style={{ flex: 1, height: 28, background: 'none', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
+              <button onClick={handleReset} disabled={busy} style={{ flex: 1, height: 28, background: 'var(--red)', border: 'none', borderRadius: 6, color: 'white', fontSize: 11, fontWeight: 700, cursor: busy ? 'wait' : 'pointer', fontFamily: 'var(--font)' }}>{busy ? '...' : 'Reset'}</button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -372,6 +406,11 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
                   title={isRev ? 'Sembunyikan' : 'Tampilkan'} style={iconBtn}>{isRev ? '🙈' : '👁'}</button>
                 {e.url && <a href={/^https?:\/\//.test(e.url) ? e.url : `https://${e.url}`} target="_blank" rel="noopener noreferrer" title="Buka situs" style={{ ...iconBtn, textDecoration: 'none' }}>🌐</a>}
               </div>
+              {e.updatedAt && (
+                <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', marginTop: 4 }}>
+                  Diubah · {fmtModified(e.updatedAt)}
+                </div>
+              )}
               {confirmDel === e.id && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                   <span style={{ fontSize: 11, color: 'var(--red)', flex: 1 }}>Hapus kata sandi ini?</span>

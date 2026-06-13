@@ -182,7 +182,7 @@ export default function Header({ onToggleOptions, optionsOpen, onOpenAdvanced, o
                 <span className="header-sub">
                   Selamat datang, {session?.username ?? ''}{emoji ? ` ${emoji}` : ''}
                 </span>
-                <span style={{ fontFamily: 'var(--mono)', display: 'flex', alignItems: 'baseline', marginTop: 2, fontSize: 17, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.5px', lineHeight: 1 }}>
+                <span className="desktop-only" style={{ fontFamily: 'var(--mono)', display: 'flex', alignItems: 'baseline', marginTop: 2, fontSize: 17, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.5px', lineHeight: 1 }}>
                   <span>{clockHH}</span>
                   <span style={{ opacity: colonOn ? 1 : 0.25, transition: 'opacity 120ms', margin: '0 1px' }}>:</span>
                   <span>{clockMM}</span>

@@ -1,33 +1,17 @@
 import { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useStore } from '../../store/dashboardStore'
-import { useAuthStore } from '../../store/authStore'
-import { saveTodoHistory } from '../../utils/supabaseClient'
+import { hijriDate, weton, dateFromYmd } from '../../utils/dates'
 import type { CalendarEvent, CalendarKind } from '../../types'
 
 // ── Constants ─────────────────────────────────────────────────────────
 const MONTH_NAMES = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 const DAY_NAMES   = ['Min','Sen','Sel','Rab','Kam','Jum','Sab']
-const COLOR_MAP   = { accent: 'var(--accent)', red: 'var(--red)', green: '#16A34A', yellow: '#D97706' }
-const COLOR_OPTS  = ['accent','red','green','yellow'] as const
-const CHALK_RED   = '#E2483D'
+const RED         = '#E2483D'
 
 function pad(n: number) { return String(n).padStart(2, '0') }
 function today() { return new Date().toISOString().split('T')[0] }
-const kindOf = (e: CalendarEvent): CalendarKind => e.kind ?? 'todo'
-
-// ── To-do timing helpers ──────────────────────────────────────────────
-const isOverdue = (e: CalendarEvent) => kindOf(e) === 'todo' && !e.done && e.date < today()
-const isDueOver = (e: CalendarEvent) => {
-  if (kindOf(e) !== 'todo' || e.done || !e.time || e.date !== today()) return false
-  const [h, m] = e.time.split(':').map(Number)
-  const due = new Date(); due.setHours(h, m, 0, 0); return due.getTime() < Date.now()
-}
-const isDueSoon = (e: CalendarEvent) => {
-  if (kindOf(e) !== 'todo' || e.done || !e.time || e.date !== today()) return false
-  const [h, m] = e.time.split(':').map(Number)
-  const due = new Date(); due.setHours(h, m, 0, 0)
-  const d = due.getTime() - Date.now(); return d > 0 && d < 30 * 60_000
-}
+// Legacy 'todo'/undefined entries render as 'event'.
+const kindOf = (e: CalendarEvent): CalendarKind => (e.kind === 'note' ? 'note' : 'event')
 
 function buildGrid(year: number, month: number) {
   const daysInMonth  = new Date(year, month + 1, 0).getDate()
@@ -48,7 +32,7 @@ function buildGrid(year: number, month: number) {
   return cells
 }
 
-// ── Google Calendar template URL (Google delivers the phone push). ─────
+// ── Google Calendar template URL + .ics export ─────────────────────────
 function gcalUrl(ev: CalendarEvent) {
   let dates: string
   if (ev.time) {
@@ -64,7 +48,6 @@ function gcalUrl(ev: CalendarEvent) {
   const p = new URLSearchParams({ action: 'TEMPLATE', text: ev.title, dates, details: 'Dibuat dari JATEAMHUB' })
   return `https://calendar.google.com/calendar/render?${p.toString()}`
 }
-
 function downloadIcs(ev: CalendarEvent) {
   const stamp = (d: Date) => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`
   let dt: string
@@ -95,18 +78,22 @@ interface Props { sectionId: string; isExpanded?: boolean }
 
 export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const now = new Date()
-  const { profile } = useAuthStore()
   const [viewYear,     setViewYear]     = useState(now.getFullYear())
   const [viewMonth,    setViewMonth]    = useState(now.getMonth())
-  const [selectedDate, setSelectedDate] = useState<string | null>(today())
+  const [selectedDate, setSelectedDate] = useState<string>(today())
   const [showAddForm,  setShowAddForm]  = useState(false)
-  const [newKind,      setNewKind]      = useState<CalendarKind>('todo')
+  const [newKind,      setNewKind]      = useState<CalendarKind>('event')
   const [newTitle,     setNewTitle]     = useState('')
   const [newTime,      setNewTime]      = useState('')
-  const [newColor,     setNewColor]     = useState<typeof COLOR_OPTS[number]>('accent')
+  const [discardConfirm, setDiscardConfirm] = useState(false)
+  const [editId,       setEditId]       = useState<string | null>(null)
   const notifSent = useRef<Set<string>>(new Set())
+  const addTimeRef = useRef<HTMLInputElement>(null)
+  const lastTap    = useRef<{ date: string; t: number }>({ date: '', t: 0 })
 
-  // ── Load events ─────────────────────────────────────────────────────
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+
+  // ── Load + persist events ───────────────────────────────────────────
   const rawDesc = useStore(s => {
     const sec = s.personalSections.find(p => p.id === sectionId)
     return sec?.items[0]?.desc ?? '[]'
@@ -116,7 +103,6 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   })
   useEffect(() => { try { setEvents(JSON.parse(rawDesc)) } catch {} }, [rawDesc])
 
-  // ── Persist ─────────────────────────────────────────────────────────
   const saveEvents = useCallback((next: CalendarEvent[]) => {
     setEvents(next)
     const store = useStore.getState()
@@ -124,33 +110,29 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
     if (!sec) return
     const item0  = sec.items[0] ?? { id: `cal-${sectionId}`, title: '', url: '', icon: '', tags: [], newTab: false, iconUrl: '', useFavicon: false }
     const items  = [{ ...item0, desc: JSON.stringify(next) }, ...sec.items.slice(1)]
-    const active = next.filter(e => !(kindOf(e) === 'todo' && e.done)).length
-    store.updatePersonalSection(sectionId, { items, subtitle: active === 0 ? '' : `${active} agenda` })
+    store.updatePersonalSection(sectionId, { items, subtitle: next.length === 0 ? '' : `${next.length} agenda` })
     store.syncPersonalToDb()
   }, [sectionId])
 
-  // ── Entries grouped by date ─────────────────────────────────────────
   const eventsByDate = useMemo(() => {
     const m = new Map<string, CalendarEvent[]>()
-    for (const e of events) {
-      const arr = m.get(e.date) ?? []; arr.push(e); m.set(e.date, arr)
-    }
+    for (const e of events) { const arr = m.get(e.date) ?? []; arr.push(e); m.set(e.date, arr) }
     for (const arr of m.values()) arr.sort((a, b) => (a.time ?? '99:99').localeCompare(b.time ?? '99:99'))
     return m
   }, [events])
 
-  // ── Notifications (events + to-dos due within 30 min) ───────────────
+  // ── Notifications: events with a time due within 30 min ─────────────
   useEffect(() => {
     const tick = () => {
       const td = today()
-      events.filter(e => e.date === td && e.time && !e.done && !notifSent.current.has(e.id)).forEach(e => {
+      events.filter(e => kindOf(e) === 'event' && e.date === td && e.time && !notifSent.current.has(e.id)).forEach(e => {
         const [hh, mm] = e.time!.split(':').map(Number)
         const due = new Date(); due.setHours(hh, mm, 0, 0)
         const diff = due.getTime() - Date.now()
         if (diff > 0 && diff <= 30 * 60_000) {
           notifSent.current.add(e.id)
           if (Notification.permission === 'granted')
-            new Notification(kindOf(e) === 'todo' ? '✅ Agenda Segera' : '📅 Acara Segera', { body: e.title, icon: '/icon-192.png' })
+            new Notification('📅 Acara Segera', { body: e.title, icon: '/icon-192.png' })
         }
       })
     }
@@ -164,43 +146,60 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) } else setViewMonth(m => m + 1) }
   const goToday = () => { setViewYear(now.getFullYear()); setViewMonth(now.getMonth()); setSelectedDate(today()) }
 
-  // ── Add / delete / toggle ───────────────────────────────────────────
+  // ── Add form helpers ────────────────────────────────────────────────
+  const openAdd = (date?: string) => {
+    if (date) setSelectedDate(date)
+    setNewKind('event'); setNewTitle(''); setNewTime(''); setDiscardConfirm(false); setEditId(null)
+    setShowAddForm(true)
+  }
+  const closeAdd = () => {
+    // Confirm before discarding typed text.
+    if ((newTitle.trim() || newTime) && !discardConfirm) { setDiscardConfirm(true); return }
+    setShowAddForm(false); setDiscardConfirm(false); setNewTitle(''); setNewTime('')
+  }
   const addEvent = () => {
-    if (!newTitle.trim() || !selectedDate) return
+    if (!newTitle.trim()) return
     const ev: CalendarEvent = {
       id: crypto.randomUUID(), date: selectedDate, title: newTitle.trim(),
-      time: newKind === 'todo' ? (newTime || undefined) : undefined,
-      color: newColor, kind: newKind, done: false, createdAt: Date.now(),
+      time: newKind === 'event' ? (newTime || undefined) : undefined,
+      kind: newKind, createdAt: Date.now(),
     }
     saveEvents([...events, ev])
-    setNewTitle(''); setNewTime(''); setNewColor('accent'); setShowAddForm(false)
+    setNewTitle(''); setNewTime(''); setShowAddForm(false); setDiscardConfirm(false)
     if (Notification.permission === 'default') Notification.requestPermission()
   }
-  const deleteEvent = (id: string) => saveEvents(events.filter(e => e.id !== id))
-  const toggleDone = (ev: CalendarEvent) => {
-    const done = !ev.done
-    saveEvents(events.map(e => e.id === ev.id ? { ...e, done, doneAt: done ? Date.now() : undefined } : e))
-    if (done && profile?.id) {
-      // Keep the existing "Riwayat Task" history working.
-      void saveTodoHistory(profile.id, [{
-        id: ev.id, text: ev.title, done: true, createdAt: ev.createdAt, doneAt: Date.now(),
-        dueTime: ev.time, date: ev.date,
-      }], isOverdue(ev) ? 'overdue' : 'done').catch(() => {})
-    }
+  const deleteEvent = (id: string) => { saveEvents(events.filter(e => e.id !== id)); setEditId(null) }
+  const saveEdit = (id: string, patch: Partial<CalendarEvent>) => {
+    saveEvents(events.map(e => e.id === id ? { ...e, ...patch } : e)); setEditId(null)
   }
 
   const requestNotif = () => { if (Notification.permission === 'default') Notification.requestPermission() }
 
+  // ── Date cell tap (single = select, double on mobile = add) ─────────
+  const onCellTap = (date: string) => {
+    setSelectedDate(date); setShowAddForm(false)
+    if (isMobile) {
+      const n = Date.now()
+      if (lastTap.current.date === date && n - lastTap.current.t < 350) {
+        lastTap.current = { date: '', t: 0 }
+        openAdd(date)
+        return
+      }
+      lastTap.current = { date, t: n }
+    }
+  }
+
   // ── Derived ──────────────────────────────────────────────────────────
   const cells = buildGrid(viewYear, viewMonth)
   const isTodayStr = today()
-  const selectedEvs = selectedDate ? (eventsByDate.get(selectedDate) ?? []) : []
+  const selectedEvs = eventsByDate.get(selectedDate) ?? []
   const cellSize = isExpanded ? 40 : 30
   const notifOff = typeof Notification !== 'undefined' && Notification.permission === 'default'
+  const selDate = dateFromYmd(selectedDate)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '8px 10px', gap: 6 }}>
-      {/* Chalk filter def (one per widget) */}
+      {/* Chalk filter def */}
       <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
         <defs>
           <filter id="calChalk">
@@ -218,9 +217,9 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
         </div>
         <button onClick={nextMonth} style={navBtn} aria-label="Bulan berikutnya">›</button>
         <button onClick={goToday} style={{
-          fontSize: 10, fontWeight: 700, color: 'var(--accent)',
-          background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
+          fontSize: 10, fontWeight: 700, color: RED,
+          background: 'color-mix(in srgb, ' + RED + ' 10%, transparent)',
+          border: '1px solid color-mix(in srgb, ' + RED + ' 25%, transparent)',
           borderRadius: 6, padding: '3px 8px', cursor: 'pointer', flexShrink: 0, fontFamily: 'var(--font)',
         }}>Hari ini</button>
       </div>
@@ -228,7 +227,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
       {/* Day header row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, flexShrink: 0 }}>
         {DAY_NAMES.map((d, i) => (
-          <div key={d} style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, color: i === 0 ? 'var(--red)' : 'var(--silver4)', fontFamily: 'var(--mono)', padding: '2px 0' }}>{d}</div>
+          <div key={d} style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, color: i === 0 ? RED : 'var(--silver4)', fontFamily: 'var(--mono)', padding: '2px 0' }}>{d}</div>
         ))}
       </div>
 
@@ -241,7 +240,8 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
           return (
             <button
               key={i}
-              onClick={() => { setSelectedDate(cell.date); setShowAddForm(false) }}
+              onClick={() => onCellTap(cell.date)}
+              onDoubleClick={() => { if (!isMobile) openAdd(cell.date) }}
               style={{
                 position: 'relative', height: cellSize, borderRadius: 8,
                 border: isSel ? '1px solid var(--border2)' : '1px solid transparent',
@@ -254,13 +254,13 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
                 <svg className="cal-chalk" viewBox="0 0 40 36" preserveAspectRatio="none"
                   style={{ position: 'absolute', inset: -1, width: 'calc(100% + 2px)', height: 'calc(100% + 2px)', pointerEvents: 'none', overflow: 'visible' }}>
                   <path d="M29 7 C 38 9 38 27 21 30 C 5 33 2 12 17 7 C 24 4.5 31 6 32.5 12"
-                    fill="none" stroke={CHALK_RED} strokeWidth="2" strokeLinecap="round"
+                    fill="none" stroke={RED} strokeWidth="2" strokeLinecap="round"
                     strokeDasharray="300" filter="url(#calChalk)" opacity="0.9" />
                 </svg>
               )}
               <span style={{
                 fontSize: 11, fontWeight: isTd ? 800 : cell.curr ? 600 : 400,
-                color: isTd ? 'var(--accent)' : cell.curr ? 'var(--silver)' : 'var(--silver4)',
+                color: isTd ? RED : cell.curr ? 'var(--silver)' : 'var(--silver4)',
                 lineHeight: 1, zIndex: 1,
               }}>{Number(cell.date.split('-')[2])}</span>
             </button>
@@ -269,120 +269,162 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
       </div>
 
       {/* Day detail */}
-      {selectedDate && (
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, color: 'var(--silver3)', fontFamily: 'var(--mono)', letterSpacing: '0.5px', flexShrink: 0 }}>
-            <span>{formatDisplayDate(selectedDate)}</span>
-            <button onClick={() => { setShowAddForm(v => !v); setNewKind('todo'); setNewTitle(''); setNewTime(''); setNewColor('accent') }}
-              style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: 0 }}>
-              {showAddForm ? 'Batal' : '+ Tambah'}
-            </button>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {/* Simplified date + Hijri + Weton */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0, gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--silver2)', fontFamily: 'var(--font)' }}>{formatDisplayDate(selectedDate)}</div>
+            <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              ☪ {hijriDate(selDate)} · {weton(selDate)}
+            </div>
           </div>
+          <button onClick={() => (showAddForm ? closeAdd() : openAdd())}
+            style={{ fontSize: 10, fontWeight: 700, color: RED, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: 0, flexShrink: 0, whiteSpace: 'nowrap' }}>
+            {showAddForm ? 'Batal' : '+ Tambah'}
+          </button>
+        </div>
 
-          {/* Add form */}
-          {showAddForm && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, background: 'var(--bg4)', borderRadius: 8, border: '1px solid var(--border2)', flexShrink: 0, animation: 'slideDown 150ms ease' }}>
-              {/* Kind toggle */}
-              <div style={{ display: 'flex', gap: 4, background: 'var(--bg)', borderRadius: 7, padding: 3 }}>
-                {([['todo', '✅ Acara / To-do'], ['note', '📝 Catatan']] as const).map(([k, lbl]) => (
-                  <button key={k} onClick={() => setNewKind(k)} style={{
-                    flex: 1, height: 26, borderRadius: 5, border: 'none', cursor: 'pointer',
-                    fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--font)',
-                    background: newKind === k ? 'var(--accent)' : 'transparent',
-                    color: newKind === k ? 'white' : 'var(--silver3)',
-                  }}>{lbl}</button>
-                ))}
-              </div>
+        {/* Discard confirm */}
+        {discardConfirm && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 7, flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: 'var(--silver2)', flex: 1 }}>Buang masukan?</span>
+            <button onClick={() => { setShowAddForm(false); setDiscardConfirm(false); setNewTitle(''); setNewTime('') }} style={{ height: 22, padding: '0 8px', background: 'var(--red)', border: 'none', borderRadius: 5, color: 'white', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Ya</button>
+            <button onClick={() => setDiscardConfirm(false)} style={{ height: 22, padding: '0 8px', background: 'none', border: '1px solid var(--border2)', borderRadius: 5, color: 'var(--silver3)', fontSize: 10, cursor: 'pointer', fontFamily: 'var(--font)' }}>Tidak</button>
+          </div>
+        )}
+
+        {/* Add form */}
+        {showAddForm && !discardConfirm && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, background: 'var(--bg4)', borderRadius: 8, border: '1px solid var(--border2)', flexShrink: 0, animation: 'slideDown 150ms ease' }}>
+            {/* Penanda: Event / Catatan */}
+            <div style={{ display: 'flex', gap: 4, background: 'var(--bg)', borderRadius: 7, padding: 3 }}>
+              {([['event', '🔴 Event'], ['note', '📝 Catatan']] as const).map(([k, lbl]) => (
+                <button key={k} onClick={() => setNewKind(k)} style={{
+                  flex: 1, height: 26, borderRadius: 5, border: 'none', cursor: 'pointer',
+                  fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--font)',
+                  background: newKind === k ? RED : 'transparent',
+                  color: newKind === k ? 'white' : 'var(--silver3)',
+                }}>{lbl}</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addEvent() }}
-                placeholder={newKind === 'todo' ? 'Judul acara / tugas...' : 'Catatan / aktivitas hari ini...'}
-                style={{ height: 32, padding: '0 10px', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 12, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', width: '100%', boxSizing: 'border-box' }}
-                onFocus={e => e.target.style.borderColor = 'var(--accent)'} onBlur={e => e.target.style.borderColor = 'var(--border2)'} />
-              {newKind === 'todo' && (
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)}
-                    style={{ height: 28, padding: '0 8px', flex: 1, background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 11, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box' }} />
-                  {COLOR_OPTS.map(c => (
-                    <button key={c} onClick={() => setNewColor(c)} aria-label={`Warna ${c}`}
-                      style={{ width: 16, height: 16, borderRadius: '50%', background: COLOR_MAP[c], border: newColor === c ? '2px solid var(--silver)' : '2px solid transparent', cursor: 'pointer', flexShrink: 0, padding: 0 }} />
-                  ))}
+                placeholder={newKind === 'event' ? 'Judul event...' : 'Catatan / aktivitas...'}
+                style={{ flex: 1, height: 32, padding: '0 10px', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 12, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box' }} />
+              {/* Clock icon → time picker (events only) */}
+              {newKind === 'event' && (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <button onClick={() => addTimeRef.current?.showPicker?.()} title="Pilih jam"
+                    style={{ width: 32, height: 32, borderRadius: 6, border: `1px solid ${newTime ? RED : 'var(--border2)'}`, background: newTime ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg)', color: newTime ? RED : 'var(--silver3)', cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🕐</button>
+                  <input ref={addTimeRef} type="time" value={newTime} onChange={e => setNewTime(e.target.value)}
+                    style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, top: 0, left: 0 }} tabIndex={-1} />
                 </div>
               )}
-              <button onClick={addEvent} disabled={!newTitle.trim()}
-                style={{ height: 28, background: newTitle.trim() ? 'var(--accent)' : 'var(--border2)', border: 'none', borderRadius: 6, color: 'white', fontSize: 11, fontWeight: 700, cursor: newTitle.trim() ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)' }}>
-                {newKind === 'todo' ? 'Tambah acara' : 'Tambah catatan'}
-              </button>
+            </div>
+            {newKind === 'event' && newTime && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start', fontSize: 10, fontFamily: 'var(--mono)', color: RED, background: 'color-mix(in srgb, ' + RED + ' 12%, transparent)', borderRadius: 5, padding: '2px 7px' }}>
+                🕐 {newTime}
+                <button onClick={() => setNewTime('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: RED, fontSize: 11, padding: 0, lineHeight: 1 }}>×</button>
+              </span>
+            )}
+            <button onClick={addEvent} disabled={!newTitle.trim()}
+              style={{ height: 28, background: newTitle.trim() ? RED : 'var(--border2)', border: 'none', borderRadius: 6, color: 'white', fontSize: 11, fontWeight: 700, cursor: newTitle.trim() ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)' }}>
+              {newKind === 'event' ? 'Tambah event' : 'Tambah catatan'}
+            </button>
+          </div>
+        )}
+
+        {notifOff && selectedEvs.length > 0 && (
+          <button onClick={requestNotif} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 26, flexShrink: 0, background: 'color-mix(in srgb, ' + RED + ' 10%, transparent)', border: '1px solid color-mix(in srgb, ' + RED + ' 30%, transparent)', borderRadius: 7, color: RED, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--mono)' }}>🔔 Aktifkan pengingat</button>
+        )}
+
+        {/* Entry rows */}
+        <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {selectedEvs.length === 0 && !showAddForm && (
+            <div style={{ fontSize: 11, color: 'var(--silver4)', fontFamily: 'var(--font)', padding: '10px 0', textAlign: 'center' }}>
+              Tidak ada agenda{isMobile ? ' · ketuk dua kali tanggal' : ''}
             </div>
           )}
-
-          {notifOff && selectedEvs.length > 0 && (
-            <button onClick={requestNotif} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 26, flexShrink: 0, background: 'var(--accent-light)', border: '1px solid var(--accent-soft)', borderRadius: 7, color: 'var(--accent)', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--mono)' }}>🔔 Aktifkan pengingat di perangkat ini</button>
-          )}
-
-          {/* Entry rows */}
-          <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {selectedEvs.length === 0 && !showAddForm && (
-              <div style={{ fontSize: 11, color: 'var(--silver4)', fontFamily: 'var(--font)', padding: '10px 0', textAlign: 'center' }}>Tidak ada agenda</div>
-            )}
-            {selectedEvs.map((ev, idx) => {
-              const kind = kindOf(ev)
-              const over = isOverdue(ev) || isDueOver(ev), soon = isDueSoon(ev)
-              return (
-                <div key={ev.id} className="cal-row" style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8,
-                  background: over ? 'color-mix(in srgb, var(--red) 6%, var(--bg4))' : 'var(--bg4)',
-                  border: '1px solid var(--border)', animationDelay: `${idx * 40}ms`,
-                }}>
-                  {kind === 'todo' ? (
-                    <button onClick={() => toggleDone(ev)} aria-label={ev.done ? 'Batalkan' : 'Tandai selesai'} style={{
-                      width: 17, height: 17, flexShrink: 0, borderRadius: 5,
-                      border: `1.5px solid ${ev.done ? 'var(--accent)' : over ? 'var(--red)' : 'var(--border2)'}`,
-                      background: ev.done ? 'var(--accent)' : 'none', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 10, padding: 0,
-                    }}>{ev.done ? '✓' : ''}</button>
-                  ) : (
-                    <span style={{ width: 7, height: 7, flexShrink: 0, borderRadius: 2, background: COLOR_MAP[ev.color ?? 'accent'] }} />
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 11.5, fontWeight: 600,
-                      color: ev.done ? 'var(--silver4)' : over ? 'var(--red)' : 'var(--silver)',
-                      textDecoration: ev.done ? 'line-through' : 'none',
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}>{ev.title}</div>
-                    <div style={{ fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-                      {ev.time && <span style={{ color: over ? 'var(--red)' : soon ? '#F59E0B' : 'var(--silver4)' }}>🕐 {ev.time}{over ? ' ⚠️' : soon ? ' !' : ''}</span>}
-                      {kind === 'note' && <span style={{ color: 'var(--silver4)' }}>catatan</span>}
-                    </div>
+          {selectedEvs.map((ev, idx) => {
+            if (editId === ev.id) return (
+              <EntryEditor key={ev.id} ev={ev} onCancel={() => setEditId(null)} onSave={p => saveEdit(ev.id, p)} onDelete={() => deleteEvent(ev.id)} />
+            )
+            const isEvent = kindOf(ev) === 'event'
+            return (
+              <div key={ev.id} className="cal-row" style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8,
+                background: 'var(--bg4)', border: '1px solid var(--border)', animationDelay: `${idx * 40}ms`,
+              }}>
+                <span style={{ width: 7, height: 7, flexShrink: 0, borderRadius: isEvent ? '50%' : 2, background: RED, opacity: isEvent ? 1 : 0.5 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--silver)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.title}</div>
+                  <div style={{ fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                    {ev.time && <span>🕐 {ev.time}</span>}
+                    {!isEvent && <span>catatan</span>}
                   </div>
-                  {kind === 'todo' && (
-                    <>
-                      <a href={gcalUrl(ev)} target="_blank" rel="noopener noreferrer" title="Tambah ke Google Calendar"
-                        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, color: 'var(--silver3)', textDecoration: 'none' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
-                      </a>
-                      <button onClick={() => downloadIcs(ev)} title="Unduh .ics"
-                        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                      </button>
-                    </>
-                  )}
-                  <button onClick={() => deleteEvent(ev.id)} aria-label="Hapus"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver4)', padding: 2, fontSize: 14, lineHeight: 1, flexShrink: 0 }}>×</button>
                 </div>
-              )
-            })}
-          </div>
+                {isEvent && (
+                  <>
+                    <a href={gcalUrl(ev)} target="_blank" rel="noopener noreferrer" title="Tambah ke Google Calendar"
+                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, color: 'var(--silver3)', textDecoration: 'none' }}
+                      onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    </a>
+                    <button onClick={() => downloadIcs(ev)} title="Unduh .ics"
+                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)' }}
+                      onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                  </>
+                )}
+                {/* Edit (replaces the old trash) */}
+                <button onClick={() => setEditId(ev.id)} title="Edit"
+                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+              </div>
+            )
+          })}
         </div>
-      )}
+      </div>
     </div>
   )
 })
 
+// Inline editor for an existing entry (title, time for events, Delete + Save).
+function EntryEditor({ ev, onSave, onDelete, onCancel }: { ev: CalendarEvent; onSave: (p: Partial<CalendarEvent>) => void; onDelete: () => void; onCancel: () => void }) {
+  const isEvent = ev.kind !== 'note'
+  const [title, setTitle] = useState(ev.title)
+  const [time,  setTime]  = useState(ev.time ?? '')
+  const timeRef = useRef<HTMLInputElement>(null)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, background: 'var(--bg4)', border: '1px solid color-mix(in srgb, ' + RED + ' 35%, transparent)', borderRadius: 8 }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input value={title} onChange={e => setTitle(e.target.value)} autoFocus placeholder="Judul"
+          style={{ flex: 1, height: 30, padding: '0 10px', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 12, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box' }} />
+        {isEvent && (
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button onClick={() => timeRef.current?.showPicker?.()} title="Pilih jam"
+              style={{ width: 30, height: 30, borderRadius: 6, border: `1px solid ${time ? RED : 'var(--border2)'}`, background: time ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg)', color: time ? RED : 'var(--silver3)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🕐</button>
+            <input ref={timeRef} type="time" value={time} onChange={e => setTime(e.target.value)} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, top: 0, left: 0 }} tabIndex={-1} />
+          </div>
+        )}
+      </div>
+      {isEvent && time && <span style={{ alignSelf: 'flex-start', fontSize: 10, fontFamily: 'var(--mono)', color: RED }}>🕐 {time}</span>}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={onDelete} title="Hapus" style={{ height: 30, padding: '0 12px', background: 'none', border: '1px solid color-mix(in srgb, ' + RED + ' 40%, transparent)', borderRadius: 6, color: RED, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>Hapus</button>
+        <button onClick={onCancel} style={{ flex: 1, height: 30, background: 'none', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
+        <button onClick={() => onSave({ title: title.trim() || ev.title, time: isEvent ? (time || undefined) : undefined })}
+          style={{ flex: 1, height: 30, background: RED, border: 'none', borderRadius: 6, color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Simpan</button>
+      </div>
+    </div>
+  )
+}
+
 function formatDisplayDate(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })
+  return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 const navBtn: React.CSSProperties = {

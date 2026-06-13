@@ -180,6 +180,38 @@ function ConnectedAccounts() {
   )
 }
 
+// ── Superadmin: reset (wipe) a user's password vault ────────
+function ResetVaultButton({ userId, username }: { userId: string; username?: string }) {
+  const resetUserVault = useAuthStore(s => s.resetUserVault)
+  const toast = useStore(s => (s as any).toast as (m: string, t?: 'success'|'error'|'warn') => void)
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const handle = async () => {
+    setBusy(true)
+    const err = await resetUserVault(userId)
+    setBusy(false); setConfirm(false)
+    toast?.(err ?? `Brankas ${username ? '@' + username : 'user'} direset.`, err ? 'error' : 'success')
+  }
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <label style={{ fontSize: 10, color: 'var(--silver3)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--mono)' }}>Brankas Kata Sandi</label>
+      {!confirm ? (
+        <button onClick={() => setConfirm(true)} style={{ width: '100%', padding: '8px', background: 'none', border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600 }}>
+          🔐 Reset brankas (wipe)
+        </button>
+      ) : (
+        <div style={{ padding: 9, background: 'color-mix(in srgb, var(--red) 7%, var(--bg4))', border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)', borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <span style={{ fontSize: 11, color: 'var(--red)', lineHeight: 1.45 }}>Menghapus <b>semua kata sandi</b> user ini permanen (tidak bisa dipulihkan). Lanjutkan?</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => setConfirm(false)} disabled={busy} style={{ flex: 1, height: 28, background: 'none', border: '1px solid var(--border2)', borderRadius: 5, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
+            <button onClick={handle} disabled={busy} style={{ flex: 1, height: 28, background: 'var(--red)', border: 'none', borderRadius: 5, color: 'white', fontSize: 11, fontWeight: 700, cursor: busy ? 'wait' : 'pointer', fontFamily: 'var(--font)' }}>{busy ? '...' : 'Reset'}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Change Password Form (pure form, no internal toggle) ─────
 function ChangePasswordSection({ profileId, username, onDone }: { profileId?: string, username?: string, onDone?: () => void }) {
   const [oldPw, setOldPw] = useState('')
@@ -615,6 +647,11 @@ export default function ProfilePage({ onClose }: Props) {
                       style={inputStyle}
                     />
                   </div>
+
+                  {/* Reset brankas — superadmin saja, saat edit user lain */}
+                  {!um.addMode && profile?.role === 'superadmin' && um.editTarget && um.editTarget.id !== profile?.id && (
+                    <ResetVaultButton userId={um.editTarget.id} username={um.editTarget.username} />
+                  )}
 
                   {/* Emoji — admin ke atas saja */}
                   {!um.addMode && (profile?.role === 'superadmin' || profile?.role === 'admin') && (

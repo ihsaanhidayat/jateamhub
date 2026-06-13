@@ -173,9 +173,9 @@ export interface TodoItem {
   date:      string       // 'YYYY-MM-DD' tanggal task dibuat
 }
 
-// kind 'todo' → checkable agenda item (done = strikethrough); 'note' → plain
-// activity for the day. Legacy events without `kind` are treated as 'todo'.
-export type CalendarKind = 'todo' | 'note'
+// kind 'event' → a dated red marker (optional time); 'note' → plain activity.
+// Legacy entries (kind 'todo' or undefined) are treated as 'event'.
+export type CalendarKind = 'event' | 'note'
 export interface CalendarEvent {
   id:        string
   date:      string            // 'YYYY-MM-DD'
