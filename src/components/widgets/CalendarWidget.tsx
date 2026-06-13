@@ -1,8 +1,8 @@
 import { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { hijriDate, weton, dateFromYmd } from '../../utils/dates'
-import { holidayOn } from '../../utils/holidays'
-import { IconChevL, IconChevR, IconClock, IconPlus, IconEdit } from '../ui/icons'
+import { holidayOn, holidaysForYear } from '../../utils/holidays'
+import { IconChevL, IconChevR, IconClock, IconPlus, IconEdit, IconTrash, IconCheck, IconSearch } from '../ui/icons'
 import type { CalendarEvent, CalendarKind } from '../../types'
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -48,6 +48,8 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const [newTime,      setNewTime]      = useState('')
   const [discardConfirm, setDiscardConfirm] = useState(false)
   const [editId,       setEditId]       = useState<string | null>(null)
+  const [query,        setQuery]        = useState('')
+  const [liburFilter,  setLiburFilter]  = useState(false)
   const notifSent = useRef<Set<string>>(new Set())
   const addTimeRef = useRef<HTMLInputElement>(null)
   const lastTap    = useRef<{ date: string; t: number }>({ date: '', t: 0 })
@@ -138,6 +140,9 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const saveEdit = (id: string, patch: Partial<CalendarEvent>) => {
     saveEvents(events.map(e => e.id === id ? { ...e, ...patch } : e)); setEditId(null)
   }
+  // Events (todo) can be checked off; notes can't.
+  const toggleDone = (ev: CalendarEvent) =>
+    saveEvents(events.map(e => e.id === ev.id ? { ...e, done: !e.done, doneAt: !e.done ? Date.now() : undefined } : e))
 
   const requestNotif = () => { if (Notification.permission === 'default') Notification.requestPermission() }
 
@@ -163,6 +168,41 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const notifOff = typeof Notification !== 'undefined' && Notification.permission === 'default'
   const selDate = dateFromYmd(selectedDate)
   const selHoliday = holidayOn(selectedDate)
+
+  const rowSt: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 7, padding: '5px 2px', borderBottom: '1px solid var(--border)' }
+  const iconBtnSt: React.CSSProperties = { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)' }
+
+  // Flat, compact entry row (checkbox for events, none for notes) + edit/delete.
+  const renderEntry = (ev: CalendarEvent, showDate: boolean) => {
+    if (editId === ev.id) return (
+      <EntryEditor key={ev.id} ev={ev} onCancel={() => setEditId(null)} onSave={p => saveEdit(ev.id, p)} onDelete={() => deleteEvent(ev.id)} />
+    )
+    const isEvent = kindOf(ev) === 'event'
+    const done = !!ev.done
+    return (
+      <div key={ev.id} className="cal-row" style={rowSt}>
+        {isEvent ? (
+          <button onClick={() => toggleDone(ev)} aria-label={done ? 'Batalkan' : 'Tandai selesai'}
+            style={{ width: 15, height: 15, flexShrink: 0, borderRadius: 4, border: `1.5px solid ${done ? 'var(--accent)' : 'var(--border2)'}`, background: done ? 'var(--accent)' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', padding: 0 }}>
+            {done && <IconCheck size={10} />}
+          </button>
+        ) : (
+          <span style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 2, background: 'var(--accent)' }} />
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 500, color: done ? 'var(--silver4)' : 'var(--silver)', textDecoration: done ? 'line-through' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.title}</div>
+          {(showDate || ev.time) && (
+            <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+              {showDate && <span>{shortDate(ev.date)}</span>}
+              {ev.time && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}><IconClock size={9} /> {ev.time}</span>}
+            </div>
+          )}
+        </div>
+        <button onClick={() => setEditId(ev.id)} title="Edit" style={iconBtnSt} onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}><IconEdit size={13} /></button>
+        <button onClick={() => deleteEvent(ev.id)} title="Hapus" style={iconBtnSt} onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}><IconTrash size={13} /></button>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '8px 10px', gap: 6 }}>
@@ -214,11 +254,9 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
               onDoubleClick={() => { if (!isMobile) openAdd(cell.date) }}
               title={holi ?? undefined}
               style={{
-                position: 'relative', height: cellSize, borderRadius: 12,
-                border: isSel && !isTd ? '1.5px solid var(--accent)' : '1.5px solid transparent',
-                background: 'transparent', cursor: 'pointer', padding: 0,
+                position: 'relative', height: cellSize, borderRadius: 10,
+                border: 'none', background: 'transparent', cursor: 'pointer', padding: 0,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                transition: 'border-color 140ms',
               }}
             >
               {has && (
@@ -232,11 +270,11 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
               <span style={{
                 width: pill, height: pill, borderRadius: '50%', zIndex: 1,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: isTd ? 'var(--accent)' : 'transparent',
+                background: isTd ? 'var(--accent)' : isSel ? 'color-mix(in srgb, var(--accent) 16%, transparent)' : 'transparent',
                 boxShadow: isTd ? '0 3px 10px color-mix(in srgb, var(--accent) 45%, transparent)' : 'none',
-                fontSize: 12.5, lineHeight: 1,
-                fontWeight: isTd ? 800 : cell.curr ? 600 : 400,
-                color: isTd ? '#fff' : redDay ? RED : cell.curr ? 'var(--silver)' : 'var(--silver4)',
+                fontSize: 12.5, lineHeight: 1, transition: 'background 140ms',
+                fontWeight: isTd || isSel ? 800 : cell.curr ? 600 : 400,
+                color: isTd ? '#fff' : isSel ? 'var(--accent)' : redDay ? RED : cell.curr ? 'var(--silver)' : 'var(--silver4)',
               }}>{Number(cell.date.split('-')[2])}</span>
               {holi && cell.curr && !isTd && <span style={{ position: 'absolute', bottom: 3, width: 4, height: 4, borderRadius: '50%', background: RED, zIndex: 1 }} />}
             </button>
@@ -252,9 +290,15 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
 
       {/* Day detail — agenda panel */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2, paddingTop: 7, borderTop: '1px solid var(--border)' }}>
-        {/* Date (add via double-click / double-tap a date) */}
-        <div style={{ fontSize: 12.5, fontWeight: 800, color: selHoliday ? RED : 'var(--silver)', fontFamily: 'var(--font)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 0 }}>
-          {formatDisplayDate(selectedDate)}
+        {/* Search + national-holiday filter */}
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--silver4)', display: 'flex', pointerEvents: 'none' }}><IconSearch size={12} /></span>
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari agenda…"
+              style={{ width: '100%', height: 26, padding: '0 8px 0 26px', boxSizing: 'border-box', background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 7, fontSize: 11, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none' }} />
+          </div>
+          <button onClick={() => setLiburFilter(v => !v)} title="Libur nasional"
+            style={{ height: 26, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', flexShrink: 0, border: `1px solid ${liburFilter ? 'color-mix(in srgb, ' + RED + ' 40%, transparent)' : 'var(--border2)'}`, background: liburFilter ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg4)', color: liburFilter ? RED : 'var(--silver4)' }}>Libur</button>
         </div>
 
         {/* Discard confirm */}
@@ -311,54 +355,60 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
           </div>
         )}
 
-        {notifOff && selectedEvs.length > 0 && (
-          <button onClick={requestNotif} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 26, flexShrink: 0, background: 'color-mix(in srgb, ' + RED + ' 10%, transparent)', border: '1px solid color-mix(in srgb, ' + RED + ' 30%, transparent)', borderRadius: 7, color: RED, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--mono)' }}>🔔 Aktifkan pengingat</button>
+        {notifOff && !query && !liburFilter && selectedEvs.length > 0 && (
+          <button onClick={requestNotif} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 24, flexShrink: 0, background: 'color-mix(in srgb, ' + RED + ' 10%, transparent)', border: '1px solid color-mix(in srgb, ' + RED + ' 30%, transparent)', borderRadius: 7, color: RED, fontSize: 9.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--mono)' }}>🔔 Aktifkan pengingat</button>
         )}
 
-        {/* Entry rows */}
-        <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {selectedEvs.length === 0 && !selHoliday && !showAddForm && (
-            <div style={{ fontSize: 11, color: 'var(--silver4)', fontFamily: 'var(--font)', padding: '10px 0', textAlign: 'center' }}>
-              Tidak ada agenda · {isMobile ? 'ketuk' : 'klik'} dua kali tanggal untuk tambah
-            </div>
-          )}
-
-          {/* Holiday — non-editable */}
-          {selHoliday && (
-            <div className="cal-row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'color-mix(in srgb, ' + RED + ' 7%, var(--bg4))', border: '1px solid color-mix(in srgb, ' + RED + ' 25%, transparent)' }}>
-              <Badge label="Libur" color={RED} />
-              <div style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, color: RED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selHoliday}</div>
-            </div>
-          )}
-
-          {selectedEvs.map((ev, idx) => {
-            if (editId === ev.id) return (
-              <EntryEditor key={ev.id} ev={ev} onCancel={() => setEditId(null)} onSave={p => saveEdit(ev.id, p)} onDelete={() => deleteEvent(ev.id)} />
-            )
-            const isEvent = kindOf(ev) === 'event'
-            return (
-              <div key={ev.id} className="cal-row" style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8,
-                background: 'var(--bg4)', border: '1px solid var(--border)', animationDelay: `${idx * 40}ms`,
-              }}>
-                <Badge label={isEvent ? 'Event' : 'Catatan'} color={isEvent ? RED : 'var(--accent)'} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--silver)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.title}</div>
-                  {ev.time && <div style={{ fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}><IconClock size={10} /> {ev.time}</div>}
+        {/* List */}
+        <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {(() => {
+            const q = query.trim().toLowerCase()
+            // Search across all events
+            if (q) {
+              const matches = events
+                .filter(e => e.title.toLowerCase().includes(q))
+                .sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))
+              if (!matches.length) return <Empty text="Tidak ada hasil" />
+              return matches.map(ev => renderEntry(ev, true))
+            }
+            // National holidays for the viewed year
+            if (liburFilter) {
+              return holidaysForYear(viewYear).map(h => (
+                <div key={h.date} className="cal-row" style={rowSt}>
+                  <Badge label="Libur" color={RED} />
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: RED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</div>
+                  <span style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', flexShrink: 0 }}>{shortDate(h.date)}</span>
                 </div>
-                <button onClick={() => setEditId(ev.id)} title="Edit"
-                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
-                  <IconEdit size={14} />
-                </button>
-              </div>
+              ))
+            }
+            // Default — selected day
+            return (
+              <>
+                {selHoliday && (
+                  <div className="cal-row" style={rowSt}>
+                    <Badge label="Libur" color={RED} />
+                    <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: RED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selHoliday}</div>
+                  </div>
+                )}
+                {selectedEvs.length === 0 && !selHoliday && !showAddForm && (
+                  <Empty text={`Tidak ada agenda · ${isMobile ? 'ketuk' : 'klik'} dua kali tanggal`} />
+                )}
+                {selectedEvs.map(ev => renderEntry(ev, false))}
+              </>
             )
-          })}
+          })()}
         </div>
       </div>
     </div>
   )
 })
+
+function shortDate(ymd: string) {
+  return new Date(ymd + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+}
+function Empty({ text }: { text: string }) {
+  return <div style={{ fontSize: 10.5, color: 'var(--silver4)', fontFamily: 'var(--font)', padding: '12px 0', textAlign: 'center' }}>{text}</div>
+}
 
 // Small kind/holiday badge.
 function Badge({ label, color }: { label: string; color: string }) {

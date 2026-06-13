@@ -33,6 +33,14 @@ const VARIABLE: Record<string, string> = {
 export function holidayOn(ymd: string): string | undefined {
   return VARIABLE[ymd] ?? FIXED[ymd.slice(5)]
 }
+
+// All national holidays for a given year, date-sorted.
+export function holidaysForYear(year: number): { date: string; name: string }[] {
+  const out: { date: string; name: string }[] = []
+  for (const [md, name] of Object.entries(FIXED)) out.push({ date: `${year}-${md}`, name })
+  for (const [date, name] of Object.entries(VARIABLE)) if (date.startsWith(`${year}-`)) out.push({ date, name })
+  return out.sort((a, b) => a.date.localeCompare(b.date))
+}
 export function isHoliday(ymd: string): boolean {
   return holidayOn(ymd) !== undefined
 }

@@ -3,7 +3,7 @@ import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../utils/supabaseClient'
 import {
-  IconEye, IconEyeOff, IconUpload, IconLock, IconCopy, IconCheck,
+  IconEye, IconEyeOff, IconLock, IconCopy, IconCheck,
   IconEdit, IconTrash, IconGlobe, IconRefresh, IconSearch, IconPlus,
 } from '../ui/icons'
 import {
@@ -46,42 +46,6 @@ function strength(pw: string): { label: string; color: string; pct: number } {
   return map[Math.min(s, 4)]
 }
 
-// ── CSV import (Chrome/Edge/Firefox export: name,url,username,password,note) ──
-function parseCsv(text: string): VaultEntry[] {
-  const rows: string[][] = []
-  let row: string[] = [], cur = '', q = false
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]
-    if (q) {
-      if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++ } else q = false }
-      else cur += c
-    } else if (c === '"') q = true
-    else if (c === ',') { row.push(cur); cur = '' }
-    else if (c === '\n' || c === '\r') { if (cur !== '' || row.length) { row.push(cur); rows.push(row); row = []; cur = '' } if (c === '\r' && text[i + 1] === '\n') i++ }
-    else cur += c
-  }
-  if (cur !== '' || row.length) { row.push(cur); rows.push(row) }
-  if (!rows.length) return []
-  const head = rows[0].map(h => h.trim().toLowerCase())
-  const idx = (names: string[]) => names.map(n => head.indexOf(n)).find(i => i >= 0) ?? -1
-  const iName = idx(['name', 'title']), iUrl = idx(['url', 'website']), iUser = idx(['username', 'login', 'email']), iPw = idx(['password']), iNote = idx(['note', 'notes', 'comment'])
-  const out: VaultEntry[] = []
-  for (let r = 1; r < rows.length; r++) {
-    const cols = rows[r]
-    const password = iPw >= 0 ? (cols[iPw] ?? '') : ''
-    const label = (iName >= 0 ? cols[iName] : '') || (iUrl >= 0 ? cols[iUrl] : '') || 'Tanpa nama'
-    if (!password && !(iUser >= 0 && cols[iUser])) continue
-    out.push({
-      id: crypto.randomUUID(), label: label.trim(),
-      username: (iUser >= 0 ? cols[iUser] : '')?.trim() ?? '',
-      password, url: (iUrl >= 0 ? cols[iUrl] : '')?.trim() || undefined,
-      note: (iNote >= 0 ? cols[iNote] : '')?.trim() || undefined,
-      updatedAt: Date.now(),
-    })
-  }
-  return out
-}
-
 function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   const { profile } = useAuthStore()
   const setNotesLockActive = useStore(s => (s as any).setNotesLockActive)
@@ -117,7 +81,6 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
 
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const fileRef   = useRef<HTMLInputElement>(null)
 
   const doLock = useCallback(() => {
     clearVaultSession()
@@ -275,13 +238,6 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
     // success → browser redirects to Google
   }
 
-  const onImport = async (file: File) => {
-    const text = await file.text()
-    const imported = parseCsv(text)
-    if (!imported.length) { setErr('Tidak ada data yang dikenali di CSV.'); setTimeout(() => setErr(''), 3000); return }
-    persist([...imported, ...entries])
-    resetIdle()
-  }
 
   // ── Styles ──────────────────────────────────────────────────
   const inp: React.CSSProperties = {
@@ -300,6 +256,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
       <input
         type={showPin ? 'text' : 'password'}
         value={p.value} autoFocus={p.autoFocus}
+        autoComplete="new-password" spellCheck={false} data-lpignore="true" data-1p-ignore=""
         onChange={e => { p.onChange(e.target.value); setErr('') }}
         onKeyDown={e => { if (e.key === 'Enter' && p.onEnter) p.onEnter() }}
         placeholder={p.placeholder}
@@ -393,30 +350,40 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   const miniInp: React.CSSProperties = { height: 28, padding: '0 9px', boxSizing: 'border-box', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 11.5, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', minWidth: 0 }
   const miniBtn: React.CSSProperties = { width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--silver3)' }
   const canAdd = !!(form.label.trim() || form.username.trim())
+  // Keep the browser's own autofill/password manager OUT of the vault fields.
+  const noAutofill: any = { autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'off', spellCheck: false, 'data-lpignore': 'true', 'data-1p-ignore': '', 'data-form-type': 'other' }
+  const noAutofillPw: any = { ...noAutofill, autoComplete: 'new-password' }
 
   return (
     <div onPointerDown={resetIdle} onKeyDown={resetIdle} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px' }}>
-      {/* Sticky top: add trigger/form + toolbar */}
+      {/* Sticky top: toolbar (search · +add · lock) + collapsible add form */}
       <div style={{ position: 'sticky', top: 0, zIndex: 3, background: 'var(--bg2)', display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 4 }}>
+        {/* Toolbar */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--silver4)', display: 'flex', pointerEvents: 'none' }}><IconSearch size={13} /></span>
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari..." {...noAutofill} style={{ ...inp, height: 30, paddingLeft: 28 }} />
+          </div>
+          <button onClick={() => { if (showAdd) { setShowAdd(false); setShowGen(false); setForm({ label: '', username: '', password: '', url: '' }) } else setShowAdd(true) }}
+            title={showAdd ? 'Tutup' : 'Tambahkan password'}
+            style={{ ...toolBtn, background: showAdd ? 'var(--accent)' : 'var(--bg4)', border: showAdd ? 'none' : '1px solid var(--border2)', color: showAdd ? 'white' : 'var(--silver3)' }}><IconPlus size={15} /></button>
+          <button onClick={doLock} title="Kunci" style={toolBtn}><IconLock size={14} /></button>
+        </div>
+
         {/* Collapsible add form */}
-        {!showAdd ? (
-          <button onClick={() => setShowAdd(true)} style={{ height: 30, background: 'var(--accent-light)', border: '1px dashed var(--accent-soft)', borderRadius: 8, color: 'var(--accent)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, flexShrink: 0 }}>
-            <IconPlus size={13} /> Tambahkan password
-          </button>
-        ) : (
+        {showAdd && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: 6, background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 8, flexShrink: 0, animation: 'slideDown 150ms ease' }}>
             <div style={{ display: 'flex', gap: 5 }}>
-              <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Nama situs" autoFocus style={{ ...miniInp, flex: 1 }} />
-              <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username / email" style={{ ...miniInp, flex: 1 }} />
+              <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Nama situs" autoFocus {...noAutofill} style={{ ...miniInp, flex: 1 }} />
+              <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username / email" {...noAutofill} style={{ ...miniInp, flex: 1 }} />
             </div>
             <div style={{ display: 'flex', gap: 5 }}>
               <input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                 onKeyDown={e => { if (e.key === 'Enter' && canAdd) addEntry() }}
-                placeholder="Kata sandi" type={showPw ? 'text' : 'password'} style={{ ...miniInp, flex: 1 }} />
+                placeholder="Kata sandi" type={showPw ? 'text' : 'password'} {...noAutofillPw} style={{ ...miniInp, flex: 1 }} />
               <button onClick={() => setShowPw(v => !v)} title={showPw ? 'Sembunyikan' : 'Tampilkan'} style={miniBtn}>{showPw ? <IconEyeOff size={13} /> : <IconEye size={13} />}</button>
               <button onClick={() => setShowGen(v => !v)} title="Buat kata sandi" style={{ ...miniBtn, color: showGen ? 'var(--accent)' : 'var(--silver3)' }}><IconRefresh size={13} /></button>
-              <button onClick={addEntry} disabled={!canAdd} title="Tambah" style={{ ...miniBtn, background: canAdd ? 'var(--accent)' : 'var(--bg)', border: canAdd ? 'none' : '1px solid var(--border2)', color: canAdd ? 'white' : 'var(--silver4)', cursor: canAdd ? 'pointer' : 'not-allowed' }}><IconPlus size={14} /></button>
-              <button onClick={() => { setShowAdd(false); setShowGen(false); setForm({ label: '', username: '', password: '', url: '' }) }} title="Tutup" style={{ ...miniBtn, fontSize: 15, color: 'var(--silver3)' }}>×</button>
+              <button onClick={addEntry} disabled={!canAdd} title="Simpan" style={{ ...miniBtn, background: canAdd ? 'var(--accent)' : 'var(--bg)', border: canAdd ? 'none' : '1px solid var(--border2)', color: canAdd ? 'white' : 'var(--silver4)', cursor: canAdd ? 'pointer' : 'not-allowed' }}><IconCheck size={14} /></button>
             </div>
             {form.password && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -440,18 +407,6 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
             )}
           </div>
         )}
-
-        {/* Toolbar */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--silver4)', display: 'flex', pointerEvents: 'none' }}><IconSearch size={13} /></span>
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari..." style={{ ...inp, height: 30, paddingLeft: 28 }} />
-          </div>
-          <button onClick={() => fileRef.current?.click()} title="Impor CSV" style={toolBtn}><IconUpload size={14} /></button>
-          <button onClick={doLock} title="Kunci" style={toolBtn}><IconLock size={14} /></button>
-          <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
-            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onImport(f) }} />
-        </div>
       </div>
       {err && <div style={{ fontSize: 11, color: 'var(--red)' }}>{err}</div>}
 

@@ -47,11 +47,12 @@ function NotesWidgetImpl({ sectionId }: Props) {
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg2)', position: 'relative' }}>
-      {/* Status bar — sticky so it stays visible while the note scrolls */}
+      {/* Status bar — sticky + fully opaque so the note never shows through it */}
       <div style={{
-        padding: '3px 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-        fontSize: 9, fontFamily: 'var(--mono)', flexShrink: 0, borderBottom: '1px solid var(--border)',
-        position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg2)',
+        padding: '4px 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+        fontSize: 9, fontFamily: 'var(--mono)', flexShrink: 0,
+        position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg2)',
+        boxShadow: '0 2px 8px -3px rgba(0,0,0,0.22)', borderBottom: '1px solid var(--border)',
       }}>
         <span style={{ color: saved ? 'var(--silver4)' : 'var(--accent)' }}>
           {saved ? '✓ tersimpan' : '● menyimpan...'}
