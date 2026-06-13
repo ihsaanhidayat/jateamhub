@@ -186,6 +186,7 @@ export interface CalendarEvent {
   kind?:     CalendarKind
   done?:     boolean
   doneAt?:   number
+  gcalId?:   string   // mapped Google Calendar event id (after sync)
   createdAt: number
 }
 

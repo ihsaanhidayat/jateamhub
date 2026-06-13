@@ -75,6 +75,18 @@ export const signInWithGoogle = () =>
     options: { redirectTo: window.location.origin },
   })
 
+// Re-auth with the Calendar scope to obtain a fresh provider_token for sync.
+// For an already-Google-linked user this signs into the SAME account.
+export const signInWithGoogleCalendar = () =>
+  supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+      scopes: 'https://www.googleapis.com/auth/calendar.events',
+      queryParams: { prompt: 'consent', access_type: 'online' },
+    },
+  })
+
 // ── Identity linking (bind Google ke akun lokal yang sudah login) ──
 // Memerlukan "Manual linking" aktif di Supabase Auth settings.
 export const linkGoogleIdentity = () =>

@@ -1,7 +1,10 @@
 import { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useStore } from '../../store/dashboardStore'
+import { useAuthStore } from '../../store/authStore'
+import { signInWithGoogleCalendar } from '../../utils/supabaseClient'
 import { hijriDate, weton, dateFromYmd } from '../../utils/dates'
 import { holidayOn, holidaysForYear } from '../../utils/holidays'
+import { gcalReady, listEvents, pushEvent, patchEvent, deleteEvent as gcalDeleteEvent, type GEvent } from '../../utils/gcal'
 import { IconChevL, IconChevR, IconClock, IconPlus, IconEdit, IconTrash, IconCheck, IconSearch, IconX } from '../ui/icons'
 import type { CalendarEvent, CalendarKind } from '../../types'
 
@@ -53,6 +56,11 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const [liburFilter,  setLiburFilter]  = useState(false)
   const [liburPage,    setLiburPage]    = useState(0)
   const [confirmDelId, setConfirmDelId] = useState<string | null>(null)
+  const { profile } = useAuthStore()
+  const googleLinked = !!(profile as any)?.google_email
+  const [syncing,   setSyncing]   = useState(false)
+  const [syncMsg,   setSyncMsg]   = useState('')
+  const [gEvents,   setGEvents]   = useState<GEvent[]>([])
   const notifSent = useRef<Set<string>>(new Set())
   const addTimeRef = useRef<HTMLInputElement>(null)
   const lastTap    = useRef<{ date: string; t: number }>({ date: '', t: 0 })
@@ -139,13 +147,59 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
     setNewTitle(''); setNewTime(''); setShowAddForm(false); setDiscardConfirm(false)
     if (Notification.permission === 'default') Notification.requestPermission()
   }
-  const deleteEvent = (id: string) => { saveEvents(events.filter(e => e.id !== id)); setEditId(null) }
+  const deleteEvent = (id: string) => {
+    const ev = events.find(e => e.id === id)
+    if (ev?.gcalId) gcalDeleteEvent(ev.gcalId).catch(() => {})   // best-effort propagate to Google
+    saveEvents(events.filter(e => e.id !== id)); setEditId(null)
+  }
   const saveEdit = (id: string, patch: Partial<CalendarEvent>) => {
     saveEvents(events.map(e => e.id === id ? { ...e, ...patch } : e)); setEditId(null)
   }
   // Events (todo) can be checked off; notes can't.
   const toggleDone = (ev: CalendarEvent) =>
     saveEvents(events.map(e => e.id === ev.id ? { ...e, done: !e.done, doneAt: !e.done ? Date.now() : undefined } : e))
+
+  // ── Google Calendar sync (on-demand, two-way) ───────────────────────
+  const doSync = useCallback(async () => {
+    setSyncing(true); setSyncMsg('')
+    try {
+      const cur = (() => { try { return JSON.parse(useStore.getState().personalSections.find(p => p.id === sectionId)?.items?.[0]?.desc ?? '[]') as CalendarEvent[] } catch { return [] } })()
+      // Push app events → Google (create/update), record gcalId.
+      let needAuth = false
+      const next = [...cur]
+      for (let i = 0; i < next.length; i++) {
+        const ev = next[i]
+        const r = ev.gcalId ? await patchEvent(ev.gcalId, ev) : await pushEvent(ev)
+        if (r.needsAuth) { needAuth = true; break }
+        if (r.ok && !ev.gcalId && r.data?.id) next[i] = { ...ev, gcalId: r.data.id }
+      }
+      if (needAuth) { setSyncMsg('Sesi Google berakhir — sinkron ulang.'); setSyncing(false); return }
+      saveEvents(next)
+      // Pull Google events for the viewed month (read-only display).
+      const first = new Date(viewYear, viewMonth, 1)
+      const last  = new Date(viewYear, viewMonth + 1, 1)
+      const lr = await listEvents(first.toISOString(), last.toISOString())
+      if (lr.ok && lr.data) {
+        const mine = new Set(next.map(e => e.gcalId).filter(Boolean))
+        setGEvents(lr.data.filter(g => !mine.has(g.id)))
+      }
+      setSyncMsg(`Tersinkron · ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`)
+    } catch { setSyncMsg('Sinkron gagal.') }
+    setSyncing(false)
+  }, [sectionId, viewYear, viewMonth, saveEvents])
+
+  const onSyncClick = () => {
+    if (!gcalReady()) { sessionStorage.setItem('gcal-sync-pending', sectionId); signInWithGoogleCalendar(); return }
+    doSync()
+  }
+
+  // Auto-run sync after returning from the Calendar OAuth.
+  useEffect(() => {
+    if (sessionStorage.getItem('gcal-sync-pending') === sectionId && gcalReady()) {
+      sessionStorage.removeItem('gcal-sync-pending')
+      doSync()
+    }
+  }, [sectionId, doSync])
 
   const requestNotif = () => { if (Notification.permission === 'default') Notification.requestPermission() }
 
@@ -167,6 +221,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const cells = buildGrid(viewYear, viewMonth)
   const isTodayStr = today()
   const selectedEvs = eventsByDate.get(selectedDate) ?? []
+  const gDayEvents = gEvents.filter(g => g.date === selectedDate)
   const cellSize = isExpanded ? 38 : 28
   const notifOff = typeof Notification !== 'undefined' && Notification.permission === 'default'
   const selDate = dateFromYmd(selectedDate)
@@ -298,9 +353,19 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
 
       {/* Day detail — agenda panel */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2, paddingTop: 7, borderTop: '1px solid var(--border)' }}>
-        {/* Tools — collapsed until needed: search toggle + Libur filter */}
+        {/* Tools — collapsed until needed: sync + search toggle + Libur filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-          <div style={{ flex: 1 }} />
+          {syncMsg && <span style={{ fontSize: 8.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{syncMsg}</span>}
+          {!syncMsg && <div style={{ flex: 1 }} />}
+          {googleLinked && (
+            <button onClick={onSyncClick} disabled={syncing} title="Sinkron Google Calendar"
+              style={{ height: 26, padding: '0 9px', flexShrink: 0, borderRadius: 7, cursor: syncing ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', border: '1px solid var(--border2)', background: 'var(--bg4)', color: 'var(--silver3)' }}>
+              {syncing
+                ? <span style={{ width: 11, height: 11, border: '2px solid var(--border2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+                : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>}
+              Sinkron
+            </button>
+          )}
           <button onClick={() => setShowTools(v => { if (v) { setQuery(''); setLiburFilter(false) } return !v })} title="Cari & filter"
             style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${(showTools || query || liburFilter) ? 'var(--accent-soft)' : 'var(--border2)'}`, background: (showTools || query || liburFilter) ? 'var(--accent-light)' : 'var(--bg4)', color: (showTools || query || liburFilter) ? 'var(--accent)' : 'var(--silver4)' }}><IconSearch size={13} /></button>
         </div>
@@ -400,10 +465,23 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
                     <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: RED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selHoliday}</div>
                   </div>
                 )}
-                {selectedEvs.length === 0 && !selHoliday && !showAddForm && (
+                {selectedEvs.length === 0 && gDayEvents.length === 0 && !selHoliday && !showAddForm && (
                   <Empty text={`Tidak ada agenda · ${isMobile ? 'ketuk' : 'klik'} dua kali tanggal`} />
                 )}
                 {selectedEvs.map(ev => renderEntry(ev, false))}
+                {/* Google-origin events (read-only) */}
+                {gDayEvents.map(g => (
+                  <div key={'g-' + g.id} className="cal-row" style={rowSt}>
+                    <span style={{ width: 6, height: 6, flexShrink: 0, borderRadius: '50%', background: '#4285F4' }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--silver)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</div>
+                      <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                        {g.time && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}><IconClock size={9} /> {g.time}</span>}
+                        <span style={{ color: '#4285F4', fontWeight: 700 }}>Google</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </>
             )
           })()}

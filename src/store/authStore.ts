@@ -11,6 +11,7 @@ import {
   linkGoogleIdentity, getIdentities, unlinkIdentity,
 } from '../utils/supabaseClient'
 import type { Profile } from '../utils/supabaseClient'
+import { storeGcalToken } from '../utils/gcal'
 import type { Role } from '../types'
 import { canManageUser, canCreateUser, canAssignRole } from '../utils/roles'
 
@@ -107,6 +108,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       clearTimeout(safetyTimer)
 
+      // Capture the Google access token right after an OAuth redirect (only
+      // window it's available client-side) for Calendar sync.
+      storeGcalToken((session as any)?.provider_token)
+
       if (!session?.user) {
         set({ profile: null, loading: false, initialized: true })
       } else {
@@ -148,6 +153,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } else if (event === 'SIGNED_OUT') {
         set({ profile: null, users: [], _usersLoaded: false, pendingGoogleUser: null })
       } else if (event === 'SIGNED_IN' && session?.user) {
+        storeGcalToken((session as any).provider_token)
         // Hanya handle Google OAuth — email/password login ditangani oleh login()
         if (get().profile) return
         const provider = session.user.app_metadata?.provider
