@@ -2,6 +2,7 @@ import { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { hijriDayMonth, weton, dateFromYmd } from '../../utils/dates'
 import { holidayOn } from '../../utils/holidays'
+import { IconChevL, IconChevR, IconClock, IconPlus, IconEdit, IconDownload } from '../ui/icons'
 import type { CalendarEvent, CalendarKind } from '../../types'
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -199,7 +200,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const cells = buildGrid(viewYear, viewMonth)
   const isTodayStr = today()
   const selectedEvs = eventsByDate.get(selectedDate) ?? []
-  const cellSize = isExpanded ? 46 : 36
+  const cellSize = isExpanded ? 38 : 28
   const notifOff = typeof Notification !== 'undefined' && Notification.permission === 'default'
   const selDate = dateFromYmd(selectedDate)
   const selHoliday = holidayOn(selectedDate)
@@ -216,29 +217,29 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
         </defs>
       </svg>
 
-      {/* Header — bold month/year, nav on the right */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, padding: '0 2px' }}>
-        <div style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 800, color: 'var(--silver)', fontFamily: 'var(--font)', letterSpacing: '-0.4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      {/* Header — compact month/year, nav on the right */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: '0 2px' }}>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 800, color: 'var(--silver)', fontFamily: 'var(--font)', letterSpacing: '-0.3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {MONTH_NAMES[viewMonth]} <span style={{ color: 'var(--silver4)', fontWeight: 700 }}>{viewYear}</span>
         </div>
         <button onClick={goToday} title="Hari ini" style={{
-          width: 9, height: 9, borderRadius: '50%', padding: 0, flexShrink: 0,
+          width: 8, height: 8, borderRadius: '50%', padding: 0, flexShrink: 0, marginRight: 2,
           background: 'var(--accent)', border: 'none', cursor: 'pointer',
           boxShadow: '0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)',
         }} />
-        <button onClick={prevMonth} style={navBtn} aria-label="Bulan sebelumnya">‹</button>
-        <button onClick={nextMonth} style={navBtn} aria-label="Bulan berikutnya">›</button>
+        <button onClick={prevMonth} style={navBtn} aria-label="Bulan sebelumnya"><IconChevL size={13} /></button>
+        <button onClick={nextMonth} style={navBtn} aria-label="Bulan berikutnya"><IconChevR size={13} /></button>
       </div>
 
       {/* Day header row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, flexShrink: 0 }}>
         {DAY_NAMES.map((d, i) => (
-          <div key={d} style={{ textAlign: 'center', fontSize: 9, fontWeight: 800, color: i === 0 ? RED : 'var(--silver4)', fontFamily: 'var(--mono)', letterSpacing: '0.5px', padding: '1px 0 3px' }}>{d}</div>
+          <div key={d} style={{ textAlign: 'center', fontSize: 8.5, fontWeight: 800, color: i === 0 ? RED : 'var(--silver4)', fontFamily: 'var(--mono)', letterSpacing: '0.3px', padding: '0 0 2px' }}>{d}</div>
         ))}
       </div>
 
       {/* Calendar grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, flexShrink: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, flexShrink: 0 }}>
         {cells.map((cell, i) => {
           const isTd   = cell.date === isTodayStr
           const isSel  = cell.date === selectedDate
@@ -284,8 +285,14 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
         })}
       </div>
 
+      {/* Keterangan — exactly under the dates: Hijri · Weton (+ holiday) */}
+      <div style={{ flexShrink: 0, fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        ☪ {hijriDayMonth(selDate)} · {weton(selDate)}
+        {selHoliday && <span style={{ color: RED, fontWeight: 700 }}> · {selHoliday}</span>}
+      </div>
+
       {/* Day detail — agenda panel */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2, paddingTop: 7, borderTop: '1px solid var(--border)' }}>
         {/* Date + add */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, gap: 8 }}>
           <div style={{ fontSize: 12.5, fontWeight: 800, color: selHoliday ? RED : 'var(--silver)', fontFamily: 'var(--font)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
@@ -298,12 +305,9 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
               background: showAddForm ? 'var(--bg4)' : RED, border: showAddForm ? '1px solid var(--border2)' : 'none',
               borderRadius: 7, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap',
             }}>
-            {showAddForm ? 'Batal' : '＋ Tambah'}
+            {showAddForm ? 'Batal' : <><IconPlus size={12} /> Tambah</>}
           </button>
         </div>
-        {selHoliday && (
-          <div style={{ fontSize: 9.5, color: RED, fontWeight: 700, fontFamily: 'var(--mono)', flexShrink: 0, lineHeight: 1.3 }}>🔴 {selHoliday}</div>
-        )}
 
         {/* Discard confirm */}
         {discardConfirm && (
@@ -319,7 +323,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, background: 'var(--bg4)', borderRadius: 8, border: '1px solid var(--border2)', flexShrink: 0, animation: 'slideDown 150ms ease' }}>
             {/* Penanda: Event / Catatan */}
             <div style={{ display: 'flex', gap: 4, background: 'var(--bg)', borderRadius: 7, padding: 3 }}>
-              {([['event', '🔴 Event'], ['note', '📝 Catatan']] as const).map(([k, lbl]) => (
+              {([['event', 'Event'], ['note', 'Catatan']] as const).map(([k, lbl]) => (
                 <button key={k} onClick={() => setNewKind(k)} style={{
                   flex: 1, height: 26, borderRadius: 5, border: 'none', cursor: 'pointer',
                   fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--font)',
@@ -336,7 +340,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
               {newKind === 'event' && (
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button onClick={() => addTimeRef.current?.showPicker?.()} title="Pilih jam"
-                    style={{ width: 32, height: 32, borderRadius: 6, border: `1px solid ${newTime ? RED : 'var(--border2)'}`, background: newTime ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg)', color: newTime ? RED : 'var(--silver3)', cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🕐</button>
+                    style={{ width: 32, height: 32, borderRadius: 6, border: `1px solid ${newTime ? RED : 'var(--border2)'}`, background: newTime ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg)', color: newTime ? RED : 'var(--silver3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconClock size={15} /></button>
                   <input ref={addTimeRef} type="time" value={newTime} onChange={e => setNewTime(e.target.value)}
                     style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, top: 0, left: 0 }} tabIndex={-1} />
                 </div>
@@ -344,7 +348,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
             </div>
             {newKind === 'event' && newTime && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start', fontSize: 10, fontFamily: 'var(--mono)', color: RED, background: 'color-mix(in srgb, ' + RED + ' 12%, transparent)', borderRadius: 5, padding: '2px 7px' }}>
-                🕐 {newTime}
+                <IconClock size={11} /> {newTime}
                 <button onClick={() => setNewTime('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: RED, fontSize: 11, padding: 0, lineHeight: 1 }}>×</button>
               </span>
             )}
@@ -380,7 +384,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--silver)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.title}</div>
                   <div style={{ fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-                    {ev.time && <span>🕐 {ev.time}</span>}
+                    {ev.time && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><IconClock size={10} /> {ev.time}</span>}
                     {!isEvent && <span>catatan</span>}
                   </div>
                 </div>
@@ -394,7 +398,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
                     <button onClick={() => downloadIcs(ev)} title="Unduh .ics"
                       style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)' }}
                       onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      <IconDownload size={14} />
                     </button>
                   </>
                 )}
@@ -402,16 +406,11 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
                 <button onClick={() => setEditId(ev.id)} title="Edit"
                   style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)' }}
                   onMouseEnter={e => (e.currentTarget.style.color = RED)} onMouseLeave={e => (e.currentTarget.style.color = 'var(--silver3)')}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <IconEdit size={14} />
                 </button>
               </div>
             )
           })}
-        </div>
-
-        {/* Keterangan — bottom-left: Hijri · Weton (always shown, quiet) */}
-        <div style={{ flexShrink: 0, fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', paddingTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          ☪ {hijriDayMonth(selDate)} · ꦮ {weton(selDate)}
         </div>
       </div>
     </div>
@@ -432,12 +431,12 @@ function EntryEditor({ ev, onSave, onDelete, onCancel }: { ev: CalendarEvent; on
         {isEvent && (
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button onClick={() => timeRef.current?.showPicker?.()} title="Pilih jam"
-              style={{ width: 30, height: 30, borderRadius: 6, border: `1px solid ${time ? RED : 'var(--border2)'}`, background: time ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg)', color: time ? RED : 'var(--silver3)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🕐</button>
+              style={{ width: 30, height: 30, borderRadius: 6, border: `1px solid ${time ? RED : 'var(--border2)'}`, background: time ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg)', color: time ? RED : 'var(--silver3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconClock size={14} /></button>
             <input ref={timeRef} type="time" value={time} onChange={e => setTime(e.target.value)} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, top: 0, left: 0 }} tabIndex={-1} />
           </div>
         )}
       </div>
-      {isEvent && time && <span style={{ alignSelf: 'flex-start', fontSize: 10, fontFamily: 'var(--mono)', color: RED }}>🕐 {time}</span>}
+      {isEvent && time && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, alignSelf: 'flex-start', fontSize: 10, fontFamily: 'var(--mono)', color: RED }}><IconClock size={11} /> {time}</span>}
       <div style={{ display: 'flex', gap: 6 }}>
         <button onClick={onDelete} title="Hapus" style={{ height: 30, padding: '0 12px', background: 'none', border: '1px solid color-mix(in srgb, ' + RED + ' 40%, transparent)', borderRadius: 6, color: RED, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>Hapus</button>
         <button onClick={onCancel} style={{ flex: 1, height: 30, background: 'none', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>

@@ -2,7 +2,10 @@ import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { useStore } from '../../store/dashboardStore'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../utils/supabaseClient'
-import { IconEye, IconEyeOff } from '../ui/icons'
+import {
+  IconEye, IconEyeOff, IconUpload, IconLock, IconCopy, IconCheck,
+  IconEdit, IconTrash, IconGlobe, IconRefresh, IconSearch, IconPlus,
+} from '../ui/icons'
 import {
   vaultExists, createVault, unlockVault, encryptVault, decryptVault,
   isVaultUnlocked, clearVaultSession,
@@ -321,7 +324,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   if (!hasVault) {
     return (
       <div style={overlay}>
-        <span style={{ fontSize: 30 }}>🔐</span>
+        <span style={{ color: 'var(--accent)', display: 'flex' }}><IconLock size={28} /></span>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)' }}>Buat PIN Brankas</div>
         <div style={{ fontSize: 11, color: 'var(--silver4)', lineHeight: 1.5, maxWidth: 240 }}>
           Min. 6 karakter. Mengenkripsi semua kata sandi. <b>Tidak bisa dipulihkan tanpa PIN ini.</b>
@@ -341,7 +344,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   if (locked) {
     return (
       <div style={overlay}>
-        <span style={{ fontSize: 30 }}>🔒</span>
+        <span style={{ color: 'var(--silver3)', display: 'flex' }}><IconLock size={28} /></span>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--silver)' }}>Brankas Terkunci</div>
         {lockoutRem > 0 ? (
           <span style={{ fontSize: 11, color: 'var(--red)' }}>Coba lagi dalam {lockoutRem}s</span>
@@ -390,9 +393,12 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
     <div onPointerDown={resetIdle} onKeyDown={resetIdle} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px' }}>
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="🔍 Cari..." style={{ ...inp, height: 30, flex: 1 }} />
-        <button onClick={() => fileRef.current?.click()} title="Impor CSV" style={toolBtn}>⬆️</button>
-        <button onClick={doLock} title="Kunci" style={toolBtn}>🔒</button>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--silver4)', display: 'flex', pointerEvents: 'none' }}><IconSearch size={13} /></span>
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari..." style={{ ...inp, height: 30, paddingLeft: 28 }} />
+        </div>
+        <button onClick={() => fileRef.current?.click()} title="Impor CSV" style={toolBtn}><IconUpload size={14} /></button>
+        <button onClick={doLock} title="Kunci" style={toolBtn}><IconLock size={14} /></button>
         <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
           onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onImport(f) }} />
       </div>
@@ -418,17 +424,17 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--silver)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.label}</div>
                   {e.username && <div style={{ fontSize: 10.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.username}</div>}
                 </div>
-                <button onClick={() => copyPw(e)} title="Salin kata sandi" style={iconBtn}>{copiedId === e.id ? '✓' : '📋'}</button>
-                <button onClick={() => setEditId(e.id)} title="Edit" style={iconBtn}>✏️</button>
-                <button onClick={() => setConfirmDel(e.id)} title="Hapus" style={iconBtn}>✕</button>
+                <button onClick={() => copyPw(e)} title="Salin kata sandi" style={{ ...iconBtn, color: copiedId === e.id ? 'var(--green, #16A34A)' : 'var(--silver3)' }}>{copiedId === e.id ? <IconCheck size={14} /> : <IconCopy size={14} />}</button>
+                <button onClick={() => setEditId(e.id)} title="Edit" style={iconBtn}><IconEdit size={14} /></button>
+                <button onClick={() => setConfirmDel(e.id)} title="Hapus" style={iconBtn}><IconTrash size={14} /></button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5 }}>
                 <code style={{ flex: 1, fontSize: 12, color: 'var(--silver2)', fontFamily: 'var(--mono)', letterSpacing: isRev ? 0 : 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {isRev ? (e.password || '—') : '••••••••••'}
                 </code>
                 <button onClick={() => setRevealed(s => { const n = new Set(s); n.has(e.id) ? n.delete(e.id) : n.add(e.id); return n })}
-                  title={isRev ? 'Sembunyikan' : 'Tampilkan'} style={iconBtn}>{isRev ? '🙈' : '👁'}</button>
-                {e.url && <a href={/^https?:\/\//.test(e.url) ? e.url : `https://${e.url}`} target="_blank" rel="noopener noreferrer" title="Buka situs" style={{ ...iconBtn, textDecoration: 'none' }}>🌐</a>}
+                  title={isRev ? 'Sembunyikan' : 'Tampilkan'} style={iconBtn}>{isRev ? <IconEyeOff size={14} /> : <IconEye size={14} />}</button>
+                {e.url && <a href={/^https?:\/\//.test(e.url) ? e.url : `https://${e.url}`} target="_blank" rel="noopener noreferrer" title="Buka situs" style={{ ...iconBtn, textDecoration: 'none' }}><IconGlobe size={14} /></a>}
               </div>
               {e.updatedAt && (
                 <div style={{ fontSize: 9, color: 'var(--silver4)', fontFamily: 'var(--mono)', marginTop: 4 }}>
@@ -454,7 +460,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
           <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username / email" style={inp} />
           <div style={{ display: 'flex', gap: 6 }}>
             <input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Kata sandi" style={{ ...inp, flex: 1 }} />
-            <button onClick={() => setShowGen(v => !v)} title="Buat kata sandi" style={{ ...toolBtn, width: 34 }}>🎲</button>
+            <button onClick={() => setShowGen(v => !v)} title="Buat kata sandi" style={{ ...toolBtn, width: 34 }}><IconRefresh size={14} /></button>
           </div>
           {form.password && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -487,8 +493,8 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
           </div>
         </div>
       ) : (
-        <button onClick={() => setShowAdd(true)} style={{ height: 32, background: 'var(--accent-light)', border: '1px dashed var(--accent-soft)', borderRadius: 7, color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-          ＋ Tambah kata sandi
+        <button onClick={() => setShowAdd(true)} style={{ height: 32, background: 'var(--accent-light)', border: '1px dashed var(--accent-soft)', borderRadius: 7, color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+          <IconPlus size={13} /> Tambah kata sandi
         </button>
       )}
     </div>
