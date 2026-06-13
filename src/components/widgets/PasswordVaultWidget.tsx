@@ -109,7 +109,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
 
   // add form
   const [form, setForm] = useState({ label: '', username: '', password: '', url: '' })
-  const [showAdd, setShowAdd] = useState(false)
+  const [showPw, setShowPw] = useState(false)
   const [showGen, setShowGen] = useState(false)
   const [genLen,  setGenLen]  = useState(16)
   const [genOpts, setGenOpts] = useState({ upper: true, digit: true, symbol: true })
@@ -121,7 +121,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   const doLock = useCallback(() => {
     clearVaultSession()
     setLocked(true); setEntries([]); setRevealed(new Set())
-    setEditId(null); setShowAdd(false); setShowGen(false)
+    setEditId(null); setShowGen(false)
     setForm({ label: '', username: '', password: '', url: '' })
   }, [])
 
@@ -237,7 +237,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
       url: form.url.trim() || undefined, updatedAt: Date.now(),
     }
     persist([e, ...entries])
-    setForm({ label: '', username: '', password: '', url: '' }); setShowAdd(false); setShowGen(false)
+    setForm({ label: '', username: '', password: '', url: '' }); setShowGen(false)
     resetIdle()
   }
   const saveEdit = (id: string, patch: Partial<VaultEntry>) => {
@@ -389,8 +389,48 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
     ? entries.filter(e => (e.label + ' ' + e.username + ' ' + (e.url ?? '')).toLowerCase().includes(query.toLowerCase()))
     : entries
 
+  const miniInp: React.CSSProperties = { height: 28, padding: '0 9px', boxSizing: 'border-box', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 11.5, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', minWidth: 0 }
+  const miniBtn: React.CSSProperties = { width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--silver3)' }
+  const canAdd = !!(form.label.trim() || form.username.trim())
+
   return (
     <div onPointerDown={resetIdle} onKeyDown={resetIdle} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px' }}>
+      {/* Always-on compact add form (top) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: 6, background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 5 }}>
+          <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Nama situs" style={{ ...miniInp, flex: 1 }} />
+          <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username / email" style={{ ...miniInp, flex: 1 }} />
+        </div>
+        <div style={{ display: 'flex', gap: 5 }}>
+          <input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+            onKeyDown={e => { if (e.key === 'Enter' && canAdd) addEntry() }}
+            placeholder="Kata sandi" type={showPw ? 'text' : 'password'} style={{ ...miniInp, flex: 1 }} />
+          <button onClick={() => setShowPw(v => !v)} title={showPw ? 'Sembunyikan' : 'Tampilkan'} style={miniBtn}>{showPw ? <IconEyeOff size={13} /> : <IconEye size={13} />}</button>
+          <button onClick={() => setShowGen(v => !v)} title="Buat kata sandi" style={{ ...miniBtn, color: showGen ? 'var(--accent)' : 'var(--silver3)' }}><IconRefresh size={13} /></button>
+          <button onClick={addEntry} disabled={!canAdd} title="Tambah" style={{ ...miniBtn, background: canAdd ? 'var(--accent)' : 'var(--bg)', border: canAdd ? 'none' : '1px solid var(--border2)', color: canAdd ? 'white' : 'var(--silver4)', cursor: canAdd ? 'pointer' : 'not-allowed' }}><IconPlus size={14} /></button>
+        </div>
+        {form.password && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ width: `${strength(form.password).pct}%`, height: '100%', background: strength(form.password).color, transition: 'width 200ms' }} />
+            </div>
+            <span style={{ fontSize: 8.5, color: strength(form.password).color, fontFamily: 'var(--mono)' }}>{strength(form.password).label}</span>
+          </div>
+        )}
+        {showGen && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>{genLen}</span>
+            <input type="range" min={8} max={32} value={genLen} onChange={e => setGenLen(+e.target.value)} style={{ flex: 1, minWidth: 70, accentColor: 'var(--accent)' }} />
+            {([['upper', 'A'], ['digit', '0'], ['symbol', '#']] as const).map(([k, lbl]) => (
+              <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9.5, color: 'var(--silver3)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={genOpts[k]} onChange={e => setGenOpts(o => ({ ...o, [k]: e.target.checked }))} style={{ accentColor: 'var(--accent)' }} />{lbl}
+              </label>
+            ))}
+            <button onClick={useGenerated} style={{ height: 22, padding: '0 9px', background: 'var(--accent)', border: 'none', borderRadius: 5, color: 'white', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Pakai</button>
+          </div>
+        )}
+      </div>
+
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1 }}>
@@ -453,50 +493,6 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
         })}
       </div>
 
-      {/* Add form */}
-      {showAdd ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 8, animation: 'slideDown 150ms ease' }}>
-          <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Nama situs / aplikasi" autoFocus style={inp} />
-          <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Username / email" style={inp} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Kata sandi" style={{ ...inp, flex: 1 }} />
-            <button onClick={() => setShowGen(v => !v)} title="Buat kata sandi" style={{ ...toolBtn, width: 34 }}><IconRefresh size={14} /></button>
-          </div>
-          {form.password && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ flex: 1, height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ width: `${strength(form.password).pct}%`, height: '100%', background: strength(form.password).color, transition: 'width 200ms' }} />
-              </div>
-              <span style={{ fontSize: 9, color: strength(form.password).color, fontFamily: 'var(--mono)' }}>{strength(form.password).label}</span>
-            </div>
-          )}
-          {showGen && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 7, background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 7 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 10, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>Panjang {genLen}</span>
-                <input type="range" min={8} max={32} value={genLen} onChange={e => setGenLen(+e.target.value)} style={{ flex: 1, accentColor: 'var(--accent)' }} />
-              </div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {([['upper', 'A-Z'], ['digit', '0-9'], ['symbol', '!@#']] as const).map(([k, lbl]) => (
-                  <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--silver3)', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={genOpts[k]} onChange={e => setGenOpts(o => ({ ...o, [k]: e.target.checked }))} style={{ accentColor: 'var(--accent)' }} /> {lbl}
-                  </label>
-                ))}
-                <button onClick={useGenerated} style={{ marginLeft: 'auto', height: 24, padding: '0 10px', background: 'var(--accent)', border: 'none', borderRadius: 5, color: 'white', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Pakai</button>
-              </div>
-            </div>
-          )}
-          <input value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="URL (opsional)" style={inp} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => { setShowAdd(false); setShowGen(false); setForm({ label: '', username: '', password: '', url: '' }) }} style={{ flex: 1, height: 30, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
-            <button onClick={addEntry} style={{ flex: 2, height: 30, background: 'var(--accent)', border: 'none', borderRadius: 7, color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Simpan</button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => setShowAdd(true)} style={{ height: 32, background: 'var(--accent-light)', border: '1px dashed var(--accent-soft)', borderRadius: 7, color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-          <IconPlus size={13} /> Tambah kata sandi
-        </button>
-      )}
     </div>
   )
 }

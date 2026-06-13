@@ -106,6 +106,7 @@ interface DashboardStore {
   editMode:         boolean
   searchQuery:      string
   notesLockActive:  boolean
+  calendarOpen:     boolean
   currentUserId:    string | null
   currentUserRole:  string
   currentRegion:    string
@@ -157,6 +158,7 @@ interface DashboardStore {
   editingItem:       { sectionId: string; item: any } | null
   addingItemSectionId: string | null
   setSearch:         (q: string) => void
+  setCalendarOpen:   (v: boolean) => void
 
   // -- Tampilan / Appearance --
   setAppearance:     (o: Partial<AppearanceSettings>) => void
@@ -194,6 +196,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   addingItemSectionId: null,
   searchQuery:      '',
   notesLockActive:  false,
+  calendarOpen:     false,
   currentUserId:    null,
   currentUserRole:  'user',
   currentRegion:    'global',
@@ -650,6 +653,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   // ── Set query filter pencarian section ────────────────────
   setSearch: (q) => set({ searchQuery: q }),
   setNotesLockActive: (v: boolean) => set({ notesLockActive: v }),
+  setCalendarOpen: (v: boolean) => set({ calendarOpen: v }),
 
   // ── Set filter preview untuk admin (role + region + unit) ─
 

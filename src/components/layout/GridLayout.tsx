@@ -179,6 +179,13 @@ export default function GridLayout({ onAddSection }: { onAddSection?: () => void
   // Tutup focus saat edit mode mati
   useEffect(() => { if (!editMode) setFocusedId(null) }, [editMode])
 
+  // Tell the header when a calendar widget is expanded (to hide the header date)
+  useEffect(() => {
+    const sec = personalSections.find(s => s.id === expandedWidgetId)
+    useStore.getState().setCalendarOpen(!!sec && (sec as any).widgetType === 'calendar')
+    return () => useStore.getState().setCalendarOpen(false)
+  }, [expandedWidgetId, personalSections])
+
   // ── One-time migration: fold any legacy To-Do widget into the Calendar ──
   useEffect(() => {
     const uid = profile?.id

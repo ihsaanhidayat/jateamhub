@@ -1,6 +1,6 @@
 import { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useStore } from '../../store/dashboardStore'
-import { hijriDayMonth, weton, dateFromYmd } from '../../utils/dates'
+import { hijriDate, weton, dateFromYmd } from '../../utils/dates'
 import { holidayOn } from '../../utils/holidays'
 import { IconChevL, IconChevR, IconClock, IconPlus, IconEdit, IconDownload } from '../ui/icons'
 import type { CalendarEvent, CalendarKind } from '../../types'
@@ -287,26 +287,15 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
 
       {/* Keterangan — exactly under the dates: Hijri · Weton (+ holiday) */}
       <div style={{ flexShrink: 0, fontSize: 9.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        ☪ {hijriDayMonth(selDate)} · {weton(selDate)}
+        ☪ {hijriDate(selDate)} · {weton(selDate)}
         {selHoliday && <span style={{ color: RED, fontWeight: 700 }}> · {selHoliday}</span>}
       </div>
 
       {/* Day detail — agenda panel */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2, paddingTop: 7, borderTop: '1px solid var(--border)' }}>
-        {/* Date + add */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, gap: 8 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 800, color: selHoliday ? RED : 'var(--silver)', fontFamily: 'var(--font)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-            {formatDisplayDate(selectedDate)}
-          </div>
-          <button onClick={() => (showAddForm ? closeAdd() : openAdd())}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
-              fontSize: 10.5, fontWeight: 700, color: showAddForm ? 'var(--silver3)' : 'white',
-              background: showAddForm ? 'var(--bg4)' : RED, border: showAddForm ? '1px solid var(--border2)' : 'none',
-              borderRadius: 7, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap',
-            }}>
-            {showAddForm ? 'Batal' : <><IconPlus size={12} /> Tambah</>}
-          </button>
+        {/* Date (add via double-click / double-tap a date) */}
+        <div style={{ fontSize: 12.5, fontWeight: 800, color: selHoliday ? RED : 'var(--silver)', fontFamily: 'var(--font)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 0 }}>
+          {formatDisplayDate(selectedDate)}
         </div>
 
         {/* Discard confirm */}
@@ -318,44 +307,39 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
           </div>
         )}
 
-        {/* Add form */}
+        {/* Add form — fully inline */}
         {showAddForm && !discardConfirm && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, background: 'var(--bg4)', borderRadius: 8, border: '1px solid var(--border2)', flexShrink: 0, animation: 'slideDown 150ms ease' }}>
-            {/* Penanda: Event / Catatan */}
-            <div style={{ display: 'flex', gap: 4, background: 'var(--bg)', borderRadius: 7, padding: 3 }}>
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', padding: 6, background: 'var(--bg4)', borderRadius: 8, border: '1px solid var(--border2)', flexShrink: 0, animation: 'slideDown 150ms ease' }}>
+            {/* Penanda toggle */}
+            <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 6, padding: 2, flexShrink: 0 }}>
               {([['event', 'Event'], ['note', 'Catatan']] as const).map(([k, lbl]) => (
                 <button key={k} onClick={() => setNewKind(k)} style={{
-                  flex: 1, height: 26, borderRadius: 5, border: 'none', cursor: 'pointer',
-                  fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--font)',
-                  background: newKind === k ? RED : 'transparent',
-                  color: newKind === k ? 'white' : 'var(--silver3)',
+                  height: 24, padding: '0 8px', borderRadius: 4, border: 'none', cursor: 'pointer',
+                  fontSize: 10, fontWeight: 700, fontFamily: 'var(--font)',
+                  background: newKind === k ? RED : 'transparent', color: newKind === k ? 'white' : 'var(--silver4)',
                 }}>{lbl}</button>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addEvent() }}
-                placeholder={newKind === 'event' ? 'Judul event...' : 'Catatan / aktivitas...'}
-                style={{ flex: 1, height: 32, padding: '0 10px', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 12, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box' }} />
-              {/* Clock icon → time picker (events only) */}
-              {newKind === 'event' && (
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <button onClick={() => addTimeRef.current?.showPicker?.()} title="Pilih jam"
-                    style={{ width: 32, height: 32, borderRadius: 6, border: `1px solid ${newTime ? RED : 'var(--border2)'}`, background: newTime ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg)', color: newTime ? RED : 'var(--silver3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconClock size={15} /></button>
-                  <input ref={addTimeRef} type="time" value={newTime} onChange={e => setNewTime(e.target.value)}
-                    style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, top: 0, left: 0 }} tabIndex={-1} />
-                </div>
-              )}
-            </div>
+            <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addEvent() }}
+              placeholder={newKind === 'event' ? 'Judul event…' : 'Catatan…'}
+              style={{ flex: '1 1 90px', minWidth: 80, height: 28, padding: '0 9px', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 11.5, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box' }} />
+            {newKind === 'event' && (
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <button onClick={() => addTimeRef.current?.showPicker?.()} title="Pilih jam"
+                  style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${newTime ? RED : 'var(--border2)'}`, background: newTime ? 'color-mix(in srgb, ' + RED + ' 12%, transparent)' : 'var(--bg)', color: newTime ? RED : 'var(--silver3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconClock size={14} /></button>
+                <input ref={addTimeRef} type="time" value={newTime} onChange={e => setNewTime(e.target.value)}
+                  style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, top: 0, left: 0 }} tabIndex={-1} />
+              </div>
+            )}
             {newKind === 'event' && newTime && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start', fontSize: 10, fontFamily: 'var(--mono)', color: RED, background: 'color-mix(in srgb, ' + RED + ' 12%, transparent)', borderRadius: 5, padding: '2px 7px' }}>
-                <IconClock size={11} /> {newTime}
-                <button onClick={() => setNewTime('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: RED, fontSize: 11, padding: 0, lineHeight: 1 }}>×</button>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9.5, fontFamily: 'var(--mono)', color: RED, background: 'color-mix(in srgb, ' + RED + ' 12%, transparent)', borderRadius: 5, padding: '2px 6px', flexShrink: 0 }}>
+                {newTime}<button onClick={() => setNewTime('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: RED, fontSize: 11, padding: 0, lineHeight: 1 }}>×</button>
               </span>
             )}
-            <button onClick={addEvent} disabled={!newTitle.trim()}
-              style={{ height: 28, background: newTitle.trim() ? RED : 'var(--border2)', border: 'none', borderRadius: 6, color: 'white', fontSize: 11, fontWeight: 700, cursor: newTitle.trim() ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)' }}>
-              {newKind === 'event' ? 'Tambah event' : 'Tambah catatan'}
-            </button>
+            <button onClick={addEvent} disabled={!newTitle.trim()} title="Tambah"
+              style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: 'none', background: newTitle.trim() ? RED : 'var(--border2)', color: 'white', cursor: newTitle.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconPlus size={14} /></button>
+            <button onClick={closeAdd} title="Tutup"
+              style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: '1px solid var(--border2)', background: 'none', color: 'var(--silver3)', cursor: 'pointer', fontSize: 15, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
           </div>
         )}
 
@@ -367,7 +351,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
         <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
           {selectedEvs.length === 0 && !showAddForm && (
             <div style={{ fontSize: 11, color: 'var(--silver4)', fontFamily: 'var(--font)', padding: '10px 0', textAlign: 'center' }}>
-              Tidak ada agenda{isMobile ? ' · ketuk dua kali tanggal' : ''}
+              Tidak ada agenda · {isMobile ? 'ketuk' : 'klik'} dua kali tanggal untuk tambah
             </div>
           )}
           {selectedEvs.map((ev, idx) => {
