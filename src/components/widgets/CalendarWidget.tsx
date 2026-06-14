@@ -62,6 +62,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
   const googleLinked = !!(profile as any)?.google_email
   const [syncing,   setSyncing]   = useState(false)
   const [syncMsg,   setSyncMsg]   = useState('')
+  const [scopeHelp, setScopeHelp] = useState(false)
   const [gEvents,   setGEvents]   = useState<GEvent[]>([])
   const notifSent = useRef<Set<string>>(new Set())
   const addTimeRef = useRef<HTMLInputElement>(null)
@@ -163,30 +164,33 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
 
   // ── Google Calendar sync (on-demand, two-way) ───────────────────────
   const doSync = useCallback(async () => {
-    setSyncing(true); setSyncMsg('')
+    setSyncing(true); setSyncMsg(''); setScopeHelp(false)
     try {
       const cur = (() => { try { return JSON.parse(useStore.getState().personalSections.find(p => p.id === sectionId)?.items?.[0]?.desc ?? '[]') as CalendarEvent[] } catch { return [] } })()
       // Push app events → Google (create/update), record gcalId.
-      let needAuth = false
+      let needAuth = false, needScope = false
       const next = [...cur]
       for (let i = 0; i < next.length; i++) {
         const ev = next[i]
         const r = ev.gcalId ? await patchEvent(ev.gcalId, ev) : await pushEvent(ev)
-        if (r.needsAuth) { needAuth = true; break }
+        if (r.needsScope) { needScope = true; break }
+        if (r.needsAuth)  { needAuth = true; break }
         if (r.ok && !ev.gcalId && r.data?.id) next[i] = { ...ev, gcalId: r.data.id }
       }
-      if (needAuth) { setSyncMsg('Sesi Google berakhir — sinkron ulang.'); setSyncing(false); return }
+      if (needScope) { setSyncMsg(t('cal.sync.scopemissing')); setScopeHelp(true); setSyncing(false); return }
+      if (needAuth)  { setSyncMsg(t('cal.sync.expired')); setSyncing(false); return }
       saveEvents(next)
       // Pull Google events for the viewed month (read-only display).
       const first = new Date(viewYear, viewMonth, 1)
       const last  = new Date(viewYear, viewMonth + 1, 1)
       const lr = await listEvents(first.toISOString(), last.toISOString())
+      if (lr.needsScope) { setSyncMsg(t('cal.sync.scopemissing')); setScopeHelp(true); setSyncing(false); return }
       if (lr.ok && lr.data) {
         const mine = new Set(next.map(e => e.gcalId).filter(Boolean))
         setGEvents(lr.data.filter(g => !mine.has(g.id)))
       }
-      setSyncMsg(`Tersinkron · ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`)
-    } catch { setSyncMsg('Sinkron gagal.') }
+      setSyncMsg(`${t('cal.sync.done')} · ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`)
+    } catch { setSyncMsg(t('cal.sync.failed')) }
     setSyncing(false)
   }, [sectionId, viewYear, viewMonth, saveEvents])
 
@@ -360,7 +364,7 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
           {syncMsg && <span style={{ fontSize: 8.5, color: 'var(--silver4)', fontFamily: 'var(--mono)', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{syncMsg}</span>}
           {!syncMsg && <div style={{ flex: 1 }} />}
           {googleLinked && (
-            <button onClick={onSyncClick} disabled={syncing} title="Sinkron Google Calendar"
+            <button onClick={onSyncClick} disabled={syncing} title={t('cal.synctitle')}
               style={{ height: 26, padding: '0 9px', flexShrink: 0, borderRadius: 7, cursor: syncing ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', border: '1px solid var(--border2)', background: 'var(--bg4)', color: 'var(--silver3)' }}>
               {syncing
                 ? <span style={{ width: 11, height: 11, border: '2px solid var(--border2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
@@ -368,9 +372,26 @@ export default memo(function CalendarWidget({ sectionId, isExpanded }: Props) {
               {t('cal.sync')}
             </button>
           )}
-          <button onClick={() => setShowTools(v => { if (v) { setQuery(''); setLiburFilter(false) } return !v })} title="Cari & filter"
+          {googleLinked && (
+            <button onClick={() => setScopeHelp(v => !v)} title={t('cal.sync.help')}
+              style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, fontFamily: 'var(--mono)', border: `1px solid ${scopeHelp ? 'var(--accent-soft)' : 'var(--border2)'}`, background: scopeHelp ? 'var(--accent-light)' : 'var(--bg4)', color: scopeHelp ? 'var(--accent)' : 'var(--silver4)' }}>?</button>
+          )}
+          <button onClick={() => setShowTools(v => { if (v) { setQuery(''); setLiburFilter(false) } return !v })} title={t('cal.searchfilter')}
             style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${(showTools || query || liburFilter) ? 'var(--accent-soft)' : 'var(--border2)'}`, background: (showTools || query || liburFilter) ? 'var(--accent-light)' : 'var(--bg4)', color: (showTools || query || liburFilter) ? 'var(--accent)' : 'var(--silver4)' }}><IconSearch size={13} /></button>
         </div>
+
+        {/* Google Calendar setup help — toggled by the ? button, or shown
+            automatically when a sync hits a missing-scope (403). */}
+        {scopeHelp && (
+          <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '7px 9px', background: 'var(--bg4)', border: '1px solid var(--accent-soft)', borderRadius: 8, animation: 'slideDown 130ms ease' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--silver2)' }}>{t('cal.sync.help.title')}</div>
+            <div style={{ fontSize: 9.5, color: 'var(--silver3)', lineHeight: 1.5 }}>{t('cal.sync.help.s1')}</div>
+            <div style={{ fontSize: 9.5, color: 'var(--silver3)', lineHeight: 1.5 }}>{t('cal.sync.help.s2')}</div>
+            <div style={{ fontSize: 9.5, color: 'var(--silver3)', lineHeight: 1.5 }}>{t('cal.sync.help.s3')}</div>
+            <a href="https://console.cloud.google.com/auth/scopes" target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--accent)', textDecoration: 'none', marginTop: 1 }}>{t('cal.sync.help.link')}</a>
+          </div>
+        )}
         {showTools && (
           <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0, animation: 'slideDown 130ms ease' }}>
             <div style={{ position: 'relative', flex: 1 }}>

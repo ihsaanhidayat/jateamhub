@@ -28,7 +28,7 @@ function getToken(): string | null {
 export function gcalReady(): boolean { return !!getToken() }
 export function clearGcalToken() { try { localStorage.removeItem(TOKEN_KEY) } catch {} }
 
-export interface GcalResult<T = any> { ok: boolean; data?: T; needsAuth?: boolean }
+export interface GcalResult<T = any> { ok: boolean; data?: T; needsAuth?: boolean; needsScope?: boolean }
 
 async function call<T = any>(path: string, init?: RequestInit): Promise<GcalResult<T>> {
   const tok = getToken()
@@ -38,7 +38,11 @@ async function call<T = any>(path: string, init?: RequestInit): Promise<GcalResu
       ...init,
       headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
     })
-    if (r.status === 401 || r.status === 403) { clearGcalToken(); return { ok: false, needsAuth: true } }
+    // 401 = token expired/invalid → just re-auth. 403 = the granted token lacks
+    // the calendar.events scope (consent screen not configured / not consented)
+    // → re-auth alone won't fix it; the user must add the scope in Cloud Console.
+    if (r.status === 401) { clearGcalToken(); return { ok: false, needsAuth: true } }
+    if (r.status === 403) { clearGcalToken(); return { ok: false, needsScope: true } }
     if (!r.ok) return { ok: false }
     const data = r.status === 204 ? (null as any) : await r.json()
     return { ok: true, data }

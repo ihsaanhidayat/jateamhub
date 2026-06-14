@@ -58,6 +58,18 @@ const DICT: Record<string, { id: string; en: string }> = {
   'cal.discard':    { id: 'Buang masukan?', en: 'Discard input?' },
   'cal.delq':       { id: 'Hapus?', en: 'Delete?' },
   'cal.page':       { id: 'Hal.', en: 'Page' },
+  'cal.sync.done':     { id: 'Tersinkron', en: 'Synced' },
+  'cal.sync.failed':   { id: 'Sinkron gagal.', en: 'Sync failed.' },
+  'cal.sync.expired':  { id: 'Sesi Google berakhir — sinkron ulang.', en: 'Google session expired — sync again.' },
+  'cal.sync.scopemissing': { id: 'Akses kalender belum diizinkan — atur scope dulu.', en: 'Calendar access not granted — configure the scope first.' },
+  'cal.sync.help':     { id: 'Bantuan sinkron', en: 'Sync help' },
+  'cal.sync.help.title': { id: 'Hubungkan Google Calendar', en: 'Connect Google Calendar' },
+  'cal.sync.help.s1':  { id: '1. Aktifkan Google Calendar API di Google Cloud Console.', en: '1. Enable the Google Calendar API in Google Cloud Console.' },
+  'cal.sync.help.s2':  { id: '2. Di OAuth consent screen → Data Access, tambahkan scope calendar.events.', en: '2. In OAuth consent screen → Data Access, add the calendar.events scope.' },
+  'cal.sync.help.s3':  { id: '3. Tambahkan email-mu sebagai Test user, lalu login ulang Google.', en: '3. Add your email as a Test user, then re-login with Google.' },
+  'cal.sync.help.link': { id: 'Buka pengaturan Google →', en: 'Open Google settings →' },
+  'cal.synctitle':     { id: 'Sinkron Google Calendar', en: 'Sync Google Calendar' },
+  'cal.searchfilter':  { id: 'Cari & filter', en: 'Search & filter' },
 
   // Vault
   'v.createpin':    { id: 'Buat PIN Brankas', en: 'Create Vault PIN' },
