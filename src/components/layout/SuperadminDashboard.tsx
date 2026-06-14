@@ -15,6 +15,7 @@ import { REGION_LABELS, UNIT_LABELS, canManageUser, getAllowedRoles, getAllowedR
 import type { Role } from '../../types'
 import type { Profile } from '../../utils/supabaseClient'
 import { REGIONS, UNITS } from '../../types'
+import { useT } from '../../utils/i18n'
 
 const EMOJI_PRESETS = ['','🌸','🔥','⭐','🎯','💎','🚀','🌊','🦁','🐯','🌺','🎨','💡','🍀','🏆','🦋','🌙','☀️','🍉']
 
@@ -41,6 +42,7 @@ const labelSt: React.CSSProperties = {
 }
 
 export default function SuperadminDashboard() {
+  const t = useT()
   const { profile, logout, users, loadUsers, addUser, updateUser, removeUser } = useAuthStore()
   const toast = useStore.getState().toast
 
@@ -73,11 +75,11 @@ export default function SuperadminDashboard() {
       target_role: annRole || null, target_region: annRegion || null, target_unit: annUnit || null,
     }, profile.id)
     setAnnSending(false)
-    if (error || !data) { toast('Gagal mengirim pengumuman.', 'error'); return }
+    if (error || !data) { toast(t('adm.annfail'), 'error'); return }
     void logAudit('announcement.send', { target_type: 'announcement', target_id: data.id, target_label: annTitle.trim(), metadata: { role: annRole || 'semua', region: annRegion || 'semua', unit: annUnit || 'semua' } })
     void triggerAnnouncePush(data.id)
     setAnnTitle(''); setAnnBody(''); setAnnRole(''); setAnnRegion(''); setAnnUnit('')
-    toast('Pengumuman terkirim.', 'success')
+    toast(t('adm.annsent'), 'success')
     loadAnnouncements()
   }
 
@@ -163,7 +165,7 @@ export default function SuperadminDashboard() {
     }
     setSaving(false)
     if (error) { setErr(error); return }
-    toast('User diperbarui.', 'success'); setEditTarget(null); loadUsers()
+    toast(t('adm.userupdated'), 'success'); setEditTarget(null); loadUsers()
   }
 
   const handleAddUser = async () => {
@@ -190,7 +192,7 @@ export default function SuperadminDashboard() {
   const handleReject = async () => {
     if (!rejectId) return
     await rejectRegistration(rejectId, rejectNote, profile!.id)
-    toast('Pendaftaran ditolak.', 'warn')
+    toast(t('adm.regrejected'), 'warn')
     setPending(p => p.map(r => r.id === rejectId ? { ...r, status: 'rejected' } : r))
     setRejectId(null); setRejectNote('')
   }
@@ -202,7 +204,7 @@ export default function SuperadminDashboard() {
       {/* Header */}
       <header className="admin-header">
         <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--silver)', letterSpacing: -0.5 }}>JateamHub</span>
-        <span style={{ fontSize: 12, color: 'var(--silver3)', background: 'var(--bg4)', padding: '2px 8px', borderRadius: 99, border: '1px solid var(--border2)' }}>Admin Panel</span>
+        <span style={{ fontSize: 12, color: 'var(--silver3)', background: 'var(--bg4)', padding: '2px 8px', borderRadius: 99, border: '1px solid var(--border2)' }}>{t('adm.panel')}</span>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 13, color: 'var(--silver3)' }}>{profile?.username}</span>
           <button onClick={logout} style={{ height: 32, padding: '0 14px', background: 'var(--red-bg)', border: '1px solid var(--red)', borderRadius: 8, color: 'var(--red)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -220,10 +222,10 @@ export default function SuperadminDashboard() {
           👥 Users ({users.length})
         </button>
         <button className={`admin-tab${tab === 'audit' ? ' active' : ''}`} onClick={() => setTab('audit')}>
-          🛡️ Log Audit
+          🛡️ {t('adm.tab.audit')}
         </button>
         <button className={`admin-tab${tab === 'settings' ? ' active' : ''}`} onClick={() => setTab('settings')}>
-          ⚙️ Pengaturan
+          ⚙️ {t('adm.tab.settings')}
         </button>
       </div>
 
@@ -234,12 +236,12 @@ export default function SuperadminDashboard() {
         {tab === 'pending' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <p style={{ fontSize: 13, color: 'var(--silver3)', marginBottom: 4 }}>
-              Pendaftaran baru yang menunggu persetujuan.
+              {t('adm.pendingdesc')}
             </p>
             {pendingLoad ? (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--silver3)', fontSize: 13 }}>Memuat...</div>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--silver3)', fontSize: 13 }}>{t('adm.loading')}</div>
             ) : pending.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--silver3)', fontSize: 13 }}>Tidak ada pendaftaran.</div>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--silver3)', fontSize: 13 }}>{t('adm.noreg')}</div>
             ) : pending.map(reg => (
               <div key={reg.id} className="pending-card">
                 <div style={{ flex: 1 }}>
@@ -271,17 +273,17 @@ export default function SuperadminDashboard() {
               <div className="modal-overlay" onClick={() => setRejectId(null)}>
                 <div className="modal-box" onClick={e => e.stopPropagation()}>
                   <div className="modal-header">
-                    <span className="modal-title">Tolak Pendaftaran</span>
+                    <span className="modal-title">{t('adm.reject')}</span>
                     <button className="modal-close" onClick={() => setRejectId(null)}>✕</button>
                   </div>
                   <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <label style={labelSt}>Alasan penolakan (opsional)</label>
+                    <label style={labelSt}>{t('adm.rejectreason')}</label>
                     <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)} rows={3}
-                      placeholder="Masukkan alasan..." style={{ ...inputSt, height: 'auto', padding: '10px 12px', resize: 'vertical' }} />
+                      placeholder={t('adm.reasonph')} style={{ ...inputSt, height: 'auto', padding: '10px 12px', resize: 'vertical' }} />
                   </div>
                   <div className="modal-footer">
-                    <button className="btn btn-secondary" onClick={() => setRejectId(null)}>Batal</button>
-                    <button className="btn btn-danger" onClick={handleReject}>Tolak Pendaftaran</button>
+                    <button className="btn btn-secondary" onClick={() => setRejectId(null)}>{t('cancel')}</button>
+                    <button className="btn btn-danger" onClick={handleReject}>{t('adm.reject')}</button>
                   </div>
                 </div>
               </div>
@@ -295,15 +297,15 @@ export default function SuperadminDashboard() {
             {/* Filter bar */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
-                placeholder="Cari username / nama..." style={{ ...inputSt, width: 220 }} />
+                placeholder={t('adm.searchuser')} style={{ ...inputSt, width: 220 }} />
               <select value={filterRegion} onChange={e => { setFilterRegion(e.target.value); setPage(0) }}
                 style={{ ...inputSt, width: 140, appearance: 'auto' }}>
-                <option value="">Semua Wilayah</option>
+                <option value="">{t('adm.allregions')}</option>
                 {REGIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
               <select value={filterUnit} onChange={e => { setFilterUnit(e.target.value); setPage(0) }}
                 style={{ ...inputSt, width: 130, appearance: 'auto' }}>
-                <option value="">Semua Unit</option>
+                <option value="">{t('adm.allunits')}</option>
                 {UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
               </select>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
@@ -320,21 +322,21 @@ export default function SuperadminDashboard() {
               <div className="edit-form">
                 <div className="edit-form-title">＋ Tambah User Baru</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div><label style={labelSt}>Nama Lengkap</label><input value={newFullName} onChange={e => setNewFullName(e.target.value)} placeholder="Nama lengkap" style={inputSt} /></div>
-                  <div><label style={labelSt}>Username *</label><input value={newUser} onChange={e => setNewUser(e.target.value)} placeholder="username" style={inputSt} /></div>
-                  <div><label style={labelSt}>Password *</label><input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="min. 6 karakter" style={inputSt} /></div>
-                  <div><label style={labelSt}>Email</label><input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="user@email.com" style={inputSt} /></div>
-                  <div><label style={labelSt}>Role</label>
+                  <div><label style={labelSt}>{t('fullname')}</label><input value={newFullName} onChange={e => setNewFullName(e.target.value)} placeholder={t('adm.fullnameph')} style={inputSt} /></div>
+                  <div><label style={labelSt}>{t('adm.usernamereq')}</label><input value={newUser} onChange={e => setNewUser(e.target.value)} placeholder="username" style={inputSt} /></div>
+                  <div><label style={labelSt}>{t('adm.passwordreq')}</label><input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="min. 6 karakter" style={inputSt} /></div>
+                  <div><label style={labelSt}>{t('adm.email')}</label><input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="user@email.com" style={inputSt} /></div>
+                  <div><label style={labelSt}>{t('p.role')}</label>
                     <select value={newRole} onChange={e => setNewRole(e.target.value as Role)} style={{ ...inputSt, appearance: 'auto' }}>
                       {getAllowedRoles(profile as any).map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </div>
-                  <div><label style={labelSt}>Wilayah</label>
+                  <div><label style={labelSt}>{t('p.region')}</label>
                     <select value={newRegion} onChange={e => setNewRegion(e.target.value)} style={{ ...inputSt, appearance: 'auto' }}>
                       {getAllowedRegions(profile as any).map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                     </select>
                   </div>
-                  <div><label style={labelSt}>Unit</label>
+                  <div><label style={labelSt}>{t('p.unit')}</label>
                     <select value={newUnit} onChange={e => setNewUnit(e.target.value)} style={{ ...inputSt, appearance: 'auto' }}>
                       {getAllowedUnits(profile as any).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                     </select>
@@ -342,7 +344,7 @@ export default function SuperadminDashboard() {
                 </div>
                 {err && <div style={{ color: 'var(--red)', fontSize: 12, padding: '8px 12px', background: 'var(--red-bg)', borderRadius: 8 }}>{err}</div>}
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button className="btn btn-secondary" onClick={() => { setAddMode(false); setErr('') }}>Batal</button>
+                  <button className="btn btn-secondary" onClick={() => { setAddMode(false); setErr('') }}>{t('cancel')}</button>
                   <button className="btn btn-primary" disabled={saving} onClick={handleAddUser}>{saving ? 'Menyimpan...' : 'Tambah User'}</button>
                 </div>
               </div>
@@ -414,11 +416,11 @@ export default function SuperadminDashboard() {
                             {u.id !== profile?.id && u.role !== 'superadmin' && (
                               confirmDeleteId === u.id ? (
                                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                  <span style={{ fontSize: 10, color: 'var(--red)', fontWeight: 600 }}>Yakin hapus?</span>
+                                  <span style={{ fontSize: 10, color: 'var(--red)', fontWeight: 600 }}>{t('adm.confirmdel')}</span>
                                   <button className="btn btn-danger" style={{ height: 28, fontSize: 10, padding: '0 8px' }}
                                     onClick={async () => { await removeUser(u.id); loadUsers(); setConfirmDeleteId(null) }}>Ya</button>
                                   <button className="btn btn-secondary" style={{ height: 28, fontSize: 10, padding: '0 8px' }}
-                                    onClick={() => setConfirmDeleteId(null)}>Batal</button>
+                                    onClick={() => setConfirmDeleteId(null)}>{t('cancel')}</button>
                                 </div>
                               ) : (
                                 <button className="btn btn-danger" style={{ height: 30, fontSize: 11, padding: '0 10px' }}
@@ -437,25 +439,25 @@ export default function SuperadminDashboard() {
                       <div className="edit-form" style={{ marginTop: 8, marginLeft: 16 }}>
                         <div className="edit-form-title">✏️ Edit: {u.username}</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                          <div><label style={labelSt}>Nama Lengkap</label><input value={editFullName} onChange={e => setEditFullName(e.target.value)} style={inputSt} /></div>
-                          <div><label style={labelSt}>Email</label><input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="user@email.com" style={inputSt} /></div>
-                          <div><label style={labelSt}>Role</label>
+                          <div><label style={labelSt}>{t('fullname')}</label><input value={editFullName} onChange={e => setEditFullName(e.target.value)} style={inputSt} /></div>
+                          <div><label style={labelSt}>{t('adm.email')}</label><input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="user@email.com" style={inputSt} /></div>
+                          <div><label style={labelSt}>{t('p.role')}</label>
                             <select value={editRole} onChange={e => setEditRole(e.target.value as Role)} style={{ ...inputSt, appearance: 'auto' }}>
                               {getAllowedRoles(profile as any).map(r => <option key={r} value={r}>{r}</option>)}
                             </select>
                           </div>
-                          <div><label style={labelSt}>Wilayah</label>
+                          <div><label style={labelSt}>{t('p.region')}</label>
                             <select value={editRegion} onChange={e => setEditRegion(e.target.value)} style={{ ...inputSt, appearance: 'auto' }}>
                               {getAllowedRegions(profile as any).map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                             </select>
                           </div>
-                          <div><label style={labelSt}>Unit</label>
+                          <div><label style={labelSt}>{t('p.unit')}</label>
                             <select value={editUnit} onChange={e => setEditUnit(e.target.value)} style={{ ...inputSt, appearance: 'auto' }}>
                               {getAllowedUnits(profile as any).map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                             </select>
                           </div>
-                          <div><label style={labelSt}>Reset Password (kosong = tidak berubah)</label>
-                            <input type="password" value={editPass} onChange={e => setEditPass(e.target.value)} placeholder="Password baru min. 6 karakter" style={inputSt} />
+                          <div><label style={labelSt}>{t('adm.resetpw')}</label>
+                            <input type="password" value={editPass} onChange={e => setEditPass(e.target.value)} placeholder={t('adm.newpwph')} style={inputSt} />
                           </div>
                         </div>
                         {/* Chat toggle (only for non-superadmin) */}
@@ -466,7 +468,7 @@ export default function SuperadminDashboard() {
                             border: '1px solid var(--border2)', borderRadius: 10,
                           }}>
                             <div>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--silver)' }}>Akses Fitur Chat</div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--silver)' }}>{t('adm.chataccess')}</div>
                               <div style={{ fontSize: 11, color: 'var(--silver4)', marginTop: 2 }}>
                                 User ini {editChatEnabled ? 'dapat' : 'tidak dapat'} menggunakan chat internal.
                               </div>
@@ -492,7 +494,7 @@ export default function SuperadminDashboard() {
                         )}
                         {/* Emoji */}
                         <div>
-                          <label style={labelSt}>Emoji</label>
+                          <label style={labelSt}>{t('adm.emoji')}</label>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                             {EMOJI_PRESETS.map(e => (
                               <button key={e} onClick={() => setEditEmoji(e)} style={{
@@ -506,7 +508,7 @@ export default function SuperadminDashboard() {
                         </div>
                         {err && <div style={{ color: 'var(--red)', fontSize: 12, padding: '8px 12px', background: 'var(--red-bg)', borderRadius: 8 }}>{err}</div>}
                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                          <button className="btn btn-secondary" onClick={() => { setEditTarget(null); setErr('') }}>Batal</button>
+                          <button className="btn btn-secondary" onClick={() => { setEditTarget(null); setErr('') }}>{t('cancel')}</button>
                           <button className="btn btn-primary" disabled={saving} onClick={handleSaveUser}>{saving ? 'Menyimpan...' : 'Simpan'}</button>
                         </div>
                       </div>
@@ -545,7 +547,7 @@ export default function SuperadminDashboard() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {!auditLoad && auditLogs.length === 0 && (
-                <div style={{ padding: 28, textAlign: 'center', color: 'var(--silver4)', fontSize: 13 }}>Belum ada aktivitas tercatat.</div>
+                <div style={{ padding: 28, textAlign: 'center', color: 'var(--silver4)', fontSize: 13 }}>{t('adm.noaudit')}</div>
               )}
               {auditLogs.map(log => {
                 const meta = AUDIT_LABELS[log.action] ?? { label: log.action, color: 'var(--silver3)' }
@@ -586,23 +588,23 @@ export default function SuperadminDashboard() {
 
             {/* Announcements */}
             <div style={{ padding: '16px 20px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>📢 Pengumuman</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--silver)' }}>📢 {t('adm.announce')}</div>
               <div style={{ fontSize: 12, color: 'var(--silver3)', marginTop: -4 }}>Kirim pengumuman ke pengguna (banner + notifikasi). Bisa ditargetkan.</div>
-              <input value={annTitle} onChange={e => setAnnTitle(e.target.value)} placeholder="Judul pengumuman" maxLength={80} style={inputSt} />
-              <textarea value={annBody} onChange={e => setAnnBody(e.target.value)} placeholder="Isi pengumuman…" rows={3} maxLength={500} style={{ ...inputSt, height: 'auto', padding: '8px 12px', resize: 'vertical', lineHeight: 1.5 }} />
+              <input value={annTitle} onChange={e => setAnnTitle(e.target.value)} placeholder={t('adm.anntitle')} maxLength={80} style={inputSt} />
+              <textarea value={annBody} onChange={e => setAnnBody(e.target.value)} placeholder={t('adm.annbody')} rows={3} maxLength={500} style={{ ...inputSt, height: 'auto', padding: '8px 12px', resize: 'vertical', lineHeight: 1.5 }} />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <select value={annRole} onChange={e => setAnnRole(e.target.value)} style={{ ...inputSt, width: 'auto', flex: 1, minWidth: 110 }}>
-                  <option value="">Semua role</option>
-                  <option value="admin">Admin</option>
-                  <option value="user">User</option>
-                  <option value="guest">Guest</option>
+                  <option value="">{t('adm.allroles')}</option>
+                  <option value="admin">{t('adm.role.admin')}</option>
+                  <option value="user">{t('adm.role.user')}</option>
+                  <option value="guest">{t('adm.role.guest')}</option>
                 </select>
                 <select value={annRegion} onChange={e => setAnnRegion(e.target.value)} style={{ ...inputSt, width: 'auto', flex: 1, minWidth: 110 }}>
-                  <option value="">Semua wilayah</option>
+                  <option value="">{t('adm.allregions2')}</option>
                   {REGIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
                 <select value={annUnit} onChange={e => setAnnUnit(e.target.value)} style={{ ...inputSt, width: 'auto', flex: 1, minWidth: 110 }}>
-                  <option value="">Semua unit</option>
+                  <option value="">{t('adm.allunits2')}</option>
                   {UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                 </select>
               </div>
