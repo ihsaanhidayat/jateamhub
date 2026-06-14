@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import { create } from 'zustand'
 import type {
-  Section, LinkItem, AppearanceSettings, ThemeId,
+  Section, LinkItem, AppearanceSettings, ThemeId, SectionChange,
 } from '../types'
 import {
   SECTION_DEFAULT_W, SECTION_DEFAULT_H, DEFAULT_APPEARANCE,
@@ -59,6 +59,17 @@ const setDevicePref   = () => localStorage.setItem(DEVICE_PREF_KEY, '1')
 
 // ── Helper: generate ID unik untuk section/item ───────────────
 const uid = () => Math.random().toString(36).slice(2, 10)
+
+// Record a specific edit on a section. Widget content edits get a widget-scoped
+// label (and drop raw item titles like 'vault-data'); link sections keep the
+// precise detail. Returns the patch to spread onto the section.
+function stampChange(sec: Section | undefined, type: string, detail?: string): { updatedAt: number; lastChange: SectionChange } {
+  const at = Date.now()
+  const lastChange: SectionChange = sec?.type === 'widget'
+    ? { at, type: `widget.${sec.widgetType ?? 'widget'}` }
+    : { at, type, detail }
+  return { updatedAt: at, lastChange }
+}
 
 // ── Helper: auto-layout section agar tidak tumpang tindih ─────
 const autoLayout = (sections: Section[]): Section[] => {
@@ -462,7 +473,14 @@ export const useStore = create<DashboardStore>((set, get) => ({
 
   // ── Update section pribadi ────────────────────────────────
   updatePersonalSection: (id, updates) => {
-    const touched = 'items' in updates ? { updatedAt: Date.now() } : {}
+    const sec = get().personalSections.find(s => s.id === id)
+    // 'items' present → content/widget edit. Else a user rename (title/icon).
+    // A subtitle-only update (widgets stamping their count) is NOT a change —
+    // the real edit was already recorded by addItem/updateItem.
+    const touched =
+      'items' in updates             ? stampChange(sec, 'section.update')
+      : ('title' in updates || 'icon' in updates) ? stampChange(sec, 'section.rename', (updates as any).title)
+      : {}
     const next = get().personalSections.map(s =>
       s.id === id ? { ...s, ...updates, ...touched } : s
     )
@@ -525,7 +543,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
   addItem: (sectionId, data) => {
     const next = get().personalSections.map(s =>
       s.id === sectionId
-        ? { ...s, items: [...s.items, { id: 'i' + uid(), ...data }], updatedAt: Date.now() }
+        ? { ...s, items: [...s.items, { id: 'i' + uid(), ...data }], ...stampChange(s, 'item.add', (data as any).title) }
         : s
     )
     persistPersonal(next)
@@ -540,7 +558,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
       return {
         ...s,
         items: s.items.map((i: any) => i.id === itemId ? { id: itemId, ...data } : i),
-        updatedAt: Date.now(),
+        ...stampChange(s, 'item.edit', (data as any).title),
       }
     })
     persistPersonal(next)
@@ -552,7 +570,8 @@ export const useStore = create<DashboardStore>((set, get) => ({
   deleteItem: (sectionId, itemId) => {
     const next = get().personalSections.map(s => {
       if (s.id !== sectionId) return s
-      return { ...s, items: s.items.filter(i => i.id !== itemId), updatedAt: Date.now() }
+      const removed = s.items.find(i => i.id === itemId)
+      return { ...s, items: s.items.filter(i => i.id !== itemId), ...stampChange(s, 'item.delete', removed?.title) }
     })
     persistPersonal(next)
     set({ personalSections: next })
@@ -590,7 +609,7 @@ export const useStore = create<DashboardStore>((set, get) => ({
         return { ...s, items: [...s.items, item] }
       }
       return s
-    }).map(s => (s.id === srcId || s.id === tgtId) ? { ...s, updatedAt: Date.now() } : s)
+    }).map(s => (s.id === srcId || s.id === tgtId) ? { ...s, ...stampChange(s, 'item.move', item.title) } : s)
     persistPersonal(next)
     set({ personalSections: next })
     get().syncPersonalToDb()

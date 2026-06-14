@@ -94,6 +94,15 @@ export interface Section {
   type?:        SectionType
   widgetType?:  WidgetType
   updatedAt?:   number   // ms timestamp of the last content edit
+  lastChange?:  SectionChange   // what actually changed (drives footer + Activity)
+}
+
+// A specific, recorded edit to a section — powers the Activity feed detail and
+// the per-section "last modified" footer (which only shows when this exists).
+export interface SectionChange {
+  at:      number   // ms timestamp
+  type:    string   // e.g. 'item.add' | 'item.edit' | 'item.delete' | 'item.move' | 'section.rename' | 'widget.calendar'
+  detail?: string   // e.g. the affected link's title
 }
 
 // ── Appearance ────────────────────────────────

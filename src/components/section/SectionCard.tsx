@@ -442,14 +442,15 @@ export default memo(function SectionCard({
         </div>
       )}
 
-      {/* Last-modified footer — pinned, full width */}
-      {section.updatedAt && !effectiveCollapsed && (
+      {/* Last-modified footer — pinned, full width. Only shown once the section
+          has an actual recorded edit (no change → no footer). */}
+      {section.lastChange && !effectiveCollapsed && (
         <div style={{
           flexShrink: 0, padding: '3px 12px', borderTop: '1px solid var(--border)',
           background: 'var(--bg2)', fontSize: 9, fontFamily: 'var(--mono)',
           color: 'var(--silver4)', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>
-          {t('sec.modified')} · {new Date(section.updatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          {t('sec.modified')} · {new Date(section.lastChange.at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
         </div>
       )}
     </div>

@@ -10,11 +10,22 @@ function rel(ms: number): string {
   return new Date(ms).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-// Recent-edits feed (replaces the old "Riwayat Task"). Uses Section.updatedAt.
+// Recent-edits feed (replaces the old "Riwayat Task"). Uses Section.lastChange,
+// which records exactly what changed (added/edited/deleted/moved a link, etc.).
 export default function ActivityModal({ onClose }: { onClose: () => void }) {
   const t = useT()
   const sections = useStore(s => s.personalSections)
-  const items = sections.filter(s => s.updatedAt).sort((a, b) => (b.updatedAt! - a.updatedAt!))
+  const items = sections.filter(s => s.lastChange).sort((a, b) => (b.lastChange!.at - a.lastChange!.at))
+
+  // Human description of a section's recorded change. Detail-bearing types fall
+  // back to a no-detail variant when the title is missing.
+  const describe = (c: NonNullable<typeof items[number]['lastChange']>): string => {
+    const d = (c.detail ?? '').trim()
+    if (d) return t(`change.${c.type}`, { d })
+    const key = `change.${c.type}`
+    const fb = t(`${key}.x`)
+    return fb !== `${key}.x` ? fb : t(key)
+  }
 
   return (
     <div onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{
@@ -44,7 +55,8 @@ export default function ActivityModal({ onClose }: { onClose: () => void }) {
               <span style={{ fontSize: 19, flexShrink: 0 }}>{s.icon || '📁'}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--silver)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.title}</div>
-                <div style={{ fontSize: 11, color: 'var(--silver4)', fontFamily: 'var(--mono)' }}>{t('activity.changed')} {rel(s.updatedAt!)}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--silver2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{describe(s.lastChange!)}</div>
+                <div style={{ fontSize: 10, color: 'var(--silver4)', fontFamily: 'var(--mono)', marginTop: 1 }}>{rel(s.lastChange!.at)}</div>
               </div>
             </div>
           ))}

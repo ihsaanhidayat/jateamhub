@@ -46,6 +46,22 @@ const DICT: Record<string, { id: string; en: string }> = {
   // Activity
   'activity.empty': { id: 'Belum ada aktivitas. Edit sebuah section untuk melihatnya di sini.', en: 'No activity yet. Edit a section to see it here.' },
   'activity.changed': { id: 'diubah', en: 'edited' },
+  // Specific change descriptions ({d} = affected link title)
+  'change.item.add':       { id: 'Menambah link "{d}"', en: 'Added link "{d}"' },
+  'change.item.edit':      { id: 'Mengubah link "{d}"', en: 'Edited link "{d}"' },
+  'change.item.delete':    { id: 'Menghapus link "{d}"', en: 'Deleted link "{d}"' },
+  'change.item.move':      { id: 'Memindahkan link "{d}"', en: 'Moved link "{d}"' },
+  'change.section.rename': { id: 'Mengubah judul/info section', en: 'Renamed the section' },
+  'change.section.update': { id: 'Memperbarui isi section', en: 'Updated section content' },
+  'change.widget.calendar':{ id: 'Memperbarui agenda kalender', en: 'Updated calendar agenda' },
+  'change.widget.notes':   { id: 'Memperbarui catatan', en: 'Updated notes' },
+  'change.widget.password':{ id: 'Memperbarui kata sandi', en: 'Updated passwords' },
+  'change.widget.clock':   { id: 'Memperbarui widget jam', en: 'Updated clock widget' },
+  // Fallbacks (no detail)
+  'change.item.add.x':     { id: 'Menambah link', en: 'Added a link' },
+  'change.item.edit.x':    { id: 'Mengubah link', en: 'Edited a link' },
+  'change.item.delete.x':  { id: 'Menghapus link', en: 'Deleted a link' },
+  'change.item.move.x':    { id: 'Memindahkan link', en: 'Moved a link' },
 
   // Calendar
   'cal.today':      { id: 'Hari ini', en: 'Today' },
