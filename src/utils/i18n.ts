@@ -198,6 +198,13 @@ const DICT: Record<string, { id: string; en: string }> = {
   'adm.regrejected': { id: 'Pendaftaran ditolak.', en: 'Registration rejected.' },
   'adm.annfail':     { id: 'Gagal mengirim pengumuman.', en: 'Failed to send announcement.' },
   'adm.userupdated': { id: 'User diperbarui.', en: 'User updated.' },
+  'adm.useradded':   { id: '"{name}" ditambahkan.', en: '"{name}" added.' },
+  'adm.regapproved': { id: '{name} disetujui.', en: '{name} approved.' },
+  'adm.approvefail': { id: 'Gagal approve: {err}', en: 'Approval failed: {err}' },
+  'adm.chaton':      { id: 'diaktifkan', en: 'enabled' },
+  'adm.chatoff':     { id: 'dinonaktifkan', en: 'disabled' },
+  'adm.chattoggleuser': { id: 'Chat {state} untuk {name}.', en: 'Chat {state} for {name}.' },
+  'adm.chattoggle':  { id: 'Chat {state}.', en: 'Chat {state}.' },
 }
 
 interface I18nState { lang: Lang; setLang: (l: Lang) => void }
@@ -207,7 +214,12 @@ export const useI18n = create<I18nState>((set) => ({
 }))
 
 // Hook that re-renders on language change and returns a bound translator.
+// Supports {placeholder} interpolation: t('key', { name: 'Budi' }).
 export const useT = () => {
   const lang = useI18n(s => s.lang)
-  return (key: string) => DICT[key]?.[lang] ?? key
+  return (key: string, params?: Record<string, string | number>) => {
+    let s = DICT[key]?.[lang] ?? key
+    if (params) for (const k in params) s = s.replace(new RegExp(`\\{${k}\\}`, 'g'), String(params[k]))
+    return s
+  }
 }

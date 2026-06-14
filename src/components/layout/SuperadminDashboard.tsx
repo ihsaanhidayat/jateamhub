@@ -177,7 +177,7 @@ export default function SuperadminDashboard() {
       const { data: np } = await supabase.from('profiles').select('id').eq('username', newUser.trim().toLowerCase()).single()
       if (np?.id) await supabase.from('profiles').update({ email: newEmail }).eq('id', np.id)
     }
-    toast(`"${newUser}" ditambahkan.`, 'success')
+    toast(t('adm.useradded', { name: newUser }), 'success')
     setNewUser(''); setNewPass(''); setNewRole('user'); setNewRegion('sby')
     setNewUnit('general'); setNewFullName(''); setNewEmail(''); setAddMode(false)
     loadUsers()
@@ -185,8 +185,8 @@ export default function SuperadminDashboard() {
 
   const handleApprove = async (reg: PendingRegistration) => {
     const result = await approveRegistration(reg.id, reg, profile!.id)
-    if ((result as any).error) { toast('Gagal approve: ' + (result as any).error.message, 'error'); return }
-    toast(`${reg.full_name} disetujui.`, 'success')
+    if ((result as any).error) { toast(t('adm.approvefail', { err: (result as any).error.message }), 'error'); return }
+    toast(t('adm.regapproved', { name: reg.full_name }), 'success')
     setPending(p => p.map(r => r.id === reg.id ? { ...r, status: 'approved' } : r))
   }
   const handleReject = async () => {
@@ -387,7 +387,7 @@ export default function SuperadminDashboard() {
                               void logAudit('chat.toggle_user', { target_type: 'user', target_id: u.id, target_label: u.username, metadata: { enabled: newVal } })
                               await loadUsers(true)
                               setTogglingChat(null)
-                              toast(`Chat ${newVal ? 'diaktifkan' : 'dinonaktifkan'} untuk ${u.full_name || u.username}.`, 'success')
+                              toast(t('adm.chattoggleuser', { state: newVal ? t('adm.chaton') : t('adm.chatoff'), name: u.full_name || u.username }), 'success')
                             }}
                             style={{
                               height: 30, padding: '0 8px',
@@ -657,7 +657,7 @@ export default function SuperadminDashboard() {
                 onClick={async () => {
                   const newVal = !chatEnabled
                   await setChatEnabled(newVal)
-                  toast(`Chat ${newVal ? 'diaktifkan' : 'dinonaktifkan'}.`, 'success')
+                  toast(t('adm.chattoggle', { state: newVal ? t('adm.chaton') : t('adm.chatoff') }), 'success')
                 }}
                 style={{
                   flexShrink: 0, width: 52, height: 28, borderRadius: 14,
