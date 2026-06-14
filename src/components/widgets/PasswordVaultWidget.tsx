@@ -5,10 +5,10 @@ import { supabase } from '../../utils/supabaseClient'
 import { useT } from '../../utils/i18n'
 import {
   IconEye, IconEyeOff, IconLock, IconCopy, IconCheck,
-  IconEdit, IconTrash, IconGlobe, IconRefresh, IconSearch, IconPlus,
+  IconEdit, IconTrash, IconGlobe, IconRefresh, IconSearch, IconPlus, IconKey,
 } from '../ui/icons'
 import {
-  vaultExists, createVault, unlockVault, encryptVault, decryptVault,
+  vaultExists, createVault, changePin, unlockVault, encryptVault, decryptVault,
   isVaultUnlocked, clearVaultSession,
 } from '../../utils/vaultCrypto'
 import type { VaultEntry } from '../../types'
@@ -82,6 +82,13 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   const [genLen,  setGenLen]  = useState(16)
   const [genOpts, setGenOpts] = useState({ upper: true, digit: true, symbol: true })
 
+  // change-PIN (re-key — keeps all passwords)
+  const [cpOpen, setCpOpen] = useState(false)
+  const [cp1, setCp1] = useState('')
+  const [cp2, setCp2] = useState('')
+  const [cpErr, setCpErr] = useState('')
+  const [cpBusy, setCpBusy] = useState(false)
+
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -90,6 +97,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
     setLocked(true); setEntries([]); setRevealed(new Set())
     setEditId(null); setShowGen(false); setShowAdd(false)
     setForm({ label: '', username: '', password: '', url: '' })
+    setCpOpen(false); setCp1(''); setCp2(''); setCpErr('')
   }, [])
 
   // First-run check
@@ -233,6 +241,23 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   }
 
   const useGenerated = () => { setForm(f => ({ ...f, password: genPassword(genLen, genOpts) })); setShowGen(false) }
+
+  const closeChangePin = () => { setCpOpen(false); setCp1(''); setCp2(''); setCpErr('') }
+
+  // Re-key to a new PIN while keeping every stored password (re-encrypts the
+  // current in-memory entries with the new key). Only available while unlocked.
+  const doChangePin = async () => {
+    if (cp1.length < 6) { setCpErr(t('v.pinmin')); return }
+    if (cp1 !== cp2)    { setCpErr(t('v.pinmismatch')); return }
+    setCpBusy(true); setCpErr('')
+    const ok = await changePin(cp1)
+    if (ok) { await persist(entries) }   // re-encrypt with the new key — nothing is wiped
+    setCpBusy(false)
+    if (!ok) { setCpErr(t('v.pinfailed')); return }
+    closeChangePin()
+    useStore.getState().toast(t('v.pinkept'), 'success')
+    resetIdle()
+  }
 
   // Forgot-PIN reset is NOT a bare button — it must re-authenticate through the
   // user's linked Google account (Google enforces its own 2FA on prompt=login).
@@ -386,8 +411,33 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
             style={{ ...toolBtn, background: showAdd ? 'var(--accent)' : 'var(--bg4)', border: showAdd ? 'none' : '1px solid var(--border2)', color: showAdd ? 'white' : 'var(--silver3)' }}>
             <span style={{ display: 'flex', transition: 'transform 220ms cubic-bezier(.34,1.56,.64,1)', transform: showAdd ? 'rotate(45deg)' : 'none' }}><IconPlus size={15} /></span>
           </button>
+          <button onClick={() => { if (cpOpen) closeChangePin(); else { setCpOpen(true); setShowAdd(false) } }}
+            title={t("v.changepin")}
+            style={{ ...toolBtn, background: cpOpen ? 'var(--accent)' : 'var(--bg4)', border: cpOpen ? 'none' : '1px solid var(--border2)', color: cpOpen ? 'white' : 'var(--silver3)' }}>
+            <IconKey size={14} />
+          </button>
           <button onClick={doLock} title={t("v.lock")} style={toolBtn}><IconLock size={14} /></button>
         </div>
+
+        {/* Change PIN — re-encrypts in place; passwords are NEVER wiped */}
+        {cpOpen && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: 8, background: 'var(--bg4)', border: '1px solid var(--accent-soft)', borderRadius: 8, flexShrink: 0, animation: 'slideDown 150ms ease' }}>
+            <div style={{ fontSize: 10.5, color: 'var(--silver3)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <IconKey size={12} /> {t("v.changepin")}
+            </div>
+            <input value={cp1} onChange={e => { setCp1(e.target.value); setCpErr('') }} placeholder={t("v.newpin")} type="password" autoFocus {...noAutofillPw} style={{ ...miniInp, height: 30 }} />
+            <input value={cp2} onChange={e => { setCp2(e.target.value); setCpErr('') }} placeholder={t("v.confirmpin")} type="password" {...noAutofillPw}
+              onKeyDown={e => { if (e.key === 'Enter') doChangePin() }} style={{ ...miniInp, height: 30 }} />
+            {cpErr && <span style={{ fontSize: 10.5, color: 'var(--red)' }}>{cpErr}</span>}
+            <div style={{ display: 'flex', gap: 5 }}>
+              <button onClick={closeChangePin} style={{ flex: 1, height: 28, background: 'none', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>{t("cancel")}</button>
+              <button onClick={doChangePin} disabled={cpBusy || cp1.length < 6}
+                style={{ flex: 2, height: 28, background: cp1.length >= 6 ? 'var(--accent)' : 'var(--border2)', border: 'none', borderRadius: 6, color: 'white', fontSize: 11, fontWeight: 700, cursor: cpBusy ? 'wait' : 'pointer', fontFamily: 'var(--font)' }}>
+                {cpBusy ? t("v.opening") : t("save")}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Collapsible add form */}
         {showAdd && (
@@ -440,7 +490,7 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
           const isRev = revealed.has(e.id)
           const isEdit = editId === e.id
           if (isEdit) return (
-            <EntryEditor key={e.id} entry={e} inp={inp} onCancel={() => setEditId(null)} onSave={p => saveEdit(e.id, p)} />
+            <EntryEditor key={e.id} entry={e} onCancel={() => setEditId(null)} onSave={p => saveEdit(e.id, p)} />
           )
           return (
             <div key={e.id} style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 9px' }}>
@@ -482,20 +532,23 @@ function PasswordVaultWidgetImpl({ sectionId }: { sectionId: string }) {
   )
 }
 
-// Inline editor for an existing entry.
-function EntryEditor({ entry, inp, onSave, onCancel }: { entry: VaultEntry; inp: React.CSSProperties; onSave: (p: Partial<VaultEntry>) => void; onCancel: () => void }) {
-  const [f, setF] = useState({ label: entry.label, username: entry.username, password: entry.password, url: entry.url ?? '' })
+// Inline editor for an existing entry — a single compact row (label · username ·
+// password · save/cancel). The URL is preserved untouched. Password is editable
+// right here; nothing is removed.
+function EntryEditor({ entry, onSave, onCancel }: { entry: VaultEntry; onSave: (p: Partial<VaultEntry>) => void; onCancel: () => void }) {
+  const t = useT()
+  const [f, setF] = useState({ label: entry.label, username: entry.username, password: entry.password })
+  const mini: React.CSSProperties = { height: 30, padding: '0 8px', boxSizing: 'border-box', background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 6, fontSize: 11.5, color: 'var(--silver)', fontFamily: 'var(--font)', outline: 'none', minWidth: 0 }
+  const btn: React.CSSProperties = { width: 30, height: 30, flexShrink: 0, borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--bg)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--silver3)' }
+  const noAf: any = { autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'off', spellCheck: false, 'data-lpignore': 'true', 'data-1p-ignore': '' }
+  const save = () => onSave({ label: f.label.trim() || 'Tanpa nama', username: f.username.trim(), password: f.password, url: entry.url })
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, background: 'var(--bg4)', border: '1px solid var(--accent-soft)', borderRadius: 8 }}>
-      <input value={f.label} onChange={e => setF(s => ({ ...s, label: e.target.value }))} placeholder="Nama" autoFocus style={inp} />
-      <input value={f.username} onChange={e => setF(s => ({ ...s, username: e.target.value }))} placeholder="Username / email" style={inp} />
-      <input value={f.password} onChange={e => setF(s => ({ ...s, password: e.target.value }))} placeholder="Kata sandi" style={inp} />
-      <input value={f.url} onChange={e => setF(s => ({ ...s, url: e.target.value }))} placeholder="URL (opsional)" style={inp} />
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={onCancel} style={{ flex: 1, height: 30, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--silver3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Batal</button>
-        <button onClick={() => onSave({ label: f.label.trim() || 'Tanpa nama', username: f.username.trim(), password: f.password, url: f.url.trim() || undefined })}
-          style={{ flex: 2, height: 30, background: 'var(--accent)', border: 'none', borderRadius: 7, color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Simpan</button>
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: 6, background: 'var(--bg4)', border: '1px solid var(--accent-soft)', borderRadius: 8 }}>
+      <input value={f.label} onChange={e => setF(s => ({ ...s, label: e.target.value }))} placeholder={t('v.sitename')} {...noAf} style={{ ...mini, flex: '1 1 0', minWidth: 44 }} />
+      <input value={f.username} onChange={e => setF(s => ({ ...s, username: e.target.value }))} placeholder={t('v.username')} {...noAf} style={{ ...mini, flex: '1 1 0', minWidth: 44 }} />
+      <input value={f.password} onChange={e => setF(s => ({ ...s, password: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') save() }} placeholder={t('v.password')} autoFocus {...noAf} autoComplete="new-password" style={{ ...mini, flex: '2 1 0', minWidth: 56 }} />
+      <button onClick={onCancel} title={t('cancel')} style={btn}>✕</button>
+      <button onClick={save} title={t('save')} style={{ ...btn, background: 'var(--accent)', border: 'none', color: 'white' }}><IconCheck size={14} /></button>
     </div>
   )
 }

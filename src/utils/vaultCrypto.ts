@@ -108,6 +108,16 @@ export async function createVault(pin: string): Promise<boolean> {
   }
 }
 
+// Change the master PIN WITHOUT losing any stored passwords. The vault must be
+// unlocked (which proves the user knows the current PIN). This re-keys the
+// escrow {salt,iv,verifier} to the new PIN and swaps the in-memory key; the
+// caller must then re-encrypt + persist the current entries (encryptVault now
+// uses the new key). No data is wiped.
+export async function changePin(newPin: string): Promise<boolean> {
+  if (!_vaultKey) return false   // refuse unless unlocked
+  return createVault(newPin)     // upsert new salt/iv/verifier + swap _vaultKey
+}
+
 // Unlock: re-derive the key from the PIN + stored salt, verify against the
 // escrowed verifier. Returns false on a wrong PIN (decrypt throws).
 export async function unlockVault(pin: string): Promise<boolean> {

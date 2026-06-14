@@ -71,6 +71,13 @@ const DICT: Record<string, { id: string; en: string }> = {
   'v.sitename':     { id: 'Nama situs', en: 'Site name' },
   'v.username':     { id: 'Username / email', en: 'Username / email' },
   'v.password':     { id: 'Kata sandi', en: 'Password' },
+  'v.changepin':    { id: 'Ganti PIN', en: 'Change PIN' },
+  'v.newpin':       { id: 'PIN baru', en: 'New PIN' },
+  'v.confirmpin':   { id: 'Konfirmasi PIN baru', en: 'Confirm new PIN' },
+  'v.pinmin':       { id: 'PIN minimal 6 karakter', en: 'PIN must be at least 6 characters' },
+  'v.pinmismatch':  { id: 'PIN tidak cocok', en: 'PINs do not match' },
+  'v.pinkept':      { id: 'PIN diperbarui · semua kata sandi tetap aman', en: 'PIN updated · all passwords kept' },
+  'v.pinfailed':    { id: 'Gagal mengganti PIN. Coba lagi.', en: 'Failed to change PIN. Try again.' },
 
   // Profile
   'p.detail':       { id: 'Detail Akun', en: 'Account Details' },
