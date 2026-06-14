@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useChatStore } from '../../store/chatStore'
+import { useT } from '../../utils/i18n'
 
 export default function ChatLockScreen() {
+  const t = useT()
   const { hasPinSet, verifyAndUnlock, setupPin } = useChatStore()
   const [pin,     setPin]     = useState('')
   const [confirm, setConfirm] = useState('')
@@ -11,15 +13,15 @@ export default function ChatLockScreen() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!pin || pin.length < 4) { setErr('PIN minimal 4 digit.'); return }
+    if (!pin || pin.length < 4) { setErr(t('chat.lock.min')); return }
     setBusy(true); setErr('')
 
     if (isSetup) {
-      if (pin !== confirm) { setErr('PIN tidak cocok.'); setBusy(false); return }
+      if (pin !== confirm) { setErr(t('chat.lock.mismatch')); setBusy(false); return }
       await setupPin(pin)
     } else {
       const ok = await verifyAndUnlock(pin)
-      if (!ok) { setErr('PIN salah.'); setBusy(false); setPin(''); return }
+      if (!ok) { setErr(t('chat.lock.wrong')); setBusy(false); setPin(''); return }
     }
     setBusy(false)
   }
@@ -42,12 +44,12 @@ export default function ChatLockScreen() {
           margin: '0 auto 16px', fontSize: 22,
         }}>🔒</div>
         <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--silver)', margin: '0 0 6px', letterSpacing: '-0.4px' }}>
-          {isSetup ? 'Buat PIN Chat' : 'Chat Terkunci'}
+          {isSetup ? t('chat.lock.setup') : t('chat.lock.locked')}
         </h2>
         <p style={{ fontSize: 13, color: 'var(--silver3)', margin: '0 0 24px' }}>
           {isSetup
-            ? 'Buat PIN 4–8 digit untuk mengamankan chat kamu.'
-            : 'Masukkan PIN untuk membuka chat.'}
+            ? t('chat.lock.setupdesc')
+            : t('chat.lock.unlockdesc')}
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -57,7 +59,7 @@ export default function ChatLockScreen() {
             maxLength={8}
             value={pin}
             onChange={e => { setPin(e.target.value.replace(/\D/g, '')); setErr('') }}
-            placeholder={isSetup ? 'Buat PIN baru' : 'Masukkan PIN'}
+            placeholder={isSetup ? t('chat.lock.newpin') : t('chat.lock.enterpin')}
             autoFocus
             style={{
               width: '100%', height: 44, padding: '0 14px', boxSizing: 'border-box',
@@ -73,7 +75,7 @@ export default function ChatLockScreen() {
               maxLength={8}
               value={confirm}
               onChange={e => { setConfirm(e.target.value.replace(/\D/g, '')); setErr('') }}
-              placeholder="Konfirmasi PIN"
+              placeholder={t('chat.lock.confirmpin')}
               style={{
                 width: '100%', height: 44, padding: '0 14px', boxSizing: 'border-box',
                 background: 'var(--bg4)', border: '1px solid var(--border2)',
@@ -101,8 +103,8 @@ export default function ChatLockScreen() {
             }}
           >
             {busy
-              ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} /> Memverifikasi...</>
-              : isSetup ? 'Buat PIN & Buka Chat' : 'Buka Chat'
+              ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} /> {t('chat.lock.verifying')}</>
+              : isSetup ? t('chat.lock.createbtn') : t('chat.lock.openbtn')
             }
           </button>
         </form>

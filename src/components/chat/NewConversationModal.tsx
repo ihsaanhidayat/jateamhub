@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { useChatStore } from '../../store/chatStore'
+import { useT } from '../../utils/i18n'
 import type { Profile } from '../../utils/supabaseClient'
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function NewConversationModal({ onClose, onStarted }: Props) {
+  const t = useT()
   const { profile, users, loadUsers } = useAuthStore()
   const { startConv } = useChatStore()
   const [query,    setQuery]    = useState('')
@@ -58,7 +60,7 @@ export default function NewConversationModal({ onClose, onStarted }: Props) {
           padding: '16px 20px', borderBottom: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)' }}>Chat Baru</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)' }}>{t('chat.new')}</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)', fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
 
@@ -66,7 +68,7 @@ export default function NewConversationModal({ onClose, onStarted }: Props) {
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Cari nama atau username..."
+            placeholder={t('chat.searchuser')}
             autoFocus
             style={{
               width: '100%', height: 38, padding: '0 12px', boxSizing: 'border-box',

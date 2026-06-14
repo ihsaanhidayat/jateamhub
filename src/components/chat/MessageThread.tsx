@@ -4,6 +4,7 @@ import type { ChatConversation } from '../../utils/supabaseClient'
 import { lastSeenText, ONLINE_WINDOW_MS } from '../../utils/presence'
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
+import { useT } from '../../utils/i18n'
 
 interface Props {
   conv:          ChatConversation
@@ -24,6 +25,7 @@ const fmtDate = (iso: string) => {
 }
 
 export default function MessageThread({ conv, currentUserId, onBack }: Props) {
+  const t = useT()
   // Narrow selectors → component only re-renders on what it uses.
   const messages    = useChatStore(s => s.messages)
   const msgLoading  = useChatStore(s => s.msgLoading)
@@ -186,7 +188,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
         {onBack && (
           <button
             onClick={onBack}
-            title="Kembali"
+            title={t('chat.back')}
             style={{
               width: 34, height: 34, flexShrink: 0, background: 'none', border: 'none',
               cursor: 'pointer', borderRadius: 8, color: 'var(--accent)',
@@ -245,7 +247,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
         {/* Kebab menu */}
         <button
           onClick={() => setMenuOpen(v => !v)}
-          title="Opsi"
+          title={t('chat.options')}
           style={{
             width: 34, height: 34, flexShrink: 0,
             background: menuOpen ? 'var(--bg3)' : 'none', border: 'none',
@@ -362,7 +364,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
             }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--silver4)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--silver3)' }}>Belum ada pesan</div>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--silver3)' }}>{t('chat.nomsg')}</div>
             <div style={{ fontSize: 12 }}>Sapa {other?.full_name?.split(' ')[0] ?? 'mereka'} dengan pesan pertama 👋</div>
           </div>
         )}
@@ -417,7 +419,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
       {(showFab || newCount > 0) && (
         <button
           onClick={() => scrollToBottom(true)}
-          title="Ke pesan terbaru"
+          title={t('chat.tolatest')}
           style={{
             position: 'absolute', right: 18, bottom: 84, zIndex: 5,
             height: 40, minWidth: 40, padding: newCount > 0 ? '0 14px 0 12px' : 0,
@@ -452,7 +454,7 @@ export default function MessageThread({ conv, currentUserId, onBack }: Props) {
             </div>
             <div className="chat-msglist" style={{ flex: 1, overflowY: 'auto', padding: '6px 8px 12px' }}>
               {messages.filter(m => starredIds[m.id]).length === 0 && (
-                <div style={{ padding: 28, textAlign: 'center', color: 'var(--silver4)', fontSize: 13 }}>Belum ada pesan berbintang di percakapan ini.</div>
+                <div style={{ padding: 28, textAlign: 'center', color: 'var(--silver4)', fontSize: 13 }}>{t('chat.nostarred')}</div>
               )}
               {messages.filter(m => starredIds[m.id]).map(m => (
                 <button

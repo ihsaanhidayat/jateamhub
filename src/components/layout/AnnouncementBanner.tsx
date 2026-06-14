@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase, getActiveAnnouncements, type Announcement } from '../../utils/supabaseClient'
+import { useT } from '../../utils/i18n'
 
 const DISMISS_KEY = 'jateamhub-dismissed-announcements'
 
@@ -8,6 +9,7 @@ const readDismissed = (): string[] => {
 }
 
 export default function AnnouncementBanner() {
+  const t = useT()
   const [items, setItems]         = useState<Announcement[]>([])
   const [dismissed, setDismissed] = useState<string[]>(readDismissed)
 
@@ -49,7 +51,7 @@ export default function AnnouncementBanner() {
           </div>
           <button
             onClick={() => dismiss(a.id)}
-            title="Tutup"
+            title={t('close')}
             style={{ flexShrink: 0, width: 26, height: 26, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)', fontSize: 18, lineHeight: 1, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >×</button>
         </div>

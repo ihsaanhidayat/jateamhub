@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useChatStore } from '../../store/chatStore'
+import { useT } from '../../utils/i18n'
 import type { ChatConversation } from '../../utils/supabaseClient'
 import { ONLINE_WINDOW_MS } from '../../utils/presence'
 
@@ -46,6 +47,7 @@ const Avatar = ({ name, url, emoji, online }: { name: string; url?: string; emoj
 )
 
 export default function ConversationList({ currentUserId, onNewChat, onSelectConv, mobile }: Props) {
+  const t = useT()
   const conversations = useChatStore(s => s.conversations)
   const currentConvId = useChatStore(s => s.currentConvId)
   const loading       = useChatStore(s => s.loading)
@@ -79,10 +81,10 @@ export default function ConversationList({ currentUserId, onNewChat, onSelectCon
       {/* Header */}
       <div style={{ padding: '12px 14px 8px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--silver)', letterSpacing: '-0.3px' }}>Pesan</span>
+          <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--silver)', letterSpacing: '-0.3px' }}>{t('chat.messages')}</span>
           <button
             onClick={onNewChat}
-            title="Chat Baru"
+            title={t('chat.new')}
             style={{
               height: 32, padding: '0 12px 0 10px', background: 'var(--accent)',
               border: 'none', borderRadius: 9, cursor: 'pointer',
@@ -100,7 +102,7 @@ export default function ConversationList({ currentUserId, onNewChat, onSelectCon
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Cari percakapan..."
+            placeholder={t('chat.searchconv')}
             style={{
               width: '100%', height: 36, padding: '0 12px 0 34px', boxSizing: 'border-box',
               background: 'var(--bg4)', border: '1px solid var(--border2)',
@@ -124,7 +126,7 @@ export default function ConversationList({ currentUserId, onNewChat, onSelectCon
             <button
               onClick={onNewChat}
               style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)' }}
-            >Mulai chat baru</button>
+            >{t('chat.startnew')}</button>
           </div>
         )}
         {!loading && conversations.length > 0 && filtered.length === 0 && (
@@ -176,8 +178,8 @@ export default function ConversationList({ currentUserId, onNewChat, onSelectCon
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
                     {conv.last_preview
-                      ? <>{conv.last_sender_id === currentUserId && <span style={{ color: 'var(--silver4)' }}>Anda: </span>}{conv.last_preview}</>
-                      : online ? <span style={{ color: 'var(--green, #22c55e)' }}>online</span>
+                      ? <>{conv.last_sender_id === currentUserId && <span style={{ color: 'var(--silver4)' }}>{t('chat.you')}</span>}{conv.last_preview}</>
+                      : online ? <span style={{ color: 'var(--green, #22c55e)' }}>{t('chat.online')}</span>
                       : (other?.username ? `@${other.username}` : 'Mulai percakapan')}
                   </span>
                   {unread > 0 && (

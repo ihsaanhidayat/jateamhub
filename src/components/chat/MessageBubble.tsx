@@ -3,6 +3,7 @@ import type { ChatMessage } from '../../utils/supabaseClient'
 import { QUICK_REACTIONS } from './emojiData'
 import { linkify, emojiOnlyCount, messagePreview } from '../../utils/chatText'
 import AudioMessage from './AudioMessage'
+import { useT } from '../../utils/i18n'
 
 interface Props {
   msg:            ChatMessage
@@ -24,6 +25,7 @@ interface Props {
 const EDIT_WINDOW_MS = 15 * 60 * 1000
 
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  const t = useT()
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
@@ -49,7 +51,7 @@ function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClos
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', color: 'white', fontSize: 22, lineHeight: 1,
         }}
-        aria-label="Tutup"
+        aria-label={t('close')}
       >×</button>
       <img
         src={src}
@@ -104,6 +106,7 @@ const FileIcon = ({ name }: { name: string }) => {
 }
 
 function MessageBubble({ msg, isMine, currentUserId, cont, starred, quoted, quotedName, onDelete, onReact, onReply, onEdit, onForward, onStar, onQuoteJump }: Props) {
+  const t = useT()
   const [showInfo,    setShowInfo]    = useState(false)
   const [showReact,   setShowReact]   = useState(false)
   const [hover,       setHover]       = useState(false)
@@ -257,7 +260,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, starred, quoted, quot
             {onReply && (
               <button
                 onClick={() => { onReply(msg); setShowReact(false) }}
-                title="Balas"
+                title={t('chat.reply')}
                 style={{
                   width: 34, height: 34, marginRight: 2, background: 'none', border: 'none',
                   borderRight: '1px solid var(--border)', borderRadius: 0, cursor: 'pointer',
@@ -287,7 +290,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, starred, quoted, quot
             {onForward && msg.message_type !== 'audio' && (
               <button
                 onClick={() => { onForward(msg); setShowReact(false) }}
-                title="Teruskan"
+                title={t('chat.forward')}
                 style={{
                   width: 34, height: 34, marginLeft: 2,
                   background: 'none', border: 'none', cursor: 'pointer',
@@ -315,7 +318,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, starred, quoted, quot
             {canEdit && (
               <button
                 onClick={() => { onEdit!(msg); setShowReact(false) }}
-                title="Edit pesan"
+                title={t('chat.editmsg')}
                 style={{
                   width: 34, height: 34, marginLeft: 2,
                   background: 'none', border: 'none', cursor: 'pointer',
@@ -329,7 +332,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, starred, quoted, quot
             {isMine && onDelete && (
               <button
                 onClick={() => { onDelete(msg.id); setShowReact(false) }}
-                title="Hapus pesan"
+                title={t('chat.delmsg')}
                 style={{
                   width: 34, height: 34, marginLeft: canEdit ? 0 : 2,
                   background: 'none', border: 'none', cursor: 'pointer',
@@ -456,7 +459,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, starred, quoted, quot
           {starred && (
             <svg width="11" height="11" viewBox="0 0 24 24" fill="#F5B301" stroke="#F5B301" strokeWidth="2" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           )}
-          {msg.edited_at && <span style={{ opacity: 0.7, fontStyle: 'italic' }}>diedit</span>}
+          {msg.edited_at && <span style={{ opacity: 0.7, fontStyle: 'italic' }}>{t('chat.edited')}</span>}
           <span style={{ opacity: isMedia ? 0.95 : 0.8 }}>{fmtTime(msg.created_at)}</span>
           {isMine && <Ticks delivered={!!msg.delivered_at} read={!!msg.read_at} light={isBig} />}
         </div>
@@ -469,13 +472,13 @@ function MessageBubble({ msg, isMine, currentUserId, cont, starred, quoted, quot
             boxShadow: 'var(--shadow-lg)', minWidth: 150, animation: 'popIn 120ms ease',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 11, color: 'var(--silver3)', padding: '2px 0' }}>
-              <span>Terkirim</span><span style={{ fontFamily: 'var(--mono)' }}>{fmtTime(msg.created_at)}</span>
+              <span>{t('chat.sent')}</span><span style={{ fontFamily: 'var(--mono)' }}>{fmtTime(msg.created_at)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 11, color: msg.delivered_at ? 'var(--silver3)' : 'var(--silver4)', padding: '2px 0' }}>
-              <span>Diterima</span><span style={{ fontFamily: 'var(--mono)' }}>{msg.delivered_at ? fmtTime(msg.delivered_at) : '—'}</span>
+              <span>{t('chat.delivered')}</span><span style={{ fontFamily: 'var(--mono)' }}>{msg.delivered_at ? fmtTime(msg.delivered_at) : '—'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 11, color: msg.read_at ? '#53BDEB' : 'var(--silver4)', padding: '2px 0' }}>
-              <span>Dibaca</span><span style={{ fontFamily: 'var(--mono)' }}>{msg.read_at ? fmtTime(msg.read_at) : '—'}</span>
+              <span>{t('chat.read')}</span><span style={{ fontFamily: 'var(--mono)' }}>{msg.read_at ? fmtTime(msg.read_at) : '—'}</span>
             </div>
           </div>
         )}
@@ -519,7 +522,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, starred, quoted, quot
           {onReply && (
             <button
               onClick={e => { e.stopPropagation(); onReply(msg) }}
-              title="Balas"
+              title={t('chat.reply')}
               style={{
                 width: 28, height: 28, background: 'var(--bg2)', border: '1px solid var(--border2)',
                 borderRadius: '50%', cursor: 'pointer', color: 'var(--silver3)',
@@ -532,7 +535,7 @@ function MessageBubble({ msg, isMine, currentUserId, cont, starred, quoted, quot
           {onReact && (
             <button
               onClick={e => { e.stopPropagation(); setShowReact(true) }}
-              title="Beri reaksi"
+              title={t('chat.react')}
               style={{
                 width: 28, height: 28, background: 'var(--bg2)', border: '1px solid var(--border2)',
                 borderRadius: '50%', cursor: 'pointer', color: 'var(--silver3)',

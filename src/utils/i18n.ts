@@ -115,6 +115,51 @@ const DICT: Record<string, { id: string; en: string }> = {
   'chat.type':      { id: 'Ketik pesan...', en: 'Type a message...' },
   'chat.team':      { id: 'Chat internal tim', en: 'Team chat' },
   'chat.pick':      { id: 'Pilih percakapan di samping, atau mulai yang baru. Pesan teks diamankan end-to-end.', en: 'Pick a conversation, or start a new one. Text messages are end-to-end encrypted.' },
+
+  // Chat — lock screen
+  'chat.lock.setup':      { id: 'Buat PIN Chat', en: 'Create Chat PIN' },
+  'chat.lock.locked':     { id: 'Chat Terkunci', en: 'Chat Locked' },
+  'chat.lock.setupdesc':  { id: 'Buat PIN 4–8 digit untuk mengamankan chat kamu.', en: 'Create a 4–8 digit PIN to secure your chat.' },
+  'chat.lock.unlockdesc': { id: 'Masukkan PIN untuk membuka chat.', en: 'Enter your PIN to unlock chat.' },
+  'chat.lock.newpin':     { id: 'Buat PIN baru', en: 'Create new PIN' },
+  'chat.lock.enterpin':   { id: 'Masukkan PIN', en: 'Enter PIN' },
+  'chat.lock.confirmpin': { id: 'Konfirmasi PIN', en: 'Confirm PIN' },
+  'chat.lock.verifying':  { id: 'Memverifikasi...', en: 'Verifying...' },
+  'chat.lock.createbtn':  { id: 'Buat PIN & Buka Chat', en: 'Create PIN & Open Chat' },
+  'chat.lock.openbtn':    { id: 'Buka Chat', en: 'Open Chat' },
+  'chat.lock.min':        { id: 'PIN minimal 4 digit.', en: 'PIN must be at least 4 digits.' },
+  'chat.lock.mismatch':   { id: 'PIN tidak cocok.', en: 'PINs do not match.' },
+  'chat.lock.wrong':      { id: 'PIN salah.', en: 'Wrong PIN.' },
+
+  // Chat — conversation list
+  'chat.messages':  { id: 'Pesan', en: 'Messages' },
+  'chat.new':       { id: 'Chat Baru', en: 'New Chat' },
+  'chat.searchconv':{ id: 'Cari percakapan...', en: 'Search conversations...' },
+  'chat.startnew':  { id: 'Mulai chat baru', en: 'Start a new chat' },
+  'chat.you':       { id: 'Anda: ', en: 'You: ' },
+  'chat.online':    { id: 'online', en: 'online' },
+  'chat.searchuser':{ id: 'Cari nama atau username...', en: 'Search name or username...' },
+
+  // Chat — thread + bubble
+  'chat.back':      { id: 'Kembali', en: 'Back' },
+  'chat.options':   { id: 'Opsi', en: 'Options' },
+  'chat.nomsg':     { id: 'Belum ada pesan', en: 'No messages yet' },
+  'chat.tolatest':  { id: 'Ke pesan terbaru', en: 'To latest message' },
+  'chat.nostarred': { id: 'Belum ada pesan berbintang di percakapan ini.', en: 'No starred messages in this conversation.' },
+  'chat.reply':     { id: 'Balas', en: 'Reply' },
+  'chat.forward':   { id: 'Teruskan', en: 'Forward' },
+  'chat.editmsg':   { id: 'Edit pesan', en: 'Edit message' },
+  'chat.delmsg':    { id: 'Hapus pesan', en: 'Delete message' },
+  'chat.edited':    { id: 'diedit', en: 'edited' },
+  'chat.sent':      { id: 'Terkirim', en: 'Sent' },
+  'chat.delivered': { id: 'Diterima', en: 'Delivered' },
+  'chat.read':      { id: 'Dibaca', en: 'Read' },
+  'chat.react':     { id: 'Beri reaksi', en: 'React' },
+
+  // Chat — forward
+  'chat.forwardto': { id: 'Teruskan ke…', en: 'Forward to…' },
+  'chat.noconv':    { id: 'Belum ada percakapan.', en: 'No conversations yet.' },
+  'chat.forwarded': { id: 'Terkirim ✓', en: 'Sent ✓' },
 }
 
 interface I18nState { lang: Lang; setLang: (l: Lang) => void }

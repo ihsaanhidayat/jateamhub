@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useChatStore } from '../../store/chatStore'
 import { messagePreview } from '../../utils/chatText'
+import { useT } from '../../utils/i18n'
 import type { ChatConversation } from '../../utils/supabaseClient'
 
 interface Props { currentUserId: string }
 
 export default function ForwardModal({ currentUserId }: Props) {
+  const t = useT()
   const forwarding    = useChatStore(s => s.forwarding)
   const setForwarding = useChatStore(s => s.setForwarding)
   const conversations = useChatStore(s => s.conversations)
@@ -41,7 +43,7 @@ export default function ForwardModal({ currentUserId }: Props) {
         display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)', animation: 'fadeUp 180ms ease',
       }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)' }}>Teruskan ke…</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--silver)' }}>{t('chat.forwardto')}</span>
           <button onClick={() => setForwarding(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--silver3)', fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
 
@@ -52,7 +54,7 @@ export default function ForwardModal({ currentUserId }: Props) {
 
         <div className="chat-msglist" style={{ flex: 1, overflowY: 'auto', padding: '6px 8px 12px' }}>
           {conversations.length === 0 && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--silver4)', fontSize: 13 }}>Belum ada percakapan.</div>
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--silver4)', fontSize: 13 }}>{t('chat.noconv')}</div>
           )}
           {conversations.map(conv => {
             const o = other(conv)
@@ -83,10 +85,10 @@ export default function ForwardModal({ currentUserId }: Props) {
                   {o?.full_name ?? o?.username ?? 'Unknown'}
                 </span>
                 {done
-                  ? <span style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>Terkirim ✓</span>
+                  ? <span style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>{t('chat.forwarded')}</span>
                   : busyId === conv.id
                   ? <span style={{ width: 14, height: 14, border: '2px solid var(--border2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
-                  : <span style={{ color: 'var(--silver4)', fontSize: 12 }}>Teruskan</span>}
+                  : <span style={{ color: 'var(--silver4)', fontSize: 12 }}>{t('chat.forward')}</span>}
               </button>
             )
           })}
